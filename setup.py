@@ -25,5 +25,7 @@ setup(
     entry_points="""\
     [paste.app_factory]
     main = cnxpublishing.main:main
+    [console_scripts]
+    cnx-publishing-initdb = cnxpublishing.scripts.initdb:main
     """,
     )
