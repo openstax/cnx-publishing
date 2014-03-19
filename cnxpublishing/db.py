@@ -6,11 +6,23 @@
 # See LICENCE.txt for details.
 # ###
 import os
+import json
+import uuid
 
 import psycopg2
+from cnxarchive.utils import join_ident_hash, split_ident_hash
+from pyramid.threadlocal import (
+    get_current_request, get_current_registry,
+    )
+
+from .utils import parse_archive_uri, parse_user_uri
 
 
-__all__ = ('initdb',)
+__all__ = (
+    'initdb',
+    'add_publication', 'poke_publication_state',
+    'add_pending_document',
+    )
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -32,6 +44,108 @@ def initdb(connection_string):
                 with open(schema_filepath, 'r') as fb:
                     schema = fb.read()
                     cursor.execute(schema)
+
+
+def upsert_pending_acceptors(cursor, document_id):
+    """Update or insert records for pending license acceptors."""
+    cursor.execute("""\
+SELECT "uuid", "metadata"
+FROM pending_documents
+WHERE id = %s""", (document_id,))
+    uuid, metadata = cursor.fetchone()
+    if metadata is None:
+        # Metadata wasn't set yet. Bailout early.
+        return
+
+    acceptors = set([])
+    for user in metadata['authors']:
+        if user['type'] != 'cnx-id':
+            raise ValueError("Archive only accepts Connexions users.")
+        id = parse_user_uri(user['id'])
+        acceptors.add(id)
+
+    # Acquire a list of existing acceptors.
+    cursor.execute("""\
+SELECT "user_id", "acceptance"
+FROM publications_license_acceptance
+WHERE uuid = %s""", (uuid,))
+    existing_acceptors_mapping = dict(cursor.fetchall())
+
+    # Who's not in the existing list?
+    existing_acceptors = set(existing_acceptors_mapping.keys())
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new licensor acceptors.
+    for acceptor in new_acceptors:
+        cursor.execute("""\
+INSERT INTO publications_license_acceptance
+  ("uuid", "user_id", "acceptance")
+VALUES (%s, %s, NULL)""", (uuid, acceptor,))
+
+    # Has everyone already accepted?
+    cursor.execute("""\
+SELECT user_id
+FROM publications_license_acceptance
+WHERE
+  uuid = %s
+  AND
+  (acceptance is NULL OR acceptance = FALSE)""", (uuid,))
+    defectors = set(cursor.fetchall())
+
+    if not defectors:
+        # Update the pending document license acceptance state.
+        cursor.execute("""\
+update pending_documents set license_accepted = 't'
+where id = %s""", (document_id,))
+
+
+def add_pending_document(cursor, publication_id, document):
+    """Adds a document that is awaiting publication to the database."""
+    uri = document.get_uri('cnx-archive')
+    if uri is None:
+        id = uuid.uuid4()
+        version = (1, None,)
+    else:
+        ident_hash = parse_archive_uri(uri)
+        id, version = split_ident_hash(ident_hash, split_version=True)
+
+    args = [publication_id, id, version[0], version[1], 'Document',
+            False, False,]
+    cursor.execute("""\
+INSERT INTO "pending_documents"
+  ("publication_id", "uuid", "major_version", "minor_version", "type",
+   "license_accepted", "roles_accepted")
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
+""", args)
+    pending_id, id, version = cursor.fetchone()
+    pending_ident_hash = join_ident_hash(id, version)
+
+    # FIXME This can't be here, because content reference resolution will need
+    # to write updates to the document after all document metadata
+    # has been added. This is because not all documents will have system
+    # identifiers until after metadata persistence.
+    # We will need to move this operation up a layer.
+    args = (json.dumps(document.metadata),
+            psycopg2.Binary(document.content.read()),
+            pending_id,)
+    cursor.execute("""\
+UPDATE "pending_documents"
+SET ("metadata", "content") = (%s, %s)
+WHERE "id" = %s
+""", args)
+
+    for resource in document.resources:
+        add_pending_resource(cursor, resource)
+
+    upsert_pending_acceptors(cursor, pending_id)
+
+    # Assign the new ident_hash to the document for later use.
+    request = get_current_request()
+    path = request.route_path('get-content', ident_hash=pending_ident_hash)
+    document.set_uri('cnx-archive', path)
+
+    return pending_ident_hash
 
 
 def add_publication(cursor, epub, epub_filepath):
