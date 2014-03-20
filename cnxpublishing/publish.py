@@ -203,8 +203,8 @@ def publish_model(cursor, model, publisher, message):
     ident_hash = _insert_metadata(cursor, model, publisher, message)
     if isinstance(model, Document):
         files = []  # TODO
-        file_hashes = _insert_files(cursor, ident_hash, files)
+        # file_hashes = _insert_files(cursor, ident_hash, files)
     elif isinstance(model, Binder):
         tree = {}  # TODO
-        tree = _insert_tree(cursor, tree)
+        # tree = _insert_tree(cursor, tree)
     return ident_hash
