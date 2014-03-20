@@ -20,24 +20,14 @@ import psycopg2
 from cnxarchive.utils import join_ident_hash
 from webob import Request
 from pyramid import testing
-from pyramid.paster import get_appsettings
 
-from .test_db import integration_test_settings
+from .testing import (
+    integration_test_settings,
+    db_connection_factory,
+    )
 
 
 here = os.path.abspath(os.path.dirname(__file__))
-
-
-def _db_connection_factory(connection_string=None):
-    if connection_string is None:
-        settings = integration_test_settings()
-        from ..config import CONNECTION_STRING
-        connection_string = settings[CONNECTION_STRING]
-
-    def db_connect():
-        return psycopg2.connect(connection_string)
-
-    return db_connect
 
 
 class PublishUtilityTestCase(unittest.TestCase):
@@ -67,7 +57,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
         cls.settings = integration_test_settings()
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
-        cls.db_connect = staticmethod(_db_connection_factory())
+        cls.db_connect = staticmethod(db_connection_factory())
         # FIXME psycopg2 UUID adaptation doesn't seem to be registering
         # itself. Temporarily call it directly.
         from psycopg2.extras import register_uuid

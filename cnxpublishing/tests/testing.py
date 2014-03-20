@@ -7,10 +7,11 @@
 # ###
 import os
 
+import psycopg2
 from pyramid.paster import get_appsettings
 
 
-__all__ = ('integration_test_settings',)
+__all__ = ('integration_test_settings', 'db_connection_factory',)
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -24,3 +25,15 @@ def integration_test_settings():
         config_uri = os.path.join(project_root, 'testing.ini')
     settings = get_appsettings(config_uri)
     return settings
+
+
+def db_connection_factory(connection_string=None):
+    if connection_string is None:
+        settings = integration_test_settings()
+        from ..config import CONNECTION_STRING
+        connection_string = settings[CONNECTION_STRING]
+
+    def db_connect():
+        return psycopg2.connect(connection_string)
+
+    return db_connect
