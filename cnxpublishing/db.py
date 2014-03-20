@@ -6,16 +6,20 @@
 # See LICENCE.txt for details.
 # ###
 import os
+import io
 import json
 import uuid
 
+import cnxepub
 import psycopg2
 from cnxarchive.utils import join_ident_hash, split_ident_hash
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
 
+from .config import CONNECTION_STRING
 from .utils import parse_archive_uri, parse_user_uri
+from .publish import publish_model
 
 
 __all__ = (
@@ -148,15 +152,115 @@ WHERE "id" = %s
     return pending_ident_hash
 
 
-def add_publication(cursor, epub, epub_filepath):
+def add_publication(cursor, epub, epub_file):
     """Adds a publication entry and makes each item
     a pending document.
     """
-    raise NotImplementedError()
+    publisher = epub[0].metadata['publisher']
+    publish_message = epub[0].metadata['publication_message']
+    epub_binary = psycopg2.Binary(epub_file.read())
+    args = (publisher, publish_message, epub_binary,)
+    cursor.execute("""\
+INSERT INTO publications ("publisher", "publication_message", "epub")
+VALUES (%s, %s, %s)
+RETURNING id
+""", args)
+    publication_id = cursor.fetchone()[0]
+    state_urls = []
+
+    for package in epub:
+        binder = cnxepub.adapt_package(package)
+        # The binding object could be translucent/see-through,
+        # (case for a binder that only contains loose-documents).
+        # Otherwise we should also publish the the binder.
+        if not binder.is_translucent:
+            raise NotImplementedError()
+        for document in cnxepub.flatten_to_documents(binder):
+            ident_hash = add_pending_document(cursor, publication_id, document)
+            request = get_current_request()
+            url = request.route_url('get-content', ident_hash=ident_hash)
+            state_urls.append(url)
+    return publication_id, state_urls
 
 
 def poke_publication_state(publication_id):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
     """
-    raise NotImplementedError()
+    registry = get_current_registry()
+    conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT
+  pd.uuid || '@' || concat_ws('.', pd.major_version, pd.minor_version),
+  license_accepted, roles_accepted
+FROM publications AS p NATURAL JOIN pending_documents AS pd
+WHERE p.id = %s""", (publication_id,))
+            pending_document_states = cursor.fetchall()
+    publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
+
+    # Are all the documents ready for publication?
+    state_lump = set([l and r for l, r in publication_state_mapping.values()])
+    is_publish_ready = not (False in state_lump)
+
+    # Publish the pending documents.
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            if is_publish_ready:
+                publication_state = publish_pending(cursor, publication_id)
+            else:
+                cursor.execute("""\
+SELECT "state"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                publication_state = cursor.fetchone()[0]
+    return publication_state
+
+
+def publish_pending(cursor, publication_id):
+    """Given a publication id as ``publication_id``,
+    write the documents to the *Connexions Archive*.
+    """
+    cursor.execute("""\
+SELECT publisher, publication_message
+FROM publications
+WHERE id = %s""", (publication_id,))
+    publisher, message = cursor.fetchone()
+
+    # Commit documents one at a time...
+    cursor.execute("""\
+SELECT id, uuid, major_version, minor_version, metadata, content
+FROM pending_documents
+WHERE type = 'Document' AND publication_id = %s""", (publication_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        # FIXME Oof, this is hideous!
+        id, major_version, minor_version = row[1:4]
+        id = str(id)
+        version = '.'.join([str(x)
+                            for x in (major_version, minor_version,)
+                            if x is not None])
+        metadata, content = row[-2:]
+        content = io.BytesIO(content[:])
+        metadata['version'] = version
+        document = cnxepub.Document(id, content, metadata)
+        ident_hash = publish_model(cursor, document, publisher, message)
+
+    # And now the binders, one at a time...
+    cursor.execute("""\
+SELECT id, uuid, major_version, minor_version, metadata, content
+FROM pending_documents
+WHERE type = 'Binder' AND publication_id = %s""", (publication_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        ident_hash = publish_model(cursor, binder, publisher, message)
+
+    # Lastly, update the publication status.
+    cursor.execute("""\
+UPDATE publications
+SET state = 'Done/Success'
+WHERE id = %s
+RETURNING state""", (publication_id,))
+    state = cursor.fetchone()[0]
+    return state

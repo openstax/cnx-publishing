@@ -21,7 +21,7 @@ CREATE TABLE publications_license_acceptance (
 CREATE TABLE publications (
   "id" SERIAL PRIMARY KEY,
   "publisher" TEXT NOT NULL,
-  "publish_message" TEXT NOT NULL,
+  "publication_message" TEXT NOT NULL,
   "epub" BYTEA NOT NULL,
   -- State information, included an optional message.
   "state" publication_states DEFAULT 'Processing'

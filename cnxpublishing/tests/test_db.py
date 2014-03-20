@@ -53,7 +53,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         testing.tearDown()
 
     def make_publication(self, publisher='nobody', message="no msg",
-                          epub=None):
+                         epub=None):
         """Make a publication entry in the database."""
         if epub is None:
             epub = b'abc123'
@@ -62,7 +62,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO publications ("publisher", "publish_message", "epub")
+INSERT INTO publications ("publisher", "publication_message", "epub")
 VALUES (%s, %s, %s) RETURNING "id";""", args)
                 publication_id = cursor.fetchone()[0]
         return publication_id
