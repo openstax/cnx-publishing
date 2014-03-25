@@ -20,7 +20,7 @@ extras_require = {
 description = """\
 Application for accepting publication requests to the Connexions Archive."""
 
-if IS_PY3:
+if not IS_PY3:
     tests_require.append('mock')
 
 setup(
@@ -34,6 +34,7 @@ setup(
     install_requires=install_requires,
     tests_require=tests_require,
     extras_require=extras_require,
+    test_suite='cnxpublishing.tests',
     packages=find_packages(),
     include_package_data=True,
     entry_points="""\
