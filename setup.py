@@ -1,15 +1,27 @@
 # -*- coding: utf-8 -*-
+import sys
 from setuptools import setup, find_packages
 
 
+IS_PY3 = sys.version_info > (3,)
+
 install_requires = (
+    'cnx-archive',
     'cnx-epub',
     'psycopg2',
     'pyramid',
     )
+tests_require = [
+    'webtest',
+    ]
+extras_require = {
+    'test': tests_require,
+    }
 description = """\
 Application for accepting publication requests to the Connexions Archive."""
 
+if IS_PY3:
+    tests_require.append('mock')
 
 setup(
     name='cnx-publishing',
@@ -20,6 +32,8 @@ setup(
     license='LGPL, See also LICENSE.txt',
     description=description,
     install_requires=install_requires,
+    tests_require=tests_require,
+    extras_require=extras_require,
     packages=find_packages(),
     include_package_data=True,
     entry_points="""\
