@@ -152,6 +152,20 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
 
+        # 2. (manual) Accept license and roles for Figgy Pudd'n
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                UPDATE pending_documents
+                SET ("license_accepted", "roles_accepted") = ('t', 't')
+                WHERE metadata->>'title' LIKE '%Figgy%'
+                """)
+
+        # 3. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path)
+        self.assertEqual(resp.json['state'], 'Processing')
+
         # 2. (manual)
         self._accept_all_pending()
 

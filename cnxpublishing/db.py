@@ -225,7 +225,7 @@ def poke_publication_state(publication_id):
 SELECT
   pd.uuid || '@' || concat_ws('.', pd.major_version, pd.minor_version),
   license_accepted, roles_accepted
-FROM publications AS p NATURAL JOIN pending_documents AS pd
+FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
 WHERE p.id = %s""", (publication_id,))
             pending_document_states = cursor.fetchall()
     publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
