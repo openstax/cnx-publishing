@@ -131,7 +131,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     # identifiers until after metadata persistence.
     # We will need to move this operation up a layer.
     args = (json.dumps(document.metadata),
-            psycopg2.Binary(document.content.read()),
+            psycopg2.Binary(document.content),
             pending_id,)
     cursor.execute("""\
 UPDATE "pending_documents"
