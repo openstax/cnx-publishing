@@ -28,5 +28,5 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
     declare_routes(config)
 
-    config.scan()
+    config.scan(ignore='cnxpublishing.tests')
     return config.make_wsgi_app()

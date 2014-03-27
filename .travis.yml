@@ -7,6 +7,9 @@ addons:
   postgresql: "9.3"
 before_install:
   - sudo apt-get update
+  # remove zope.interface installed from aptitude
+  - sudo apt-get purge python-zope.interface
+  # Install the 'plpython' extension language
 
   # Installation for cnx-archive:
   # * Install the 'plpython' extension language
@@ -35,8 +38,6 @@ before_install:
 
   # Install the coverage utility and coveralls reporting utility
   - sudo apt-get install python-pip
-  # Install test requirements
-  - sudo /usr/bin/pip install mock webtest
   # Scripts get installed to /usr/local/bin
   - sudo /usr/bin/pip install coverage
   - sudo /usr/bin/pip install coveralls
@@ -50,8 +51,8 @@ before_script:
 env:
   - TESTING_CONFIG="testing.ini"
 script:
-  # This is the same as `python -m unittest discover` with a coverage wrapper.
-  - /usr/local/bin/coverage run --source=cnxpublishing -m unittest discover
+  # This is the same as `python setup.py test` with a coverage wrapper.
+  - sudo /usr/local/bin/coverage run --source=cnxpublishing setup.py test
 after_success:
   # Report test coverage to coveralls.io
   - /usr/local/bin/coveralls
