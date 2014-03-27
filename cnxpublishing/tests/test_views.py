@@ -97,10 +97,6 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
         cls.db_connect = staticmethod(db_connection_factory())
         cls._app = cls.make_app(cls.settings)
-        # FIXME psycopg2 UUID adaptation doesn't seem to be registering
-        # itself. Temporarily call it directly.
-        from psycopg2.extras import register_uuid
-        register_uuid()
 
     @staticmethod
     def make_app(settings):
