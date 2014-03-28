@@ -103,17 +103,35 @@ update pending_documents set license_accepted = 't'
 where id = %s""", (document_id,))
 
 
-def add_pending_document(cursor, publication_id, document):
-    """Adds a document that is awaiting publication to the database."""
-    uri = document.get_uri('cnx-archive')
-    if uri is None:
-        id = uuid.uuid4()
-        version = (1, None,)
+def _get_type_name(model):
+    """Returns a type name of 'Document' or 'Binder' based model's type."""
+    # XXX Shouldn't need to complicate this...
+    #     ... IDocument.providedBy(model)
+    if isinstance(model, cnxepub.Binder):
+        return 'Binder'
     else:
+        return 'Document'
+
+
+def add_pending_model(cursor, publication_id, model):
+    """Adds a model (binder or document) that is awaiting publication
+    to the database.
+    """
+    # FIXME Too much happening here...
+    assert isinstance(model, (cnxepub.Document, cnxepub.Binder,))
+    uri = model.get_uri('cnx-archive')
+    if uri is not None:
         ident_hash = parse_archive_uri(uri)
         id, version = split_ident_hash(ident_hash, split_version=True)
+    else:
+        id = uuid.uuid4()
+        if isinstance(model, cnxepub.Document):
+            version = (1, None,)
+        else:  # ...assume it's a binder.
+            version = (1, 1,)
 
-    args = [publication_id, id, version[0], version[1], 'Document',
+    type_ = _get_type_name(model)
+    args = [publication_id, id, version[0], version[1], type_,
             False, False,]
     cursor.execute("""\
 INSERT INTO "pending_documents"
@@ -123,32 +141,45 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)
 RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
 """, args)
     pending_id, id, version = cursor.fetchone()
+    # FIXME Reassigning the ID and version here is probably not the
+    #       greatest approach to this.
+    model.metadata['version'] = version
+    model.id = str(id)
+
     pending_ident_hash = join_ident_hash(id, version)
+
+    # Assign the new ident-hash to the document for later use.
+    request = get_current_request()
+    path = request.route_path('get-content', ident_hash=pending_ident_hash)
+    model.set_uri('cnx-archive', path)
 
     # FIXME This can't be here, because content reference resolution will need
     # to write updates to the document after all document metadata
     # has been added. This is because not all documents will have system
     # identifiers until after metadata persistence.
     # We will need to move this operation up a layer.
-    args = (json.dumps(document.metadata),
-            psycopg2.Binary(document.content),
-            pending_id,)
-    cursor.execute("""\
-UPDATE "pending_documents"
-SET ("metadata", "content") = (%s, %s)
-WHERE "id" = %s
-""", args)
+    if isinstance(model, cnxepub.Document):
+        args = (json.dumps(model.metadata),
+                psycopg2.Binary(model.content),
+                pending_id,)
+        stmt = """\
+            UPDATE "pending_documents"
+            SET ("metadata", "content") = (%s, %s)
+            WHERE "id" = %s"""
+        for resource in model.resources:
+            add_pending_resource(cursor, resource)
+    else:
+        metadata = model.metadata.copy()
+        # Insert the tree into the metadata.
+        metadata['_tree'] = cnxepub.model_to_tree(model)
+        args = (json.dumps(metadata), pending_id,)
+        stmt = """\
+            UPDATE "pending_documents"
+            SET metadata = %s
+            WHERE "id" = %s"""
 
-    for resource in document.resources:
-        add_pending_resource(cursor, resource)
-
+    cursor.execute(stmt, args)
     upsert_pending_acceptors(cursor, pending_id)
-
-    # Assign the new ident_hash to the document for later use.
-    request = get_current_request()
-    path = request.route_path('get-content', ident_hash=pending_ident_hash)
-    document.set_uri('cnx-archive', path)
-
     return pending_ident_hash
 
 
@@ -166,21 +197,20 @@ VALUES (%s, %s, %s)
 RETURNING id
 """, args)
     publication_id = cursor.fetchone()[0]
-    state_urls = []
+    insert_mapping = {}
 
     for package in epub:
         binder = cnxepub.adapt_package(package)
+        for document in cnxepub.flatten_to_documents(binder):
+            ident_hash = add_pending_model(cursor, publication_id, document)
+            insert_mapping[document.id] = ident_hash
         # The binding object could be translucent/see-through,
         # (case for a binder that only contains loose-documents).
         # Otherwise we should also publish the the binder.
         if not binder.is_translucent:
-            raise NotImplementedError()
-        for document in cnxepub.flatten_to_documents(binder):
-            ident_hash = add_pending_document(cursor, publication_id, document)
-            request = get_current_request()
-            url = request.route_url('get-content', ident_hash=ident_hash)
-            state_urls.append(url)
-    return publication_id, state_urls
+            ident_hash = add_pending_model(cursor, publication_id, binder)
+            insert_mapping[binder.id] = ident_hash
+    return publication_id, insert_mapping
 
 
 def poke_publication_state(publication_id):
@@ -218,6 +248,38 @@ WHERE id = %s""", (publication_id,))
     return publication_state
 
 
+def _node_to_model(tree_or_item, metadata=None, parent=None,
+                   lucent_id=cnxepub.TRANSLUCENT_BINDER_ID):
+    """Given a tree, parse to a set of models"""
+    if 'contents' in tree_or_item:
+        # It is a binder.
+        tree = tree_or_item
+        binder = cnxepub.TranslucentBinder(metadata=tree)
+        for item in tree['contents']:
+            node = _node_to_model(item, parent=binder,
+                                  lucent_id=lucent_id)
+            if node.metadata['title'] != item['title']:
+                binder.set_title_for_node(node, item['title'])
+        result = binder
+    else:
+        # It is an item pointing at a document.
+        item = tree_or_item
+        result = cnxepub.DocumentPointer(item['id'], metadata=item)
+    if parent is not None:
+        parent.append(result)
+    return result
+
+
+def _reassemble_binder(id, tree, metadata):
+    """Reassemble a Binder object coming out of the database."""
+    binder = cnxepub.Binder(id, metadata=metadata)
+    for item in tree['contents']:
+        node = _node_to_model(item, parent=binder)
+        if node.metadata['title'] != item['title']:
+            binder.set_title_for_node(node, item['title'])
+    return binder
+
+
 def publish_pending(cursor, publication_id):
     """Given a publication id as ``publication_id``,
     write the documents to the *Connexions Archive*.
@@ -229,12 +291,12 @@ WHERE id = %s""", (publication_id,))
     publisher, message = cursor.fetchone()
 
     # Commit documents one at a time...
+    type_ = cnxepub.Document.__name__
     cursor.execute("""\
 SELECT id, uuid, major_version, minor_version, metadata, content
 FROM pending_documents
-WHERE type = 'Document' AND publication_id = %s""", (publication_id,))
-    rows = cursor.fetchall()
-    for row in rows:
+WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
+    for row in cursor.fetchall():
         # FIXME Oof, this is hideous!
         id, major_version, minor_version = row[1:4]
         id = str(id)
@@ -242,18 +304,22 @@ WHERE type = 'Document' AND publication_id = %s""", (publication_id,))
                             for x in (major_version, minor_version,)
                             if x is not None])
         metadata, content = row[-2:]
-        content = io.BytesIO(content[:])
+        content = content[:]
         metadata['version'] = version
-        document = cnxepub.Document(id, content, metadata)
+        # FIXME Resources need attached to the model.
+        document = cnxepub.Document(str(id), content, metadata)
         ident_hash = publish_model(cursor, document, publisher, message)
 
     # And now the binders, one at a time...
+    type_ = cnxepub.Binder.__name__
     cursor.execute("""\
 SELECT id, uuid, major_version, minor_version, metadata, content
 FROM pending_documents
-WHERE type = 'Binder' AND publication_id = %s""", (publication_id,))
-    rows = cursor.fetchall()
-    for row in rows:
+WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
+    for row in cursor.fetchall():
+        id, major_version, minor_version, metadata = row[1:5]
+        tree = metadata['_tree']
+        binder = _reassemble_binder(str(id), tree, metadata)
         ident_hash = publish_model(cursor, binder, publisher, message)
 
     # Lastly, update the publication status.

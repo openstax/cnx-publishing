@@ -7,6 +7,7 @@
 # ###
 import os
 import tempfile
+import json
 import shutil
 import unittest
 import zipfile
@@ -125,6 +126,15 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
+    def _accept_all_pending(self):
+        """Accept all roles on all pending documents"""
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                UPDATE pending_documents
+                SET ("license_accepted", "roles_accepted") = ('t', 't')
+                """)
+
     def test_loose_document_submission_to_publication(self):
         """\
         Publish a set of loose documents (all new documents).
@@ -143,12 +153,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         publication_id = resp.json['publication']
 
         # 2. (manual)
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                UPDATE pending_documents
-                SET ("license_accepted", "roles_accepted") = ('t', 't')
-                """)
+        self._accept_all_pending()
 
         # 3. --
         path = "/publications/{}".format(publication_id)
@@ -161,3 +166,64 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("SELECT name FROM modules ORDER BY name ASC")
                 names = [row[0] for row in cursor.fetchall()]
         self.assertEqual(names, ["Boom", "Figgy Pudd'n"])
+
+    def test_binder_submission_to_publication(self):
+        """\
+        Publish a binder with complete documents (all new documents).
+
+        1. Submit an EPUB containing.
+        2. Accept license and roles. [HACKED]
+        3. Check the state of the publication.
+        4. Verify binder and documents are in the archive. [HACKED]
+        """
+        # 1. --
+        epub_directory = os.path.join(TEST_DATA_DIR, 'book')
+        epub_filepath = self.pack_epub(epub_directory)
+        upload_files = [('epub', epub_filepath,)]
+        resp = self.app.post('/publications', upload_files=upload_files)
+        self.assertEqual(resp.json['state'], 'Processing')
+        publication_id = resp.json['publication']
+
+        # 2. (manual)
+        self._accept_all_pending()
+
+        # 3. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path)
+        self.assertEqual(resp.json['state'], 'Done/Success')
+
+        # 4. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+                names = [row[0] for row in cursor.fetchall()]
+                self.assertEqual(
+                    ['Book of Infinity', 'Document One of Infinity'],
+                    names)
+
+                cursor.execute("""\
+SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
+FROM modules""")
+                items = dict(cursor.fetchall())
+                document_ident_hash = items['Module']
+                binder_ident_hash = items['Collection']
+
+                expected_tree = {
+                    "id": binder_ident_hash,
+                    "title": "Book of Infinity",
+                    "contents": [
+                        {"id":"subcol",
+                         "title":"Part One",
+                         "contents":[
+                             {"id":"subcol",
+                              "title":"Chapter One",
+                              "contents":[
+                                  {"id": document_ident_hash,
+                                   "title":"Document One"}]}]}]}
+                cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+                tree = json.loads(cursor.fetchone()[0])
+
+                self.assertEqual(expected_tree, tree)
