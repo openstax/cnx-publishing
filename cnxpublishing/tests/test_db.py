@@ -91,10 +91,10 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
         document = self.make_document(metadata=metadata)
 
         # Here we are testing the function of add_pending_document.
-        from ..db import add_pending_document
+        from ..db import add_pending_model
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_document(
+                document_ident_hash = add_pending_model(
                     cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
@@ -143,10 +143,10 @@ VALUES (%s, %s, 't')""", (document_uuid, user_id,))
 
         # Create and add a document for the publication.
         document = self.make_document(metadata=document_metadata)
-        from ..db import add_pending_document
+        from ..db import add_pending_model
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_document(
+                document_ident_hash = add_pending_model(
                     cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry

@@ -8,6 +8,7 @@
 """\
 Functions used to commit publication works to the archive.
 """
+import cnxepub
 from cnxepub import Document, Binder
 from cnxarchive.utils import split_ident_hash
 
@@ -190,7 +191,39 @@ def _insert_files(cursor, ident_hash, files):
 
 def _insert_tree(cursor, tree, parent_id=None, index=0):
     """Inserts a binder tree into the archive."""
-    raise NotImplementedError()
+    if isinstance(tree, dict):
+        if tree['id'] == 'subcol':
+            document_id = None
+            title = tree['title']
+        else:
+            cursor.execute("""\
+            SELECT module_ident, name
+            FROM modules
+            WHERE uuid||'@'||concat_ws('.',major_version,minor_version) = %s
+            """, (tree['id'],))
+            try:
+                document_id, document_title = cursor.fetchone()
+            except TypeError as exc:  # NoneType
+                raise ValueError("Missing published document for '{}'."\
+                                 .format(tree['id']))
+            if tree.get('title', None):
+                title = tree['title']
+            else:
+                title = document_title
+        # TODO We haven't settled on a flag (name or value)
+        #      to pin the node to a specific version.
+        is_latest = True
+        cursor.execute(TREE_NODE_INSERT,
+                       dict(document_id=document_id, parent_id=parent_id,
+                            title=title, child_order=index,
+                            is_latest=is_latest))
+        node_id = cursor.fetchone()[0]
+        if 'contents' in tree:
+            _insert_tree(cursor, tree['contents'], parent_id=node_id)
+    elif isinstance(tree, list):
+        for tree_node in tree:
+            _insert_tree(cursor, tree_node, parent_id=parent_id,
+                         index=tree.index(tree_node))
 
 
 def publish_model(cursor, model, publisher, message):
@@ -205,6 +238,6 @@ def publish_model(cursor, model, publisher, message):
         files = []  # TODO
         # file_hashes = _insert_files(cursor, ident_hash, files)
     elif isinstance(model, Binder):
-        tree = {}  # TODO
-        # tree = _insert_tree(cursor, tree)
+        tree = cnxepub.model_to_tree(model)
+        tree = _insert_tree(cursor, tree)
     return ident_hash
