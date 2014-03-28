@@ -160,7 +160,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     # We will need to move this operation up a layer.
     if isinstance(model, cnxepub.Document):
         args = (json.dumps(model.metadata),
-                psycopg2.Binary(model.content),
+                psycopg2.Binary(model.content.encode('utf-8')),
                 pending_id,)
         stmt = """\
             UPDATE "pending_documents"
