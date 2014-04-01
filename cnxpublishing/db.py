@@ -117,6 +117,20 @@ def _get_type_name(model):
         return 'Document'
 
 
+def add_pending_resource(cursor, resource):
+    args = {
+            'data': psycopg2.Binary(resource.data.read()),
+            'media_type': resource.media_type,
+            }
+    cursor.execute("""\
+INSERT INTO pending_resources
+  (data, media_type)
+VALUES (%(data)s, %(media_type)s);
+SELECT md5(%(data)s);
+""", args)
+    resource.id = cursor.fetchone()[0]
+
+
 def add_pending_model(cursor, publication_id, model):
     """Adds a model (binder or document) that is awaiting publication
     to the database.
@@ -163,6 +177,13 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     # identifiers until after metadata persistence.
     # We will need to move this operation up a layer.
     if isinstance(model, cnxepub.Document):
+        for resource in model.resources:
+            add_pending_resource(cursor, resource)
+
+        for reference in model.references:
+            if reference._bound_model:
+                reference.bind(reference._bound_model, '/resources/{}')
+
         args = (json.dumps(model.metadata),
                 psycopg2.Binary(model.content.encode('utf-8')),
                 pending_id,)
@@ -310,8 +331,19 @@ WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
         metadata, content = row[-2:]
         content = content[:]
         metadata['version'] = version
-        # FIXME Resources need attached to the model.
-        document = cnxepub.Document(str(id), content, metadata)
+
+        document = cnxepub.Document(id, content, metadata)
+        for ref in document.references:
+            if ref.uri.startswith('/resources/'):
+                hash = ref.uri[len('/resources/'):]
+                cursor.execute("""\
+SELECT data, media_type
+FROM pending_resources
+WHERE hash = %s""", (hash,))
+                data, media_type = cursor.fetchone()
+                document.resources.append(cnxepub.Resource(
+                    hash, io.BytesIO(data), media_type))
+
         ident_hash = publish_model(cursor, document, publisher, message)
 
     # And now the binders, one at a time...

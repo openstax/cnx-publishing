@@ -11,7 +11,11 @@ RETURNS "trigger"
 AS $$
 BEGIN
   NEW.hash = md5(NEW.data);
-  RETURN NEW;
+  IF EXISTS (SELECT hash FROM pending_resources WHERE hash = NEW.hash) THEN
+    RETURN NULL;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
 $$
 LANGUAGE plpgsql;

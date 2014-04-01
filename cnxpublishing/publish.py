@@ -71,7 +71,7 @@ editor_roles AS (
     (module_ident, roleid, personids)
   VALUES
     ((SELECT module_ident FROM module_insertion), 5, %(editors)s))
-SELECT ident_hash FROM module_insertion
+SELECT module_ident, ident_hash FROM module_insertion
 """
 
 # Constructs a table for mapping file data, filename
@@ -94,12 +94,7 @@ SELECT ident_hash FROM module_insertion
 # So in the end we'll have a table with all fields:
 # fileid, md5, row_number, filename and mimetype
 MODULE_FILES_INSERTION_TEMPLATE = """\
-WITH module AS (
-  SELECT module_ident
-  FROM modules
-  WHERE uuid||'@'||concat_ws('.',major_version,minor_version) = %(ident_hash)s
-  ),
-file_insertion1 AS (
+WITH file_insertion1 AS (
   -- Note, the md5 hash is generated on insertion through a trigger.
   INSERT INTO files (file)
   VALUES {file_values}
@@ -111,9 +106,8 @@ file_insertion AS (
 module_file_values AS ({module_file_values_sql}),
 module_file_insertion AS (
   INSERT INTO module_files (module_ident, fileid, filename, mimetype)
-  SELECT module_ident, fileid, filename, mimetype
+  SELECT %(module_ident)s, fileid, filename, mimetype
   FROM
-    module,
     file_insertion NATURAL JOIN module_file_values
   RETURNING fileid, filename
   )
@@ -172,11 +166,10 @@ def _insert_metadata(cursor, model, publisher, message):
             })
 
     cursor.execute(stmt, params)
-    ident_hash = cursor.fetchone()[0]
-    return ident_hash
+    return cursor.fetchone()
 
 
-def _insert_files(cursor, ident_hash, files):
+def _insert_files(cursor, module_ident, files):
     """Insert files and relates them to a document.
     ``files`` should be a list of dicts::
 
@@ -186,7 +179,39 @@ def _insert_files(cursor, ident_hash, files):
 
     This returns a list of filenames and hashes.
     """
-    raise NotImplementedError()
+    module_file_values = []
+    file_values = []
+    hashes = {}
+    params = {'module_ident': module_ident}
+    for i, file_ in enumerate(files):
+        names = {
+                'row': i + 1,
+                'document': 'document{}'.format(i + 1),
+                'filename': 'filename{}'.format(i + 1),
+                'mimetype': 'mimetype{}'.format(i + 1),
+                }
+        params.update({
+            names['document']: memoryview(file_['data']),
+            names['filename']: file_['filename'],
+            names['mimetype']: file_['mimetype'],
+            })
+
+        file_values.append('(%({document})s)'.format(**names))
+        module_file_values.append("""\
+                SELECT {row} AS row_number,
+                       %({filename})s AS filename,
+                       %({mimetype})s AS mimetype"""
+                .format(**names))
+
+    if file_values:
+        stmt = MODULE_FILES_INSERTION_TEMPLATE.format(**{
+            'file_values': ','.join(file_values),
+            'module_file_values_sql': ' UNION ALL '.join(module_file_values),
+            })
+        cursor.execute(stmt, params)
+        hashes = dict(list(cursor.fetchall()))
+
+    return hashes
 
 
 def _insert_tree(cursor, tree, parent_id=None, index=0):
@@ -233,10 +258,22 @@ def publish_model(cursor, model, publisher, message):
         raise ValueError("Only one publisher is allowed. '{}' "
                          "were given: {}" \
                          .format(len(publishers), publishers))
-    ident_hash = _insert_metadata(cursor, model, publisher, message)
+    module_ident, ident_hash = _insert_metadata(cursor, model, publisher, message)
     if isinstance(model, Document):
-        files = []  # TODO
-        # file_hashes = _insert_files(cursor, ident_hash, files)
+        files = [
+                {
+                    'filename': 'index.cnxml.html',
+                    'mimetype': 'text/html',
+                    'data': model.html.encode('utf-8'),
+                    },
+                ]
+        for resource in model.resources:
+            files.append({
+                'filename': resource.filename,
+                'mimetype': resource.media_type,
+                'data': resource.data.read(),
+                })
+        file_hashes = _insert_files(cursor, module_ident, files)
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
         tree = _insert_tree(cursor, tree)
