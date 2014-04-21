@@ -97,10 +97,6 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
         cls.db_connect = staticmethod(db_connection_factory())
         cls._app = cls.make_app(cls.settings)
-        # FIXME psycopg2 UUID adaptation doesn't seem to be registering
-        # itself. Temporarily call it directly.
-        from psycopg2.extras import register_uuid
-        register_uuid()
 
     @staticmethod
     def make_app(settings):
@@ -151,6 +147,20 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         resp = self.app.post('/publications', upload_files=upload_files)
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
+
+        # 2. (manual) Accept license and roles for Figgy Pudd'n
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                UPDATE pending_documents
+                SET ("license_accepted", "roles_accepted") = ('t', 't')
+                WHERE metadata->>'title' LIKE '%Figgy%'
+                """)
+
+        # 3. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path)
+        self.assertEqual(resp.json['state'], 'Processing')
 
         # 2. (manual)
         self._accept_all_pending()

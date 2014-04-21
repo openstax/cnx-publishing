@@ -27,10 +27,6 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         cls.settings = integration_test_settings()
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
-        # FIXME psycopg2 UUID adaptation doesn't seem to be registering
-        # itself. Temporarily call it directly.
-        from psycopg2.extras import register_uuid
-        register_uuid()
 
     def setUp(self):
         from cnxarchive.database import initdb

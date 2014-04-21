@@ -12,6 +12,7 @@ import uuid
 
 import cnxepub
 import psycopg2
+from psycopg2.extras import register_uuid
 from cnxarchive.utils import join_ident_hash, split_ident_hash
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
@@ -37,6 +38,9 @@ SCHEMA_FILES = (
     'schema-indexes.sql',
     'schema-triggers.sql',
     )
+# FIXME psycopg2 UUID adaptation doesn't seem to be registering
+# itself. Temporarily call it directly.
+register_uuid()
 
 
 def initdb(connection_string):
@@ -225,7 +229,7 @@ def poke_publication_state(publication_id):
 SELECT
   pd.uuid || '@' || concat_ws('.', pd.major_version, pd.minor_version),
   license_accepted, roles_accepted
-FROM publications AS p NATURAL JOIN pending_documents AS pd
+FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
 WHERE p.id = %s""", (publication_id,))
             pending_document_states = cursor.fetchall()
     publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
