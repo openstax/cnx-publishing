@@ -82,13 +82,24 @@ class EPUBMixInTestCase(object):
         return dst
 
 
-
 class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     """Request/response client interaction"""
 
     settings = None
     db_conn_str = None
     db_connect = None
+
+    @property
+    def api_keys_by_uid(self):
+        """Mapping of uid to api key."""
+        attr_name = '_api_keys'
+        api_keys = getattr(self, attr_name, None)
+        if api_keys is None:
+            self.addCleanup(delattr, self, attr_name)
+            from ..main import _parse_api_key_lines
+            api_keys = _parse_api_key_lines(self.settings)
+            setattr(self, attr_name, api_keys)
+        return {x[1]:x[0] for x in api_keys}
 
     @classmethod
     def setUpClass(cls):
@@ -140,11 +151,14 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         3. Check the state of the publication.
         4. Verify documents are in the archive. [HACKED]
         """
+        api_key = self.api_keys_by_uid['no-trust']
+
         # 1. --
         epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
         epub_filepath = self.pack_epub(epub_directory)
         upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files)
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
 
@@ -159,7 +173,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
 
         # 2. (manual)
@@ -167,7 +181,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Done/Success')
 
         # 4. (manual)
@@ -186,11 +200,14 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         3. Check the state of the publication.
         4. Verify binder and documents are in the archive. [HACKED]
         """
+        api_key = self.api_keys_by_uid['no-trust']
+
         # 1. --
         epub_directory = os.path.join(TEST_DATA_DIR, 'book')
         epub_filepath = self.pack_epub(epub_directory)
         upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files)
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
 
@@ -199,7 +216,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Done/Success')
 
         # 4. (manual)

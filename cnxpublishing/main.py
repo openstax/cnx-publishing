@@ -8,6 +8,10 @@
 import tempfile
 
 from pyramid.config import Configurator
+from pyramid import security
+from pyramid.authorization import ACLAuthorizationPolicy
+
+from .authnz import APIKeyAuthenticationPolicy
 
 
 __version__ = '0.1'
@@ -23,10 +27,49 @@ def declare_routes(config):
     add_route('get-publication', '/publications/{id}')
 
 
+def _parse_api_key_lines(settings):
+    """Parse the api-key lines from the settings."""
+    api_key_entities = []
+    for line in settings['api-key-authnz'].split('\n'):
+        if not line.strip():
+            continue
+        entity = [x.strip() for x in line.split(',') if x.strip()]
+        api_key_entities.append(entity)
+    return api_key_entities
+
+
 def main(global_config, **settings):
     """Application factory"""
-    config = Configurator(settings=settings)
+    api_key_entities = _parse_api_key_lines(settings)
+    authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
+    authz_policy = ACLAuthorizationPolicy()
+
+    config = Configurator(settings=settings, root_factory=RootFactory)
     declare_routes(config)
+
+    config.set_authentication_policy(authn_policy)
+    config.set_authorization_policy(authz_policy)
 
     config.scan(ignore='cnxpublishing.tests')
     return config.make_wsgi_app()
+
+
+class RootFactory(object):
+    """Application root object factory.
+    Everything is accessed from the root, so the acls defined here
+    are applied to all requests.
+    """
+
+    __acl__ = (
+        (security.Allow, security.Everyone, 'view'),
+        (security.Allow, security.Authenticated, 'publish'),
+        (security.Allow, 'group:trusted-publishers',
+         ('publish.accept_licenses', 'publish.trusted-roles',)),
+        security.DENY_ALL,
+        )
+
+    def __init__(self, request):
+        self.request = request
+
+    def __getitem__(self, key):
+        raise KeyError(key)

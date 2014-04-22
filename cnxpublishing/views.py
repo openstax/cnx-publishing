@@ -14,7 +14,8 @@ from . import config
 from .db import add_publication, poke_publication_state
 
 
-@view_config(route_name='publications', request_method='POST', renderer='json')
+@view_config(route_name='publications', request_method='POST', renderer='json',
+             permission='publish')
 def publish(request):
     """Accept a publication request at form value 'epub'"""
     if 'epub' not in request.POST:
@@ -48,7 +49,7 @@ def publish(request):
 
 
 @view_config(route_name='get-publication', request_method=['GET', 'HEAD'],
-             renderer='json')
+             renderer='json', permission='view')
 def get_publication(request):
     """Lookup publication state"""
     publication_id = request.matchdict['id']
