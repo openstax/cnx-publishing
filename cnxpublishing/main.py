@@ -64,7 +64,8 @@ class RootFactory(object):
         (security.Allow, security.Everyone, 'view'),
         (security.Allow, security.Authenticated, 'publish'),
         (security.Allow, 'group:trusted-publishers',
-         ('publish.accept_licenses', 'publish.trusted-roles',)),
+         ('publish.trusted-license-assigner',
+          'publish.trusted-role-assigner',)),
         security.DENY_ALL,
         )
 

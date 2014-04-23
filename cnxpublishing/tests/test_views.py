@@ -254,3 +254,40 @@ WHERE portal_type = 'Collection'""")
                 tree = json.loads(cursor.fetchone()[0])
 
                 self.assertEqual(expected_tree, tree)
+
+    def test_loose_document_submission_to_publication_w_trust(self):
+        """\
+        Publish a set of loose documents (all new documents) using a trusted
+        application relationship.
+
+        Reminder: In a trusted relationship, the submitting application/user
+        is has done license and role acceptance; and so we trust the publication
+        no longer needs role and license acceptance and can be published
+        immediately too the archive.
+
+        1. Submit an EPUB containing loose documents, not bound to a binder.
+        2. Check the state of the publication.
+        3. Verify documents are in the archive. [HACKED]
+        """
+        api_key = self.api_keys_by_uid['some-trust']
+
+        # 1. --
+        epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
+        epub_filepath = self.pack_epub(epub_directory)
+        upload_files = [('epub', epub_filepath,)]
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # 2. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+
+        # 3. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+                names = [row[0] for row in cursor.fetchall()]
+        self.assertEqual(names, ["Boom", "Figgy Pudd'n"])

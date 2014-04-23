@@ -14,6 +14,7 @@ import cnxepub
 import psycopg2
 from psycopg2.extras import register_uuid
 from cnxarchive.utils import join_ident_hash, split_ident_hash
+from pyramid.security import has_permission
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
@@ -149,8 +150,18 @@ def add_pending_model(cursor, publication_id, model):
             version = (1, 1,)
 
     type_ = _get_type_name(model)
+    # Is the publishing party a trusted source?
+    request = get_current_request()
+    context = request.root
+    is_license_accepted = bool(
+        has_permission('publish.trusted-license-assigner',
+                       context, request))
+    are_roles_accepted = bool(
+        has_permission('publish.trusted-role-assigner',
+                       context, request))
+
     args = [publication_id, id, version[0], version[1], type_,
-            False, False,]
+            is_license_accepted, are_roles_accepted,]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
@@ -244,6 +255,7 @@ def poke_publication_state(publication_id):
     """
     registry = get_current_registry()
     conn_str = registry.settings[CONNECTION_STRING]
+    # Check for acceptance...
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
