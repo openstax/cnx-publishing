@@ -249,12 +249,24 @@ RETURNING id
     return publication_id, insert_mapping
 
 
-def poke_publication_state(publication_id):
+def poke_publication_state(publication_id, current_state=None):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
     """
     registry = get_current_registry()
     conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            if current_state is None:
+                cursor.execute(
+                    """SELECT "state" FROM publications WHERE id = %s""",
+                    (publication_id,))
+                current_state = cursor.fetchone()[0]
+    if current_state in ('Publishing', 'Done/Success',):
+        # Bailout early, because the publication is either in progress
+        # or has been completed.
+        return current_state
+
     # Check for acceptance...
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
@@ -322,10 +334,15 @@ def publish_pending(cursor, publication_id):
     write the documents to the *Connexions Archive*.
     """
     cursor.execute("""\
+WITH state_update AS (
+  UPDATE publications SET state = 'Publishing' WHERE id = %s
+)
 SELECT publisher, publication_message
 FROM publications
-WHERE id = %s""", (publication_id,))
+WHERE id = %s""",
+                   (publication_id, publication_id,))
     publisher, message = cursor.fetchone()
+    cursor.connection.commit()
 
     # Commit documents one at a time...
     type_ = cnxepub.Document.__name__

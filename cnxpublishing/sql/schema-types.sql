@@ -7,8 +7,9 @@
 
 
 CREATE TYPE publication_states AS ENUM (
-  'Done/Success',
-  'Processing',
+  'Done/Success',  -- Committed to the archive.
+  'Publishing',  -- In the process of committing.
+  'Processing',  -- Processing any part of the publication.
   'Waiting for acceptance',
   'Failed/Error'
 );
