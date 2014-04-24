@@ -26,7 +26,8 @@ from .publish import publish_model
 
 __all__ = (
     'initdb',
-    'add_publication', 'poke_publication_state',
+    'add_publication',
+    'poke_publication_state', 'check_publication_state',
     'add_pending_document',
     )
 
@@ -294,6 +295,19 @@ SELECT "state"
 FROM publications
 WHERE id = %s""", (publication_id,))
                 publication_state = cursor.fetchone()[0]
+    return publication_state
+
+
+def check_publication_state(publication_id):
+    """Check the publication's current state."""
+    registry = get_current_registry()
+    conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute(
+                """SELECT "state" FROM publications WHERE id = %s""",
+                (publication_id,))
+            publication_state = cursor.fetchone()[0]
     return publication_state
 
 

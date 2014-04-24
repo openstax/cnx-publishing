@@ -11,7 +11,11 @@ from pyramid.view import view_config
 from pyramid import httpexceptions
 
 from . import config
-from .db import add_publication, poke_publication_state
+from .db import (
+    add_publication,
+    poke_publication_state,
+    check_publication_state,
+    )
 
 
 @view_config(route_name='publications', request_method='POST', renderer='json',
@@ -53,7 +57,7 @@ def publish(request):
 def get_publication(request):
     """Lookup publication state"""
     publication_id = request.matchdict['id']
-    state = poke_publication_state(publication_id)
+    state = check_publication_state(publication_id)
     response_data = {
         'publication': publication_id,
         'state': state,

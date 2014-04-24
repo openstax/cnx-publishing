@@ -121,6 +121,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
+        config = testing.setUp(settings=self.settings)
         from cnxarchive.database import initdb
         initdb({'db-connection-string': self.db_conn_str})
         from ..db import initdb
@@ -178,6 +179,12 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 2. (manual)
         self._accept_all_pending()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Typically, acceptance requests would poke the publication
+                # into changing state.
+                from ..db import poke_publication_state
+                poke_publication_state(publication_id, current_state='Processing')
 
         # 3. --
         path = "/publications/{}".format(publication_id)
@@ -213,6 +220,12 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 2. (manual)
         self._accept_all_pending()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Typically, acceptance requests would poke the publication
+                # into changing state.
+                from ..db import poke_publication_state
+                poke_publication_state(publication_id, current_state='Processing')
 
         # 3. --
         path = "/publications/{}".format(publication_id)
