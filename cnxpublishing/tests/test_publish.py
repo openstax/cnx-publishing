@@ -112,7 +112,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 ident_hash = _insert_metadata(cursor, document,
-                                              publisher, message)
+                                              publisher, message)[1]
 
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
@@ -192,7 +192,7 @@ WHERE mor.module_ident = (SELECT module_ident from module)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 ident_hash = _insert_metadata(cursor, document,
-                                              publisher, message)
+                                              publisher, message)[1]
 
         self.assertEqual(ident_hash, expected_ident_hash)
 
