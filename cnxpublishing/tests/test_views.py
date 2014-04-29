@@ -82,13 +82,24 @@ class EPUBMixInTestCase(object):
         return dst
 
 
-
 class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     """Request/response client interaction"""
 
     settings = None
     db_conn_str = None
     db_connect = None
+
+    @property
+    def api_keys_by_uid(self):
+        """Mapping of uid to api key."""
+        attr_name = '_api_keys'
+        api_keys = getattr(self, attr_name, None)
+        if api_keys is None:
+            self.addCleanup(delattr, self, attr_name)
+            from ..main import _parse_api_key_lines
+            api_keys = _parse_api_key_lines(self.settings)
+            setattr(self, attr_name, api_keys)
+        return {x[1]:x[0] for x in api_keys}
 
     @classmethod
     def setUpClass(cls):
@@ -110,6 +121,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
+        config = testing.setUp(settings=self.settings)
         from cnxarchive.database import initdb
         initdb({'db-connection-string': self.db_conn_str})
         from ..db import initdb
@@ -140,11 +152,14 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         3. Check the state of the publication.
         4. Verify documents are in the archive. [HACKED]
         """
+        api_key = self.api_keys_by_uid['no-trust']
+
         # 1. --
         epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
         epub_filepath = self.pack_epub(epub_directory)
         upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files)
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
 
@@ -159,15 +174,21 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
 
         # 2. (manual)
         self._accept_all_pending()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Typically, acceptance requests would poke the publication
+                # into changing state.
+                from ..db import poke_publication_state
+                poke_publication_state(publication_id, current_state='Processing')
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Done/Success')
 
         # 4. (manual)
@@ -186,20 +207,29 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         3. Check the state of the publication.
         4. Verify binder and documents are in the archive. [HACKED]
         """
+        api_key = self.api_keys_by_uid['no-trust']
+
         # 1. --
         epub_directory = os.path.join(TEST_DATA_DIR, 'book')
         epub_filepath = self.pack_epub(epub_directory)
         upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files)
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Processing')
         publication_id = resp.json['publication']
 
         # 2. (manual)
         self._accept_all_pending()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Typically, acceptance requests would poke the publication
+                # into changing state.
+                from ..db import poke_publication_state
+                poke_publication_state(publication_id, current_state='Processing')
 
         # 3. --
         path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
         self.assertEqual(resp.json['state'], 'Done/Success')
 
         # 4. (manual)
@@ -237,3 +267,40 @@ WHERE portal_type = 'Collection'""")
                 tree = json.loads(cursor.fetchone()[0])
 
                 self.assertEqual(expected_tree, tree)
+
+    def test_loose_document_submission_to_publication_w_trust(self):
+        """\
+        Publish a set of loose documents (all new documents) using a trusted
+        application relationship.
+
+        Reminder: In a trusted relationship, the submitting application/user
+        is has done license and role acceptance; and so we trust the publication
+        no longer needs role and license acceptance and can be published
+        immediately too the archive.
+
+        1. Submit an EPUB containing loose documents, not bound to a binder.
+        2. Check the state of the publication.
+        3. Verify documents are in the archive. [HACKED]
+        """
+        api_key = self.api_keys_by_uid['some-trust']
+
+        # 1. --
+        epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
+        epub_filepath = self.pack_epub(epub_directory)
+        upload_files = [('epub', epub_filepath,)]
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # 2. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+
+        # 3. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+                names = [row[0] for row in cursor.fetchall()]
+        self.assertEqual(names, ["Boom", "Figgy Pudd'n"])

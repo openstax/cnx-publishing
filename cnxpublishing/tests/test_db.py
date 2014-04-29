@@ -106,9 +106,10 @@ WHERE
   AND uuid || '@' || concat_ws('.', major_version, minor_version) = %s
 """, (publication_id, document_ident_hash,))
                 record = cursor.fetchone()
-        self.assertEqual(record[0], 'Document')
-        self.assertEqual(record[1], False)
-        self.assertEqual(record[2], False)
+        type_, is_license_accepted, are_roles_accepted = record
+        self.assertEqual(type_, 'Document')
+        self.assertEqual(is_license_accepted, True)
+        self.assertEqual(are_roles_accepted, True)
 
     def test_add_pending_document_w_exist_license_accept(self):
         """Add a pending document to the database.
@@ -158,6 +159,7 @@ WHERE
   AND concat_ws('@', uuid, concat_ws('.', major_version, minor_version)) = %s
 """, (publication_id, document_ident_hash,))
                 record = cursor.fetchone()
-        self.assertEqual(record[0], 'Document')
-        self.assertEqual(record[1], True)
-        self.assertEqual(record[2], False)
+        type_, is_license_accepted, are_roles_accepted = record
+        self.assertEqual(type_, 'Document')
+        self.assertEqual(is_license_accepted, True)
+        self.assertEqual(are_roles_accepted, True)

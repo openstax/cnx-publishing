@@ -14,6 +14,7 @@ import cnxepub
 import psycopg2
 from psycopg2.extras import register_uuid
 from cnxarchive.utils import join_ident_hash, split_ident_hash
+from pyramid.security import has_permission
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
@@ -25,7 +26,8 @@ from .publish import publish_model
 
 __all__ = (
     'initdb',
-    'add_publication', 'poke_publication_state',
+    'add_publication',
+    'poke_publication_state', 'check_publication_state',
     'add_pending_document',
     )
 
@@ -149,8 +151,18 @@ def add_pending_model(cursor, publication_id, model):
             version = (1, 1,)
 
     type_ = _get_type_name(model)
+    # Is the publishing party a trusted source?
+    request = get_current_request()
+    context = request.root
+    is_license_accepted = bool(
+        has_permission('publish.trusted-license-assigner',
+                       context, request))
+    are_roles_accepted = bool(
+        has_permission('publish.trusted-role-assigner',
+                       context, request))
+
     args = [publication_id, id, version[0], version[1], type_,
-            False, False,]
+            is_license_accepted, are_roles_accepted,]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
@@ -238,12 +250,25 @@ RETURNING id
     return publication_id, insert_mapping
 
 
-def poke_publication_state(publication_id):
+def poke_publication_state(publication_id, current_state=None):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
     """
     registry = get_current_registry()
     conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            if current_state is None:
+                cursor.execute(
+                    """SELECT "state" FROM publications WHERE id = %s""",
+                    (publication_id,))
+                current_state = cursor.fetchone()[0]
+    if current_state in ('Publishing', 'Done/Success',):
+        # Bailout early, because the publication is either in progress
+        # or has been completed.
+        return current_state
+
+    # Check for acceptance...
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
@@ -270,6 +295,19 @@ SELECT "state"
 FROM publications
 WHERE id = %s""", (publication_id,))
                 publication_state = cursor.fetchone()[0]
+    return publication_state
+
+
+def check_publication_state(publication_id):
+    """Check the publication's current state."""
+    registry = get_current_registry()
+    conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute(
+                """SELECT "state" FROM publications WHERE id = %s""",
+                (publication_id,))
+            publication_state = cursor.fetchone()[0]
     return publication_state
 
 
@@ -310,10 +348,15 @@ def publish_pending(cursor, publication_id):
     write the documents to the *Connexions Archive*.
     """
     cursor.execute("""\
+WITH state_update AS (
+  UPDATE publications SET state = 'Publishing' WHERE id = %s
+)
 SELECT publisher, publication_message
 FROM publications
-WHERE id = %s""", (publication_id,))
+WHERE id = %s""",
+                   (publication_id, publication_id,))
     publisher, message = cursor.fetchone()
+    cursor.connection.commit()
 
     # Commit documents one at a time...
     type_ = cnxepub.Document.__name__
