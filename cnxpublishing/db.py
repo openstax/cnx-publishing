@@ -145,11 +145,13 @@ def add_pending_model(cursor, publication_id, model):
         id, version = split_ident_hash(ident_hash, split_version=True)
         if version is None or version == (None, None):
             cursor.execute("""\
-SELECT major_version + 1
+SELECT major_version + 1 as next_version
 FROM modules
 WHERE uuid = %s
 UNION ALL
-SELECT 1
+SELECT 1 as next_version
+ORDER BY next_version DESC
+LIMIT 1
 """, (id,))
             next_major_version = cursor.fetchone()[0]
             if isinstance(model, cnxepub.Document):
