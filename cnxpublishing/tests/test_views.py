@@ -304,3 +304,70 @@ WHERE portal_type = 'Collection'""")
                 cursor.execute("SELECT name FROM modules ORDER BY name ASC")
                 names = [row[0] for row in cursor.fetchall()]
         self.assertEqual(names, ["Boom", "Figgy Pudd'n"])
+
+    def test_binder_submission_to_publication_w_trust_w_id(self):
+        """\
+        Publish a binder with complete documents (all new documents).
+
+        Reminder: In a trusted relationship, the submitting application/user
+        is has done license and role acceptance; and so we trust the publication
+        no longer needs role and license acceptance and can be published
+        immediately too the archive.
+
+        1. Submit an EPUB containing.
+        2. Check the state of the publication.
+        3. Verify binder and documents are in the archive. [HACKED]
+        """
+        api_key = self.api_keys_by_uid['some-trust']
+
+        # 1. --
+        epub_directory = os.path.join(TEST_DATA_DIR, 'book-with-id')
+        epub_filepath = self.pack_epub(epub_directory)
+        upload_files = [('epub', epub_filepath,)]
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # 2. --
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
+        self.assertEqual(resp.json['state'], 'Done/Success')
+
+        # 3. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+                names = [row[0] for row in cursor.fetchall()]
+                self.assertEqual(
+                    ['Book of Infinity', 'Document One of Infinity'],
+                    names)
+
+                cursor.execute("""\
+SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
+FROM modules""")
+                items = dict(cursor.fetchall())
+                document_ident_hash = items['Module']
+                self.assertEqual(document_ident_hash, 'e78d4f90-e078-49d2-beac-e95e8be70667@1')
+                binder_ident_hash = items['Collection']
+                self.assertEqual(binder_ident_hash, '9b0903d2-13c4-4ebe-9ffe-1ee79db28482@1.1')
+
+                expected_tree = {
+                    "id": binder_ident_hash,
+                    "title": "Book of Infinity",
+                    "contents": [
+                        {"id":"subcol",
+                         "title":"Part One",
+                         "contents":[
+                             {"id":"subcol",
+                              "title":"Chapter One",
+                              "contents":[
+                                  {"id": document_ident_hash,
+                                   "title":"Document One"}]}]}]}
+                cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+                tree = json.loads(cursor.fetchone()[0])
+
+                self.assertEqual(expected_tree, tree)
