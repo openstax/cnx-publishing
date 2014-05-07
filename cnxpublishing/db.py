@@ -218,8 +218,6 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             UPDATE "pending_documents"
             SET ("metadata", "content") = (%s, %s)
             WHERE "id" = %s"""
-        for resource in model.resources:
-            add_pending_resource(cursor, resource)
     else:
         metadata = model.metadata.copy()
         # Insert the tree into the metadata.
