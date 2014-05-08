@@ -143,7 +143,9 @@ def _insert_metadata(cursor, model, publisher, message):
     params['publisher'] = publisher
     params['publication_message'] = message
     params['_portal_type'] = _model_to_portaltype(model)
-    params['authors'] = [parse_user_uri(x['id']) for x in params['authors']]
+    for user_field in ['authors', 'translators', 'publishers', 'editors',
+            'copyright_holders', 'illustrators']:
+        params[user_field] = [parse_user_uri(x['id']) for x in params[user_field]]
 
     # Assign the id and version if one is known.
     if model.ident_hash is not None:
