@@ -35,7 +35,8 @@ module_insertion AS (
      submitter, submitlog,
      abstractid,
      licenseid,
-     parent, parentauthors,
+     parent,
+     parentauthors,
      authors, maintainers, licensors,
      google_analytics, buylink,
      stateid, doctype)
@@ -46,7 +47,10 @@ module_insertion AS (
      %(publisher)s, %(publication_message)s,
      (SELECT abstractid FROM abstract_insertion),
      (SELECT licenseid FROM license_lookup),
-     DEFAULT, DEFAULT,
+     (SELECT module_ident FROM modules
+        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
+     (SELECT authors FROM modules
+        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
      %(authors)s, DEFAULT, %(copyright_holders)s,
      DEFAULT, DEFAULT,
      DEFAULT, ' ')
@@ -137,6 +141,12 @@ def _model_to_portaltype(model):
     return type_
 
 
+def parse_parent_ident_hash(model):
+    derived_from = model.metadata.get('derived_from_uri')
+    if derived_from:
+        return derived_from.rsplit('/', 1)[-1]
+
+
 def _insert_metadata(cursor, model, publisher, message):
     """Insert a module with the given ``metadata``."""
     params = model.metadata.copy()
@@ -146,6 +156,7 @@ def _insert_metadata(cursor, model, publisher, message):
     for user_field in ['authors', 'translators', 'publishers', 'editors',
             'copyright_holders', 'illustrators']:
         params[user_field] = [parse_user_uri(x['id']) for x in params[user_field]]
+    params['parent_ident_hash'] = parse_parent_ident_hash(model)
 
     # Assign the id and version if one is known.
     if model.ident_hash is not None:

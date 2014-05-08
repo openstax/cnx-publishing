@@ -212,3 +212,79 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         self.assertEqual(module[1], id)
         self.assertEqual(module[2], int(version))
         self.assertEqual(module[3], None)
+
+    def test_document_w_derived_from(self):
+        id, version = '3a70f722-b7b0-4b41-83dd-2790cee98c39', '1'
+        expected_ident_hash = join_ident_hash(id, version)
+        metadata = {
+            'version': version,
+            'title': "Dingbat's Dilemma",
+            'language': 'en-us',
+            'summary': "The options are limitless.",
+            'created': '1420-02-03 23:36:20.583149-05',
+            'revised': '1420-02-03 23:36:20.583149-05',
+            'license_url': 'http://creativecommons.org/licenses/by/3.0/',
+            'publishers': [{'id': 'ream', 'type': None}],  # XXX We don't have a mapping.
+            'authors': [{'id': 'rbates', 'type': 'cnx-id',
+                         'name': 'Richard Bates'},],
+            'editors': [{'id': 'jone', 'type': None}, {'id': 'kahn', 'type': None}],
+            'illustrators': [{'id': 'AbagaleBates', 'type': None}],  # XXX We don't have a mapping.
+            'translators': [{'id': 'RhowandaOkofarBates', 'type': None},
+                            {'id': 'JamesOrwel', 'type': None}],
+            'copyright_holders': [{'id': 'ream', 'type': None}],
+            'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
+            'keywords': ['dingbat', 'bates', 'dilemma'],
+            }
+        publisher = 'ream'
+        message = 'no msg'
+        document = self.make_document(id=id, metadata=metadata)
+
+        from ..publish import _insert_metadata
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                ident_hash = _insert_metadata(cursor, document,
+                                              publisher, message)[1]
+
+        self.assertEqual(ident_hash, expected_ident_hash)
+
+        metadata = {
+            'title': "Copy of Dingbat's Dilemma",
+            'language': 'en-us',
+            'summary': "The options are limitless.",
+            'created': '1420-02-03 23:36:20.583149-05',
+            'revised': '1420-02-03 23:36:20.583149-05',
+            'license_url': 'http://creativecommons.org/licenses/by/3.0/',
+            'publishers': [{'id': 'someone', 'type': None}],  # XXX We don't have a mapping.
+            'authors': [{'id': 'someone', 'type': 'cnx-id',
+                         'name': 'Someone'},],
+            'editors': [],
+            'illustrators': [],  # XXX We don't have a mapping.
+            'translators': [],
+            'copyright_holders': [{'id': 'someone', 'type': None}],
+            'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
+            'keywords': ['dingbat', 'bates', 'dilemma'],
+            'derived_from_uri': 'http://cnx.org/contents/{}'.format(ident_hash),
+            }
+        publisher = 'someone'
+        message = 'derived a copy'
+        document = self.make_document(metadata=metadata)
+
+        from ..publish import _insert_metadata
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                derived_ident_hash = _insert_metadata(cursor, document,
+                                              publisher, message)[1]
+
+        self.assertNotEqual(derived_ident_hash.split('@')[0], ident_hash.split('@')[0])
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT m.name, pm.uuid || '@' || concat_ws('.', pm.major_version, pm.minor_version), m.parentauthors
+FROM modules m JOIN modules pm ON m.parent = pm.module_ident
+WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
+""", (derived_ident_hash,))
+                title, parent, parentauthors = cursor.fetchone()
+
+        self.assertEqual(title, "Copy of Dingbat's Dilemma")
+        self.assertEqual(parent, ident_hash)
+        self.assertEqual(parentauthors, ['rbates'])
