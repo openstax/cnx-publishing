@@ -41,6 +41,11 @@ HTTP API
                 in the EPUB with values that identify where the content will be
                 published.
 
+:/publications/{id}: Poll and poke the state of the publication.
+
+:/publications/{id}/license-acceptances/{uid}: Accepts a license acceptance
+                                               request.
+
 License
 -------
 

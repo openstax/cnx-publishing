@@ -29,6 +29,7 @@ __all__ = (
     'add_publication',
     'poke_publication_state', 'check_publication_state',
     'add_pending_document',
+    'accept_publication_license',
     )
 
 
@@ -422,3 +423,24 @@ WHERE id = %s
 RETURNING state""", (publication_id,))
     state = cursor.fetchone()[0]
     return state
+
+
+def accept_publication_license(cursor, publication_id, user_id,
+                               document_ids, is_accepted=False):
+    """Accept or deny  the document license for the publication
+    (``publication_id``) and user (at ``user_id``)
+    for the documents (listed by id as ``document_ids``).
+    """
+    cursor.execute("""\
+UPDATE publications_license_acceptance AS pla
+SET acceptance = %s
+FROM pending_documents AS pd
+WHERE
+  pd.publication_id = %s
+  AND
+  pla.user_id = %s
+  AND
+    pd.uuid = ANY(%s::UUID[])
+  AND
+  pd.uuid = pla.uuid""",
+                   (is_accepted, publication_id, user_id, document_ids,))
