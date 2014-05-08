@@ -339,17 +339,35 @@ def poke_publication_state(publication_id, current_state=None):
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-SELECT
-  pd.uuid || '@' || concat_ws('.', pd.major_version, pd.minor_version),
-  license_accepted, roles_accepted
-FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
-WHERE p.id = %s""", (publication_id,))
+WITH documents AS (
+  SELECT pd.id, pd.uuid
+  FROM
+    publications AS p
+    JOIN pending_documents AS pd ON p.id = pd.publication_id
+  WHERE p.id = %s),
+license_accepts AS (
+  SELECT d.id, bool_and(acceptance) AS accepted
+  FROM
+    documents AS d
+    LEFT JOIN publications_license_acceptance AS pla ON d.uuid = pla.uuid
+  GROUP BY d.id),
+role_accepts AS (
+  SELECT d.id, bool_and(acceptance) AS accepted
+  FROM
+    documents AS d
+    LEFT JOIN publications_role_acceptance AS pra
+      ON d.id = pra.pending_document_id
+  GROUP BY d.id)
+SELECT la.id, la.accepted, ra.accepted
+FROM license_accepts AS la, role_accepts AS ra
+WHERE la.id = ra.id""",
+                           (publication_id,))
             pending_document_states = cursor.fetchall()
     publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
 
     # Are all the documents ready for publication?
     state_lump = set([l and r for l, r in publication_state_mapping.values()])
-    is_publish_ready = not (False in state_lump)
+    is_publish_ready = not (False in state_lump) and not (None in state_lump)
 
     # Publish the pending documents.
     with psycopg2.connect(conn_str) as db_conn:
