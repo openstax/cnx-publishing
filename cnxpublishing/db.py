@@ -44,6 +44,10 @@ SCHEMA_FILES = (
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
 # itself. Temporarily call it directly.
 register_uuid()
+ATTRIBUTED_ROLE_KEYS = (
+    'authors', 'copyright_holders', 'editors', 'illustrators',
+    'publishers', 'translators',
+    )
 
 
 def initdb(connection_string):
@@ -69,11 +73,12 @@ WHERE id = %s""", (document_id,))
         return
 
     acceptors = set([])
-    for user in metadata['authors']:
-        if user['type'] != 'cnx-id':
-            raise ValueError("Archive only accepts Connexions users.")
-        id = parse_user_uri(user['id'])
-        acceptors.add(id)
+    for role_key in ATTRIBUTED_ROLE_KEYS:
+        for user in metadata[role_key]:
+            if user['type'] != 'cnx-id':
+                raise ValueError("Archive only accepts Connexions users.")
+            id = parse_user_uri(user['id'])
+            acceptors.add(id)
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
