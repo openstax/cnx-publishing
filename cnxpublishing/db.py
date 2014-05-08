@@ -317,6 +317,55 @@ RETURNING id
     return publication_id, insert_mapping
 
 
+def _check_pending_document_license_state(cursor, document_id):
+    """Check the aggregate state on the pending document."""
+    cursor.execute("""\
+SELECT bool_and(acceptance)
+FROM
+  pending_documents AS pd,
+  publications_license_acceptance AS pla
+WHERE
+  pd.id = %s
+  AND
+  pd.uuid = pla.uuid""",
+                   (document_id,))
+    try:
+        is_accepted = cursor.fetchone()[0]
+    except IndexError:
+        # There are no licenses associated with this document.
+        is_accepted = True
+    return is_accepted
+
+
+def _check_pending_document_role_state(cursor, document_id):
+    """Check the aggregate state on the pending document."""
+    cursor.execute("""\
+SELECT bool_and(acceptance)
+FROM
+  publications_role_acceptance AS pra
+WHERE
+  pra.pending_document_id = %s""",
+                   (document_id,))
+    try:
+        is_accepted = cursor.fetchone()[0]
+    except IndexError:
+        # There are no licenses associated with this document.
+        is_accepted = True
+    return is_accepted
+
+
+def _update_pending_document_state(cursor, document_id, is_license_accepted,
+                                   are_roles_accepted):
+    """Update the state of the document's state values."""
+    args = (bool(is_license_accepted), bool(are_roles_accepted),
+            document_id,)
+    cursor.execute("""\
+UPDATE pending_documents
+SET (license_accepted, roles_accepted) = (%s, %s)
+WHERE id = %s""",
+                   args)
+
+
 def poke_publication_state(publication_id, current_state=None):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
@@ -339,31 +388,39 @@ def poke_publication_state(publication_id, current_state=None):
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-WITH documents AS (
-  SELECT pd.id, pd.uuid
-  FROM
-    publications AS p
-    JOIN pending_documents AS pd ON p.id = pd.publication_id
-  WHERE p.id = %s),
-license_accepts AS (
-  SELECT d.id, bool_and(acceptance) AS accepted
-  FROM
-    documents AS d
-    LEFT JOIN publications_license_acceptance AS pla ON d.uuid = pla.uuid
-  GROUP BY d.id),
-role_accepts AS (
-  SELECT d.id, bool_and(acceptance) AS accepted
-  FROM
-    documents AS d
-    LEFT JOIN publications_role_acceptance AS pra
-      ON d.id = pra.pending_document_id
-  GROUP BY d.id)
-SELECT la.id, la.accepted, ra.accepted
-FROM license_accepts AS la, role_accepts AS ra
-WHERE la.id = ra.id""",
+SELECT
+  pd.id, license_accepted, roles_accepted
+FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
+WHERE p.id = %s
+""",
                            (publication_id,))
             pending_document_states = cursor.fetchall()
-    publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
+            publication_state_mapping = {}
+            for document_state in pending_document_states:
+                id, is_license_accepted, are_roles_accepted = document_state
+                publication_state_mapping[id] = [is_license_accepted,
+                                                 are_roles_accepted]
+                has_changed_state = False
+                if is_license_accepted and are_roles_accepted:
+                    continue
+                elif not is_license_accepted:
+                    accepted = _check_pending_document_license_state(
+                        cursor, id)
+                    if accepted != is_license_accepted:
+                        has_changed_state = True
+                        is_license_accepted = accepted
+                        publication_state_mapping[id][0] = accepted
+                elif not are_roles_accepted:
+                    accepted = _check_pending_document_role_state(
+                        cursor, id)
+                    if accepted != are_roles_accepted:
+                        has_changed_state = True
+                        are_roles_accepted = accepted
+                        publication_state_mapping[id][1] = accepted
+                if has_changed_state:
+                    _update_pending_document_state(cursor, id,
+                                                   is_license_accepted,
+                                                   are_roles_accepted)
 
     # Are all the documents ready for publication?
     state_lump = set([l and r for l, r in publication_state_mapping.values()])
