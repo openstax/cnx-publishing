@@ -309,10 +309,12 @@ WHERE p.id = %s""", (publication_id,))
             if is_publish_ready:
                 publication_state = publish_pending(cursor, publication_id)
             else:
+                change_state = "Waiting for acceptance"
                 cursor.execute("""\
-SELECT "state"
-FROM publications
-WHERE id = %s""", (publication_id,))
+UPDATE publications
+SET state = %s
+WHERE id = %s
+RETURNING state""", (change_state, publication_id,))
                 publication_state = cursor.fetchone()[0]
     return publication_state
 
