@@ -53,3 +53,16 @@ CREATE TABLE publications_license_acceptance (
   "acceptance" BOOLEAN DEFAULT NULL,
   PRIMARY KEY ("uuid", "user_id")
 );
+
+
+CREATE TABLE publications_role_acceptance (
+  "pending_document_id" INTEGER,
+  "user_id" TEXT,  -- User identifier, no constraint
+  -- Acceptance can be three states null, true or false.
+  -- The initial null value indicates action is required.
+  -- A value of true or false indicates the user (at ``user_id``)
+  -- has responded to the license acceptance request.
+  "acceptance" BOOLEAN DEFAULT NULL,
+  FOREIGN KEY ("pending_document_id") REFERENCES pending_documents ("id"),
+  PRIMARY KEY ("pending_document_id", "user_id")
+);

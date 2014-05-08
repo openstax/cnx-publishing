@@ -223,6 +223,23 @@ WHERE portal_type = 'Collection'""")
             .format(publication_id, uid)
         resp = self.app.post_json(path, data, headers=headers)
 
+    def app_get_role_acceptance(self, publication_id, uid, headers=[]):
+        """User at ``uid`` lookups up the HTML page for role acceptance."""
+        path = '/publications/{}/role-acceptances/{}' \
+            .format(publication_id, uid)
+        return self.app.get(path, headers=headers)
+
+    def app_post_json_role_acceptance(self, publication_id, uid,
+                                         data, headers=[]):
+        """User at ``uid`` accepts the attributed role for publication at
+        ``publication_id either for or against as ``accept``.
+        The ``data`` value is expected to be a python type that
+        this method will marshal to JSON.
+        """
+        path = '/publications/{}/role-acceptances/{}' \
+            .format(publication_id, uid)
+        resp = self.app.post_json(path, data, headers=headers)
+
     # ######### #
     #   Tests   #
     # ######### #
@@ -291,11 +308,11 @@ WHERE portal_type = 'Collection'""")
         # 1. --
         resp = self.app_post_publication(use_case,
                                          headers=api_key_headers)
-        self.assertEqual(resp.json['state'], 'Processing')
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
         publication_id = resp.json['publication']
 
         # *. --
-        self.app_check_state(publication_id, 'Processing',
+        self.app_check_state(publication_id, 'Waiting for acceptance',
                              headers=api_key_headers)
 
         # 2. --
@@ -331,14 +348,40 @@ GROUP BY user_id, acceptance
 """)
                 acceptance_records = cursor.fetchall()
                 for user_id, has_accepted in acceptance_records:
-                    self.assertTrue(has_accepted, user_id)
+                    failure_message = "{} has not accepted " \
+                                      "the licenses.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
 
         # *. --
         self.app_check_state(publication_id, 'Waiting for acceptance',
                              headers=api_key_headers)
 
         # 3. --
-        # TODO ...
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_role_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_role_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, acceptance
+FROM publications_role_acceptance
+GROUP BY user_id, acceptance
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "role attribution.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
 
         # *. --
         # This is publication completion,

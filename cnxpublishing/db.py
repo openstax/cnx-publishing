@@ -61,7 +61,7 @@ def initdb(connection_string):
                     cursor.execute(schema)
 
 
-def upsert_pending_acceptors(cursor, document_id):
+def upsert_pending_license_acceptors(cursor, document_id):
     """Update or insert records for pending license acceptors."""
     cursor.execute("""\
 SELECT "uuid", "metadata"
@@ -113,6 +113,53 @@ WHERE
         cursor.execute("""\
 update pending_documents set license_accepted = 't'
 where id = %s""", (document_id,))
+
+
+def upsert_pending_roles(cursor, document_id):
+    """Update or insert records for pending document role acceptance."""
+    cursor.execute("""\
+SELECT "uuid", "metadata"
+FROM pending_documents
+WHERE id = %s""", (document_id,))
+    uuid, metadata = cursor.fetchone()
+    if metadata is None:
+        # Metadata wasn't set yet. Bailout early.
+        return
+
+    acceptors = set([])
+    for role_key in ATTRIBUTED_ROLE_KEYS:
+        for user in metadata[role_key]:
+            if user['type'] != 'cnx-id':
+                raise ValueError("Archive only accepts Connexions users.")
+            id = parse_user_uri(user['id'])
+            acceptors.add(id)
+
+    # Acquire a list of existing acceptors.
+    # This queries against the *archive* database.
+    cursor.execute("""\
+SELECT r.roleparam, personids
+FROM
+  latest_modules AS lm
+  NATURAL JOIN moduleoptionalroles AS mor,
+  roles AS r
+WHERE
+  mor.roleid = r.roleid
+  AND
+  uuid = %s""", (uuid,))
+    existing_roles = set([])
+    for role, people in cursor.fetchall():
+        existing_roles.update(people)
+
+    # Who's not in the existing list?
+    existing_acceptors = existing_roles
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new role acceptors.
+    for acceptor in new_acceptors:
+        cursor.execute("""\
+INSERT INTO publications_role_acceptance
+  ("pending_document_id", "user_id", "acceptance")
+VALUES (%s, %s, DEFAULT)""", (document_id, acceptor,))
 
 
 def _get_type_name(model):
@@ -235,7 +282,8 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             WHERE "id" = %s"""
 
     cursor.execute(stmt, args)
-    upsert_pending_acceptors(cursor, pending_id)
+    upsert_pending_license_acceptors(cursor, pending_id)
+    upsert_pending_roles(cursor, pending_id)
     return pending_ident_hash
 
 
@@ -447,7 +495,28 @@ WHERE
   AND
   pla.user_id = %s
   AND
-    pd.uuid = ANY(%s::UUID[])
+  pd.uuid = ANY(%s::UUID[])
   AND
   pd.uuid = pla.uuid""",
+                   (is_accepted, publication_id, user_id, document_ids,))
+
+
+def accept_publication_role(cursor, publication_id, user_id,
+                            document_ids, is_accepted=False):
+    """Accept or deny  the document role attribution for the publication
+    (``publication_id``) and user (at ``user_id``)
+    for the documents (listed by id as ``document_ids``).
+    """
+    cursor.execute("""\
+UPDATE publications_role_acceptance AS pra
+SET acceptance = %s
+FROM pending_documents AS pd
+WHERE
+  pd.publication_id = %s
+  AND
+  pra.user_id = %s
+  AND
+  pd.uuid = ANY(%s::UUID[])
+  AND
+  pd.id = pra.pending_document_id""",
                    (is_accepted, publication_id, user_id, document_ids,))

@@ -27,6 +27,8 @@ def declare_routes(config):
     add_route('get-publication', '/publications/{id}')
     add_route('license-acceptance',
               '/publications/{id}/license-acceptances/{uid}')
+    add_route('role-acceptance',
+              '/publications/{id}/role-acceptances/{uid}')
 
 
 def _parse_api_key_lines(settings):
