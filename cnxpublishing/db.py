@@ -74,7 +74,7 @@ WHERE id = %s""", (document_id,))
 
     acceptors = set([])
     for role_key in ATTRIBUTED_ROLE_KEYS:
-        for user in metadata[role_key]:
+        for user in metadata.get(role_key, []):
             if user['type'] != 'cnx-id':
                 raise ValueError("Archive only accepts Connexions users.")
             id = parse_user_uri(user['id'])
@@ -128,7 +128,7 @@ WHERE id = %s""", (document_id,))
 
     acceptors = set([])
     for role_key in ATTRIBUTED_ROLE_KEYS:
-        for user in metadata[role_key]:
+        for user in metadata.get(role_key, []):
             if user['type'] != 'cnx-id':
                 raise ValueError("Archive only accepts Connexions users.")
             id = parse_user_uri(user['id'])
