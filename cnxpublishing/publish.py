@@ -18,6 +18,10 @@ from .utils import parse_user_uri
 __all__ = ('publish_model',)
 
 
+ATTRIBUTED_ROLE_KEYS = (
+    'authors', 'copyright_holders', 'editors', 'illustrators',
+    'publishers', 'translators',
+    )
 MODULE_INSERTION_TEMPLATE = """\
 WITH abstract_insertion AS (
   INSERT INTO abstracts (abstractid, abstract, html)
@@ -153,9 +157,11 @@ def _insert_metadata(cursor, model, publisher, message):
     params['publisher'] = publisher
     params['publication_message'] = message
     params['_portal_type'] = _model_to_portaltype(model)
-    for user_field in ['authors', 'translators', 'publishers', 'editors',
-            'copyright_holders', 'illustrators']:
-        params[user_field] = [parse_user_uri(x['id']) for x in params[user_field]]
+
+    # Transform person structs to id lists for database array entry.
+    for person_field in ATTRIBUTED_ROLE_KEYS:
+        params[person_field] = [parse_user_uri(x['id'])
+                                for x in params.get(person_field, [])]
     params['parent_ident_hash'] = parse_parent_ident_hash(model)
 
     # Assign the id and version if one is known.

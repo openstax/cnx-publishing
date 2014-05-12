@@ -27,6 +27,16 @@ Or::
 
     pip install .
 
+Testing
+-------
+
+.. image:: https://travis-ci.org/Connexions/cnx-publishing.svg?branch=acceptance-2
+   :target: https://travis-ci.org/Connexions/cnx-publishing
+
+::
+
+    python setup.py test
+
 HTTP API
 --------
 
@@ -40,6 +50,17 @@ HTTP API
                 Returns a mapping of identifiers, keyed by the identifiers given
                 in the EPUB with values that identify where the content will be
                 published.
+
+:/publications/{id}: Poll and poke the state of the publication.
+
+:/publications/{id}/license-acceptances/{uid}: Route for retrieving and posting
+    information about a particular user's license acceptance. Only the user
+    at ``uid`` can get and post information to on this route.
+
+:/publications/{id}/role-acceptances/{uid}: Route for retrieving and posting
+    role acceptance information. Only the user at ``uid`` can get and post
+    information to on this route.
+
 
 License
 -------

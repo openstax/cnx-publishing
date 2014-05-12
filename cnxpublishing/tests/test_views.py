@@ -134,240 +134,260 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
-    def _accept_all_pending(self):
-        """Accept all roles on all pending documents"""
+    def _check_published_to_archive(self, use_case):
+        method_mapping = {
+            'book': '_check_p2a_for_book',
+            'loose-pages': '_check_p2a_for_loose_pages',
+            }
+        try:
+            method_name = method_mapping[use_case]
+        except:
+            raise ValueError("Unknown use-case. See code comments.")
+        # If the above ValueError is raised, then you need to add
+        # a _check_p2a_for_<use-case-name> method to this class.
+        method = getattr(self, method_name)
+        method()
+
+    def _check_p2a_for_book(self):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+                names = [row[0] for row in cursor.fetchall()]
+                self.assertEqual(
+                    ['Book of Infinity', 'Document One of Infinity'],
+                    names)
+
                 cursor.execute("""\
-                UPDATE pending_documents
-                SET ("license_accepted", "roles_accepted") = ('t', 't')
-                """)
+SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
+FROM modules""")
+                items = dict(cursor.fetchall())
+                document_ident_hash = items['Module']
+                binder_ident_hash = items['Collection']
 
-    def test_loose_document_submission_to_publication(self):
+                expected_tree = {
+                    "id": binder_ident_hash,
+                    "title": "Book of Infinity",
+                    "contents": [
+                        {"id":"subcol",
+                         "title":"Part One",
+                         "contents":[
+                             {"id":"subcol",
+                              "title":"Chapter One",
+                              "contents":[
+                                  {"id": document_ident_hash,
+                                   "title":"Document One"}]}]}]}
+                cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+                tree = json.loads(cursor.fetchone()[0])
+
+                self.assertEqual(expected_tree, tree)
+
+    # #################### #
+    #   Web app test API   #
+    # #################### #
+    # - ``app_check*`` methods are self contained checks on a process
+    #   or series of processes. These methods return ``None``.
+    # - ``app_(get|put|post|delete)*`` methods call against the
+    #   application and return the response.
+
+    def app_check_state(self, publication_id, expected_state,
+                        headers=[]):
+        path = "/publications/{}".format(publication_id)
+        resp = self.app.get(path, headers=headers)
+        self.assertEqual(resp.json['state'], expected_state)
+
+    def app_post_publication(self, publication_case, headers=[]):
+        epub_directory = os.path.join(TEST_DATA_DIR, publication_case)
+        epub_filepath = self.pack_epub(epub_directory)
+        upload_files = [('epub', epub_filepath,)]
+        resp = self.app.post('/publications', upload_files=upload_files,
+                             headers=headers)
+        return resp
+
+    def app_get_license_acceptance(self, publication_id, uid, headers=[]):
+        """User at ``uid`` lookups up the HTML page for license acceptance."""
+        path = '/publications/{}/license-acceptances/{}' \
+            .format(publication_id, uid)
+        return self.app.get(path, headers=headers)
+
+    def app_post_json_license_acceptance(self, publication_id, uid,
+                                         data, headers=[]):
+        """User at ``uid`` accepts the license for publication at
+        ``publication_id either for or against as ``accept``.
+        The ``data`` value is expected to be a python type that
+        this method will marshal to JSON.
+        """
+        path = '/publications/{}/license-acceptances/{}' \
+            .format(publication_id, uid)
+        resp = self.app.post_json(path, data, headers=headers)
+
+    def app_get_role_acceptance(self, publication_id, uid, headers=[]):
+        """User at ``uid`` lookups up the HTML page for role acceptance."""
+        path = '/publications/{}/role-acceptances/{}' \
+            .format(publication_id, uid)
+        return self.app.get(path, headers=headers)
+
+    def app_post_json_role_acceptance(self, publication_id, uid,
+                                         data, headers=[]):
+        """User at ``uid`` accepts the attributed role for publication at
+        ``publication_id either for or against as ``accept``.
+        The ``data`` value is expected to be a python type that
+        this method will marshal to JSON.
+        """
+        path = '/publications/{}/role-acceptances/{}' \
+            .format(publication_id, uid)
+        resp = self.app.post_json(path, data, headers=headers)
+
+    # ######### #
+    #   Tests   #
+    # ######### #
+    # - the contents of the publication contents are of lesser
+    #   important to that of the process itself.
+    # - the tests are firstly divided into trusted and untrusted cases.
+    # - the tests are secondly divided into new, existing and mixed
+    #   document/binder content publications.
+
+    def test_new_trusted_to_publication(self):
         """\
-        Publish a set of loose documents (all new documents).
+        Publish *new* documents from an *trusted* application.
+        This includes application and user interactions with publishing.
 
-        1. Submit an EPUB containing loose documents, not bound to a binder.
-        2. Accept license and roles. [HACKED]
-        3. Check the state of the publication.
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        2. Verify documents are in the archive. [HACKED]
+
+        """
+        use_case = 'book'
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        resp = self.app_post_publication(use_case,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # *. --
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
+
+        # 4. (manual)
+        self._check_published_to_archive(use_case)
+
+    def test_new_untrusted_to_publication(self):
+        """\
+        Publish *new* documents from an *untrusted* application.
+        This includes application and user interactions with publishing.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        2. For each *attributed role*...
+
+           - As the publisher, accept the license.
+           - As the copyright-holder, accept the license.
+           - As [other attributed roles], accept the license.
+
+        3. For each *attributed role*...
+
+           - As [an attributed role], accept my attribution
+             on these documents/binders in this publication.
+
         4. Verify documents are in the archive. [HACKED]
+
         """
+        use_case = 'book'
         api_key = self.api_keys_by_uid['no-trust']
+        api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
-        epub_filepath = self.pack_epub(epub_directory)
-        upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files,
-                             headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Processing')
+        resp = self.app_post_publication(use_case,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
         publication_id = resp.json['publication']
 
-        # 2. (manual) Accept license and roles for Figgy Pudd'n
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                UPDATE pending_documents
-                SET ("license_accepted", "roles_accepted") = ('t', 't')
-                WHERE metadata->>'title' LIKE '%Figgy%'
-                """)
-
-        # 3. --
-        path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Processing')
-
-        # 2. (manual)
-        self._accept_all_pending()
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                # Typically, acceptance requests would poke the publication
-                # into changing state.
-                from ..db import poke_publication_state
-                poke_publication_state(publication_id, current_state='Processing')
-
-        # 3. --
-        path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-
-        # 4. (manual)
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
-                names = [row[0] for row in cursor.fetchall()]
-        self.assertEqual(names, ["Boom", "Figgy Pudd'n"])
-
-    def test_binder_submission_to_publication(self):
-        """\
-        Publish a binder with complete documents (all new documents).
-
-        1. Submit an EPUB containing.
-        2. Accept license and roles. [HACKED]
-        3. Check the state of the publication.
-        4. Verify binder and documents are in the archive. [HACKED]
-        """
-        api_key = self.api_keys_by_uid['no-trust']
-
-        # 1. --
-        epub_directory = os.path.join(TEST_DATA_DIR, 'book')
-        epub_filepath = self.pack_epub(epub_directory)
-        upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files,
-                             headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Processing')
-        publication_id = resp.json['publication']
-
-        # 2. (manual)
-        self._accept_all_pending()
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                # Typically, acceptance requests would poke the publication
-                # into changing state.
-                from ..db import poke_publication_state
-                poke_publication_state(publication_id, current_state='Processing')
-
-        # 3. --
-        path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-
-        # 4. (manual)
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
-                names = [row[0] for row in cursor.fetchall()]
-                self.assertEqual(
-                    ['Book of Infinity', 'Document One of Infinity'],
-                    names)
-
-                cursor.execute("""\
-SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
-FROM modules""")
-                items = dict(cursor.fetchall())
-                document_ident_hash = items['Module']
-                binder_ident_hash = items['Collection']
-
-                expected_tree = {
-                    "id": binder_ident_hash,
-                    "title": "Book of Infinity",
-                    "contents": [
-                        {"id":"subcol",
-                         "title":"Part One",
-                         "contents":[
-                             {"id":"subcol",
-                              "title":"Chapter One",
-                              "contents":[
-                                  {"id": document_ident_hash,
-                                   "title":"Document One"}]}]}]}
-                cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
-FROM modules
-WHERE portal_type = 'Collection'""")
-                tree = json.loads(cursor.fetchone()[0])
-
-                self.assertEqual(expected_tree, tree)
-
-    def test_loose_document_submission_to_publication_w_trust(self):
-        """\
-        Publish a set of loose documents (all new documents) using a trusted
-        application relationship.
-
-        Reminder: In a trusted relationship, the submitting application/user
-        is has done license and role acceptance; and so we trust the publication
-        no longer needs role and license acceptance and can be published
-        immediately too the archive.
-
-        1. Submit an EPUB containing loose documents, not bound to a binder.
-        2. Check the state of the publication.
-        3. Verify documents are in the archive. [HACKED]
-        """
-        api_key = self.api_keys_by_uid['some-trust']
-
-        # 1. --
-        epub_directory = os.path.join(TEST_DATA_DIR, 'loose-pages')
-        epub_filepath = self.pack_epub(epub_directory)
-        upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files,
-                             headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-        publication_id = resp.json['publication']
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
 
         # 2. --
-        path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-
-        # 3. (manual)
+        # TODO This uses the JSON get/post parts; revision publications
+        #      should attempt to use the HTML form.
+        #      Check the form contains for the correct documents and default
+        #      values. This is going to be easier to look
+        #      at and verify in a revision publication, where we can depend
+        #      on known uuid values.
+        uids = (
+            'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
+            'rings', 'sarblyth',
+            )
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_license_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_license_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
-                names = [row[0] for row in cursor.fetchall()]
-        self.assertEqual(names, ["Boom", "Figgy Pudd'n"])
+                cursor.execute("""
+SELECT user_id, acceptance
+FROM publications_license_acceptance
+GROUP BY user_id, acceptance
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "the licenses.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
 
-    def test_binder_submission_to_publication_w_trust_w_id(self):
-        """\
-        Publish a binder with complete documents (all new documents).
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
 
-        Reminder: In a trusted relationship, the submitting application/user
-        is has done license and role acceptance; and so we trust the publication
-        no longer needs role and license acceptance and can be published
-        immediately too the archive.
-
-        1. Submit an EPUB containing.
-        2. Check the state of the publication.
-        3. Verify binder and documents are in the archive. [HACKED]
-        """
-        api_key = self.api_keys_by_uid['some-trust']
-
-        # 1. --
-        epub_directory = os.path.join(TEST_DATA_DIR, 'book-with-id')
-        epub_filepath = self.pack_epub(epub_directory)
-        upload_files = [('epub', epub_filepath,)]
-        resp = self.app.post('/publications', upload_files=upload_files,
-                             headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-        publication_id = resp.json['publication']
-
-        # 2. --
-        path = "/publications/{}".format(publication_id)
-        resp = self.app.get(path, headers=[('x-api-key', api_key,)])
-        self.assertEqual(resp.json['state'], 'Done/Success')
-
-        # 3. (manual)
+        # 3. --
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_role_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_role_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
-                names = [row[0] for row in cursor.fetchall()]
-                self.assertEqual(
-                    ['Book of Infinity', 'Document One of Infinity'],
-                    names)
+                cursor.execute("""
+SELECT user_id, acceptance
+FROM publications_role_acceptance
+GROUP BY user_id, acceptance
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "role attribution.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
 
-                cursor.execute("""\
-SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
-FROM modules""")
-                items = dict(cursor.fetchall())
-                document_ident_hash = items['Module']
-                self.assertEqual(document_ident_hash, 'e78d4f90-e078-49d2-beac-e95e8be70667@1')
-                binder_ident_hash = items['Collection']
-                self.assertEqual(binder_ident_hash, '9b0903d2-13c4-4ebe-9ffe-1ee79db28482@1.1')
+        # *. --
+        # This is publication completion,
+        # because all licenses and roles have been accepted.
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
 
-                expected_tree = {
-                    "id": binder_ident_hash,
-                    "title": "Book of Infinity",
-                    "contents": [
-                        {"id":"subcol",
-                         "title":"Part One",
-                         "contents":[
-                             {"id":"subcol",
-                              "title":"Chapter One",
-                              "contents":[
-                                  {"id": document_ident_hash,
-                                   "title":"Document One"}]}]}]}
-                cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
-FROM modules
-WHERE portal_type = 'Collection'""")
-                tree = json.loads(cursor.fetchone()[0])
-
-                self.assertEqual(expected_tree, tree)
+        # 4. (manual)
+        self._check_published_to_archive(use_case)

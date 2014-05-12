@@ -29,6 +29,7 @@ __all__ = (
     'add_publication',
     'poke_publication_state', 'check_publication_state',
     'add_pending_document',
+    'accept_publication_license',
     )
 
 
@@ -43,6 +44,10 @@ SCHEMA_FILES = (
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
 # itself. Temporarily call it directly.
 register_uuid()
+ATTRIBUTED_ROLE_KEYS = (
+    'authors', 'copyright_holders', 'editors', 'illustrators',
+    'publishers', 'translators',
+    )
 
 
 def initdb(connection_string):
@@ -56,7 +61,7 @@ def initdb(connection_string):
                     cursor.execute(schema)
 
 
-def upsert_pending_acceptors(cursor, document_id):
+def upsert_pending_license_acceptors(cursor, document_id):
     """Update or insert records for pending license acceptors."""
     cursor.execute("""\
 SELECT "uuid", "metadata"
@@ -68,11 +73,12 @@ WHERE id = %s""", (document_id,))
         return
 
     acceptors = set([])
-    for user in metadata['authors']:
-        if user['type'] != 'cnx-id':
-            raise ValueError("Archive only accepts Connexions users.")
-        id = parse_user_uri(user['id'])
-        acceptors.add(id)
+    for role_key in ATTRIBUTED_ROLE_KEYS:
+        for user in metadata.get(role_key, []):
+            if user['type'] != 'cnx-id':
+                raise ValueError("Archive only accepts Connexions users.")
+            id = parse_user_uri(user['id'])
+            acceptors.add(id)
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
@@ -107,6 +113,53 @@ WHERE
         cursor.execute("""\
 update pending_documents set license_accepted = 't'
 where id = %s""", (document_id,))
+
+
+def upsert_pending_roles(cursor, document_id):
+    """Update or insert records for pending document role acceptance."""
+    cursor.execute("""\
+SELECT "uuid", "metadata"
+FROM pending_documents
+WHERE id = %s""", (document_id,))
+    uuid, metadata = cursor.fetchone()
+    if metadata is None:
+        # Metadata wasn't set yet. Bailout early.
+        return
+
+    acceptors = set([])
+    for role_key in ATTRIBUTED_ROLE_KEYS:
+        for user in metadata.get(role_key, []):
+            if user['type'] != 'cnx-id':
+                raise ValueError("Archive only accepts Connexions users.")
+            id = parse_user_uri(user['id'])
+            acceptors.add(id)
+
+    # Acquire a list of existing acceptors.
+    # This queries against the *archive* database.
+    cursor.execute("""\
+SELECT r.roleparam, personids
+FROM
+  latest_modules AS lm
+  NATURAL JOIN moduleoptionalroles AS mor,
+  roles AS r
+WHERE
+  mor.roleid = r.roleid
+  AND
+  uuid = %s""", (uuid,))
+    existing_roles = set([])
+    for role, people in cursor.fetchall():
+        existing_roles.update(people)
+
+    # Who's not in the existing list?
+    existing_acceptors = existing_roles
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new role acceptors.
+    for acceptor in new_acceptors:
+        cursor.execute("""\
+INSERT INTO publications_role_acceptance
+  ("pending_document_id", "user_id", "acceptance")
+VALUES (%s, %s, DEFAULT)""", (document_id, acceptor,))
 
 
 def _get_type_name(model):
@@ -229,7 +282,8 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             WHERE "id" = %s"""
 
     cursor.execute(stmt, args)
-    upsert_pending_acceptors(cursor, pending_id)
+    upsert_pending_license_acceptors(cursor, pending_id)
+    upsert_pending_roles(cursor, pending_id)
     return pending_ident_hash
 
 
@@ -263,6 +317,55 @@ RETURNING id
     return publication_id, insert_mapping
 
 
+def _check_pending_document_license_state(cursor, document_id):
+    """Check the aggregate state on the pending document."""
+    cursor.execute("""\
+SELECT bool_and(acceptance)
+FROM
+  pending_documents AS pd,
+  publications_license_acceptance AS pla
+WHERE
+  pd.id = %s
+  AND
+  pd.uuid = pla.uuid""",
+                   (document_id,))
+    try:
+        is_accepted = cursor.fetchone()[0]
+    except IndexError:
+        # There are no licenses associated with this document.
+        is_accepted = True
+    return is_accepted
+
+
+def _check_pending_document_role_state(cursor, document_id):
+    """Check the aggregate state on the pending document."""
+    cursor.execute("""\
+SELECT bool_and(acceptance)
+FROM
+  publications_role_acceptance AS pra
+WHERE
+  pra.pending_document_id = %s""",
+                   (document_id,))
+    try:
+        is_accepted = cursor.fetchone()[0]
+    except IndexError:
+        # There are no licenses associated with this document.
+        is_accepted = True
+    return is_accepted
+
+
+def _update_pending_document_state(cursor, document_id, is_license_accepted,
+                                   are_roles_accepted):
+    """Update the state of the document's state values."""
+    args = (bool(is_license_accepted), bool(are_roles_accepted),
+            document_id,)
+    cursor.execute("""\
+UPDATE pending_documents
+SET (license_accepted, roles_accepted) = (%s, %s)
+WHERE id = %s""",
+                   args)
+
+
 def poke_publication_state(publication_id, current_state=None):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
@@ -286,16 +389,42 @@ def poke_publication_state(publication_id, current_state=None):
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT
-  pd.uuid || '@' || concat_ws('.', pd.major_version, pd.minor_version),
-  license_accepted, roles_accepted
+  pd.id, license_accepted, roles_accepted
 FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
-WHERE p.id = %s""", (publication_id,))
+WHERE p.id = %s
+""",
+                           (publication_id,))
             pending_document_states = cursor.fetchall()
-    publication_state_mapping = {x[0]:x[1:] for x in pending_document_states}
+            publication_state_mapping = {}
+            for document_state in pending_document_states:
+                id, is_license_accepted, are_roles_accepted = document_state
+                publication_state_mapping[id] = [is_license_accepted,
+                                                 are_roles_accepted]
+                has_changed_state = False
+                if is_license_accepted and are_roles_accepted:
+                    continue
+                elif not is_license_accepted:
+                    accepted = _check_pending_document_license_state(
+                        cursor, id)
+                    if accepted != is_license_accepted:
+                        has_changed_state = True
+                        is_license_accepted = accepted
+                        publication_state_mapping[id][0] = accepted
+                elif not are_roles_accepted:
+                    accepted = _check_pending_document_role_state(
+                        cursor, id)
+                    if accepted != are_roles_accepted:
+                        has_changed_state = True
+                        are_roles_accepted = accepted
+                        publication_state_mapping[id][1] = accepted
+                if has_changed_state:
+                    _update_pending_document_state(cursor, id,
+                                                   is_license_accepted,
+                                                   are_roles_accepted)
 
     # Are all the documents ready for publication?
     state_lump = set([l and r for l, r in publication_state_mapping.values()])
-    is_publish_ready = not (False in state_lump)
+    is_publish_ready = not (False in state_lump) and not (None in state_lump)
 
     # Publish the pending documents.
     with psycopg2.connect(conn_str) as db_conn:
@@ -303,10 +432,12 @@ WHERE p.id = %s""", (publication_id,))
             if is_publish_ready:
                 publication_state = publish_pending(cursor, publication_id)
             else:
+                change_state = "Waiting for acceptance"
                 cursor.execute("""\
-SELECT "state"
-FROM publications
-WHERE id = %s""", (publication_id,))
+UPDATE publications
+SET state = %s
+WHERE id = %s
+RETURNING state""", (change_state, publication_id,))
                 publication_state = cursor.fetchone()[0]
     return publication_state
 
@@ -422,3 +553,45 @@ WHERE id = %s
 RETURNING state""", (publication_id,))
     state = cursor.fetchone()[0]
     return state
+
+
+def accept_publication_license(cursor, publication_id, user_id,
+                               document_ids, is_accepted=False):
+    """Accept or deny  the document license for the publication
+    (``publication_id``) and user (at ``user_id``)
+    for the documents (listed by id as ``document_ids``).
+    """
+    cursor.execute("""\
+UPDATE publications_license_acceptance AS pla
+SET acceptance = %s
+FROM pending_documents AS pd
+WHERE
+  pd.publication_id = %s
+  AND
+  pla.user_id = %s
+  AND
+  pd.uuid = ANY(%s::UUID[])
+  AND
+  pd.uuid = pla.uuid""",
+                   (is_accepted, publication_id, user_id, document_ids,))
+
+
+def accept_publication_role(cursor, publication_id, user_id,
+                            document_ids, is_accepted=False):
+    """Accept or deny  the document role attribution for the publication
+    (``publication_id``) and user (at ``user_id``)
+    for the documents (listed by id as ``document_ids``).
+    """
+    cursor.execute("""\
+UPDATE publications_role_acceptance AS pra
+SET acceptance = %s
+FROM pending_documents AS pd
+WHERE
+  pd.publication_id = %s
+  AND
+  pra.user_id = %s
+  AND
+  pd.uuid = ANY(%s::UUID[])
+  AND
+  pd.id = pra.pending_document_id""",
+                   (is_accepted, publication_id, user_id, document_ids,))

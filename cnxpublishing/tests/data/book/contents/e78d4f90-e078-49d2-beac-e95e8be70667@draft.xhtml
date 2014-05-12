@@ -42,7 +42,7 @@
 
       <div class="authors">
         By: 
-        <span id="author01"
+        <span id="author-1"
               itemscope="itemscope"
               itemtype="http://schema.org/Person"
               itemprop="author"
@@ -52,26 +52,94 @@
              itemprop="url"
              data-type="cnx-id"
              >Mark Horner</a>
-        </span>, 
+        </span>,  
+        <span id="author-2"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="author"
+              data-type="author"
+              >
+          <a href="charrose"
+             itemprop="url"
+             data-type="cnx-id"
+             >Charmaine St. Rose</a>
+        </span> and 
+        <span id="author-3"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="author"
+              data-type="author"
+              >
+          <a href="sarblyth"
+             itemprop="url"
+             data-type="cnx-id"
+             >Sarah Blyth</a>
+        </span>
         Edited by: 
-        <span itemprop="editor"
+        <span id="editor-1"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="editor"
               data-type="editor"
-              >I. M. Picky</span>
+              >
+          <a href="impicky"
+             itemprop="url"
+             data-type="cnx-id"
+             >I. M. Picky</a>
+        </span>
         Illustrated by: 
-        <span itemprop="illustrator"
+        <span id="illustrator-1"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="illustrator"
               data-type="illustrator"
-              >Francis Hablar</span>
+              >
+          <a href="frahablar"
+             itemprop="url"
+             data-type="cnx-id"
+             >Francis Hablar</a>
+        </span>
+        <!-- Schema.org doesn't have translator.
+             Rather than really contorting to try and use something like marc:relators, 
+             for now, just use our own data-type, and use the more generic "contributor" from schema.org. -->
         Translated by: 
-        <span itemprop="contributor"
+        <span id="translator-1"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="contributor"
               data-type="translator"
-              >Francis Hablar</span>
+              >
+          <a href="frahablar"
+             itemprop="url"
+             data-type="cnx-id"
+             >Francis Hablar</a>
+        </span>
       </div>
 
       <div class="publishers">
         Published By: 
-        <span itemprop="publisher"
+        <span id="publishers-1"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="publisher"
               data-type="publisher"
-              >Ream</span>
+              >
+          <a href="ream"
+             itemprop="url"
+             data-type="cnx-id"
+             >Ream</a>
+        </span>,
+        <span id="publishers-2"
+              itemscope="itemscope"
+              itemtype="http://schema.org/Person"
+              itemprop="publisher"
+              data-type="publisher"
+              >
+          <a href="rings"
+             itemprop="url"
+             data-type="cnx-id"
+             >Rings</a>
+        </span>
       </div>
 
       <div class="derived-from">
@@ -85,9 +153,17 @@
       <div class="permissions">
         <p class="copyright">
           Copyright: 
-          <span itemprop="copyrightHolder"
+          <span id="copyright-holder-1"
+                itemscope="itemscope"
+                itemtype="http://schema.org/Person"
+                itemprop="copyrightHolder"
                 data-type="copyright-holder"
-                >Ream</span>
+                >
+            <a href="ream"
+               itemprop="url"
+               data-type="cnx-id"
+               >Ream</a>
+          </span>
         </p>
         <p class="license">
           Licensed:
