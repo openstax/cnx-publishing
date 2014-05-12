@@ -198,8 +198,7 @@ WHERE portal_type = 'Collection'""")
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json['state'], expected_state)
 
-    def app_post_publication(self, publication_case, headers=[]):
-        epub_directory = os.path.join(TEST_DATA_DIR, publication_case)
+    def app_post_publication(self, epub_directory, headers=[]):
         epub_filepath = self.pack_epub(epub_directory)
         upload_files = [('epub', epub_filepath,)]
         resp = self.app.post('/publications', upload_files=upload_files,
@@ -262,11 +261,12 @@ WHERE portal_type = 'Collection'""")
 
         """
         use_case = 'book'
+        epub_directory = os.path.join(TEST_DATA_DIR, use_case)
         api_key = self.api_keys_by_uid['some-trust']
         api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        resp = self.app_post_publication(use_case,
+        resp = self.app_post_publication(epub_directory,
                                          headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Done/Success')
         publication_id = resp.json['publication']
@@ -302,11 +302,12 @@ WHERE portal_type = 'Collection'""")
 
         """
         use_case = 'book'
+        epub_directory = os.path.join(TEST_DATA_DIR, use_case)
         api_key = self.api_keys_by_uid['no-trust']
         api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        resp = self.app_post_publication(use_case,
+        resp = self.app_post_publication(epub_directory,
                                          headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Waiting for acceptance')
         publication_id = resp.json['publication']
