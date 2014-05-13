@@ -37,6 +37,9 @@ setup(
     test_suite='cnxpublishing.tests',
     packages=find_packages(),
     include_package_data=True,
+    package_data={
+        'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql'],
+        },
     entry_points="""\
     [paste.app_factory]
     main = cnxpublishing.main:main
