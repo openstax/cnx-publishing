@@ -5,6 +5,8 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import json
+
 import cnxepub
 
 
@@ -98,3 +100,52 @@ BOOK = cnxepub.Binder(
                     ]),
                 ]),
         ])
+
+
+# ################### #
+#   Use case checks   #
+# ################### #
+# Used to verify the use case within the archive database.
+# These use a naming convension check_<use-case-name>_in_archive.
+# All checker callables should have positional arguments for
+# the test case (to allow for unittest.TestCase assertion methods)
+# and a database cursor object.
+#
+#   def check_<use-case-name>_in_archive(test_case, cursor):
+#       ...
+
+def check_BOOK_in_archive(test_case, cursor):
+    """This checker assumes that the only content in the database
+    is the content within this use case.
+    """
+    cursor.execute("SELECT name FROM modules ORDER BY name ASC")
+    names = [row[0] for row in cursor.fetchall()]
+    test_case.assertEqual(
+        ['Book of Infinity', 'Document One of Infinity'],
+        names)
+
+    cursor.execute("""\
+SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
+FROM modules""")
+    items = dict(cursor.fetchall())
+    document_ident_hash = items['Module']
+    binder_ident_hash = items['Collection']
+
+    expected_tree = {
+        "id": binder_ident_hash,
+        "title": "Book of Infinity",
+        "contents": [
+            {"id":"subcol",
+             "title":"Part One",
+             "contents":[
+                 {"id":"subcol",
+                  "title":"Chapter One",
+                  "contents":[
+                      {"id": document_ident_hash,
+                       "title":"Document One"}]}]}]}
+    cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+    tree = json.loads(cursor.fetchone()[0])
+    test_case.assertEqual(expected_tree, tree)

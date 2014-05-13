@@ -167,54 +167,20 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             with db_conn.cursor() as cursor:
                 raise NotImplementedError()
 
+
     def _check_published_to_archive(self, use_case):
-        method_mapping = {
-            use_cases.BOOK: '_check_p2a_for_book',
+        checker_mapping = {
+            use_cases.BOOK: use_cases.check_BOOK_in_archive,
             }
         try:
-            method_name = method_mapping[use_case]
+            checker = checker_mapping[use_case]
         except:
             raise ValueError("Unknown use-case. See code comments.")
         # If the above ValueError is raised, then you need to add
-        # a _check_p2a_for_<use-case-name> method to this class.
-        method = getattr(self, method_name)
-        method()
-
-    def _check_p2a_for_book(self):
+        # a checker mapping to a checker callable.
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM modules ORDER BY name ASC")
-                names = [row[0] for row in cursor.fetchall()]
-                self.assertEqual(
-                    ['Book of Infinity', 'Document One of Infinity'],
-                    names)
-
-                cursor.execute("""\
-SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
-FROM modules""")
-                items = dict(cursor.fetchall())
-                document_ident_hash = items['Module']
-                binder_ident_hash = items['Collection']
-
-                expected_tree = {
-                    "id": binder_ident_hash,
-                    "title": "Book of Infinity",
-                    "contents": [
-                        {"id":"subcol",
-                         "title":"Part One",
-                         "contents":[
-                             {"id":"subcol",
-                              "title":"Chapter One",
-                              "contents":[
-                                  {"id": document_ident_hash,
-                                   "title":"Document One"}]}]}]}
-                cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
-FROM modules
-WHERE portal_type = 'Collection'""")
-                tree = json.loads(cursor.fetchone()[0])
-
-                self.assertEqual(expected_tree, tree)
+                checker(self, cursor)
 
     # #################### #
     #   Web app test API   #
