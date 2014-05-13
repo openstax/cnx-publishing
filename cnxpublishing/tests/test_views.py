@@ -13,11 +13,13 @@ import unittest
 import zipfile
 
 import psycopg2
+import cnxepub
 from webob import Request
 from webtest import TestApp
 from pyramid import testing
 from pyramid import httpexceptions
 
+from . import use_cases
 from .testing import (
     integration_test_settings,
     db_connection_factory,
@@ -57,6 +59,15 @@ class EPUBMixInTestCase(object):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmpdir)
+
+    def make_epub(self, binder, publisher, message):
+        """Given a cnx-epub model, create an EPUB.
+        This returns a temporary file location where the EPUB can be found.
+        """
+        zip_fd, zip_filepath = tempfile.mkstemp('.epub', dir=self.tmpdir)
+        cnxepub.make_publication_epub(binder, publisher, message,
+                                      zip_filepath)
+        return zip_filepath
 
     def pack_epub(self, directory):
         """Given an directory containing epub contents,
@@ -134,10 +145,31 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
+    def _setup_to_archive(self, use_case):
+        """Used to setup a content set in the archive.
+        This is most useful when publishing revisions.
+        """
+        method_mapping = {
+            'book': '_setup_p2a_for_book',
+            'loose-pages': '_setup_p2a_for_loose_pages',
+            }
+        try:
+            method_name = method_mapping[use_case]
+        except:
+            raise ValueError("Unknown use-case. See code comments.")
+        # If the above ValueError is raised, then you need to add
+        # a _check_p2a_for_<use-case-name> method to this class.
+        method = getattr(self, method_name)
+        method()
+
+    def _setup_p2a_for_book(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                raise NotImplementedError()
+
     def _check_published_to_archive(self, use_case):
         method_mapping = {
-            'book': '_check_p2a_for_book',
-            'loose-pages': '_check_p2a_for_loose_pages',
+            use_cases.BOOK: '_check_p2a_for_book',
             }
         try:
             method_name = method_mapping[use_case]
@@ -198,8 +230,7 @@ WHERE portal_type = 'Collection'""")
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json['state'], expected_state)
 
-    def app_post_publication(self, epub_directory, headers=[]):
-        epub_filepath = self.pack_epub(epub_directory)
+    def app_post_publication(self, epub_filepath, headers=[]):
         upload_files = [('epub', epub_filepath,)]
         resp = self.app.post('/publications', upload_files=upload_files,
                              headers=headers)
@@ -229,7 +260,7 @@ WHERE portal_type = 'Collection'""")
         return self.app.get(path, headers=headers)
 
     def app_post_json_role_acceptance(self, publication_id, uid,
-                                         data, headers=[]):
+                                      data, headers=[]):
         """User at ``uid`` accepts the attributed role for publication at
         ``publication_id either for or against as ``accept``.
         The ``data`` value is expected to be a python type that
@@ -260,13 +291,14 @@ WHERE portal_type = 'Collection'""")
         2. Verify documents are in the archive. [HACKED]
 
         """
-        use_case = 'book'
-        epub_directory = os.path.join(TEST_DATA_DIR, use_case)
+        publisher = u'ream'
+        epub_filepath = self.make_epub(use_cases.BOOK, publisher,
+                                       u'públishing this book')
         api_key = self.api_keys_by_uid['some-trust']
         api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        resp = self.app_post_publication(epub_directory,
+        resp = self.app_post_publication(epub_filepath,
                                          headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Done/Success')
         publication_id = resp.json['publication']
@@ -276,7 +308,7 @@ WHERE portal_type = 'Collection'""")
                              headers=api_key_headers)
 
         # 4. (manual)
-        self._check_published_to_archive(use_case)
+        self._check_published_to_archive(use_cases.BOOK)
 
     def test_new_untrusted_to_publication(self):
         """\
@@ -301,13 +333,14 @@ WHERE portal_type = 'Collection'""")
         4. Verify documents are in the archive. [HACKED]
 
         """
-        use_case = 'book'
-        epub_directory = os.path.join(TEST_DATA_DIR, use_case)
+        publisher = u'ream'
+        epub_filepath = self.make_epub(use_cases.BOOK, publisher,
+                                       u'públishing this book')
         api_key = self.api_keys_by_uid['no-trust']
         api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        resp = self.app_post_publication(epub_directory,
+        resp = self.app_post_publication(epub_filepath,
                                          headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Waiting for acceptance')
         publication_id = resp.json['publication']
@@ -391,4 +424,4 @@ GROUP BY user_id, acceptance
                              headers=api_key_headers)
 
         # 4. (manual)
-        self._check_published_to_archive(use_case)
+        self._check_published_to_archive(use_cases.BOOK)
