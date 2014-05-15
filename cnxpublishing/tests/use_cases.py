@@ -6,8 +6,10 @@
 # See LICENCE.txt for details.
 # ###
 import json
+from copy import deepcopy
 
 import cnxepub
+from cnxarchive.utils import join_ident_hash
 
 
 # ############# #
@@ -100,12 +102,24 @@ BOOK = cnxepub.Binder(
                     ]),
                 ]),
         ])
+REVISED_BOOK = deepcopy(BOOK)
+# Take out a layer of the structure to shuffle the tree.
+# This replaces the a translucent binder with it's single document sibling.
+REVISED_BOOK[0][0] = REVISED_BOOK[0][0][0]
+# Assign identifiers to the persistent models.
+REVISED_BOOK.id = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@draft'
+REVISED_BOOK.metadata['cnx-archive-uri'] = 'http://archive.cnx.org/contents/d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+REVISED_BOOK[0][0].id = '11e2e631-73b5-44da-acae-e97defd9673b@draft'
+REVISED_BOOK[0][0].metadata['cnx-archive-uri'] = 'http://archive.cnx.org/contents/11e2e631-73b5-44da-acae-e97defd9673b'
+# Retitle the translucent binder.
+REVISED_BOOK[0].metadata['title'] = u"Stifled with Good Inténsions"
+REVISED_BOOK[0].set_title_for_node(REVISED_BOOK[0][0], u"Infinity Plus")
 
 
 # ################### #
 #   Use case checks   #
 # ################### #
-# Used to verify the use case within the archive database.
+# Used to verify a use case within the archive database.
 # These use a naming convension check_<use-case-name>_in_archive.
 # All checker callables should have positional arguments for
 # the test case (to allow for unittest.TestCase assertion methods)
@@ -135,17 +149,103 @@ FROM modules""")
         "id": binder_ident_hash,
         "title": "Book of Infinity",
         "contents": [
-            {"id":"subcol",
-             "title":"Part One",
-             "contents":[
-                 {"id":"subcol",
-                  "title":"Chapter One",
-                  "contents":[
+            {"id": "subcol",
+             "title": "Part One",
+             "contents": [
+                 {"id": "subcol",
+                  "title": "Chapter One",
+                  "contents": [
                       {"id": document_ident_hash,
-                       "title":"Document One"}]}]}]}
+                       "title": "Document One"}]}]}]}
     cursor.execute("""\
 SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
 FROM modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
+
+
+def check_REVISED_BOOK_in_archive(test_case, cursor):
+    """This checker assumes that the only content in the database
+    is the content within the BOOK and REVISED_BOOK use cases.
+    """
+    binder = REVISED_BOOK
+    document = REVISED_BOOK[0][0]
+
+    # Check the module records...
+    cursor.execute("""\
+SELECT uuid, moduleid, major_version, minor_version, version
+FROM modules ORDER BY major_version ASC""")
+    records = {}
+    for row in cursor.fetchall():
+        key = row[:1]
+        value = row[2:]
+        if key not in records:
+            records[key] = []
+        records[key].append(value)
+    expected_records = {
+        # [uuid, moduleid]: [[major_version, minor_version, version], ...]
+        [binder.id, 'col10000']: [
+            ['1', '1', '1.1'],
+            ['2', '1', '2.1'],
+            ],
+        [document.id, 'm10000']: [
+            ['1', None, '1.1'],
+            ['2', None, '2.1'],
+            ],
+        }
+    test_case.assertEqual(expected_records, records)
+
+    # Check the tree...
+    binder_ident_hash = join_ident_hash(binder.id, (2, 1,))
+    document_ident_hash = join_ident_hash(document.id, (2, None,))
+    expected_tree = {
+        "id": binder_ident_hash,
+        "title": "Book of Infinity",
+        "contents": [
+            {"id": "subcol",
+             "title": REVISED_BOOK[0].metadata['title'],
+             "contents": [
+                 {"id": document_ident_hash,
+                  "title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
+    cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM latest_modules
+WHERE portal_type = 'Collection'""")
+    tree = json.loads(cursor.fetchone()[0])
+    test_case.assertEqual(expected_tree, tree)
+
+
+# ################### #
+#   Use case setups   #
+# ################### #
+# Used to setup a use case within the archive database.
+# For example, the BOOK use case needs setup in archive, before
+# one tries to make a revision publication for it.
+# These use a naming convension setup_<use-case-name>_in_archive.
+# All checker callables should have positional arguments for
+# the test case and a database cursor object.
+#
+#   def setup_<use-case-name>_in_archive(test_case, cursor):
+#       ...
+
+def setup_BOOK_in_archive(test_case, cursor):
+    """This assumes that the identifiers used within REVISED_BOOK
+    are used while inputting this into the database. This assumption
+    is made because the two use cases are meant to work together.
+    """
+    binder = deepcopy(BOOK)
+    # FIXME Use the REVISED_BOOK id when it exists.
+    binder.id = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+    binder.metadata['version'] = '1.1'
+    document = binder[0][0][0]
+    # FIXME Use the REVISED_BOOK id when it exists.
+    document.id = '11e2e631-73b5-44da-acae-e97defd9673b'
+    document.metadata['version'] = '1'
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+
+    from ..publish import publish_model
+    publish_model(cursor, document, publisher, publication_message)
+    publish_model(cursor, binder, publisher, publication_message)
