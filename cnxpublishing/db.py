@@ -529,7 +529,7 @@ FROM pending_resources
 WHERE hash = %s""", (hash,))
                 data, media_type = cursor.fetchone()
                 document.resources.append(cnxepub.Resource(
-                    hash, io.BytesIO(data), media_type))
+                    hash, io.BytesIO(data), media_type, filename=hash))
 
         ident_hash = publish_model(cursor, document, publisher, message)
 
