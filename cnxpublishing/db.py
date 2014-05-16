@@ -229,21 +229,19 @@ LIMIT 1
         has_permission('publish.trusted-role-assigner',
                        context, request))
 
+    model.id = str(id)
+    model.metadata['version'] = '.'.join([str(v) for v in version if v])
     args = [publication_id, id, version[0], version[1], type_,
-            is_license_accepted, are_roles_accepted,]
+            is_license_accepted, are_roles_accepted,
+            json.dumps(model.metadata)]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
-   "license_accepted", "roles_accepted")
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+    "license_accepted", "roles_accepted", "metadata")
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
 """, args)
     pending_id, id, version = cursor.fetchone()
-    # FIXME Reassigning the ID and version here is probably not the
-    #       greatest approach to this.
-    model.metadata['version'] = version
-    model.id = str(id)
-
     pending_ident_hash = join_ident_hash(id, version)
 
     # Assign the new ident-hash to the document for later use.
@@ -251,11 +249,17 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     path = request.route_path('get-content', ident_hash=pending_ident_hash)
     model.set_uri('cnx-archive', path)
 
-    # FIXME This can't be here, because content reference resolution will need
-    # to write updates to the document after all document metadata
-    # has been added. This is because not all documents will have system
-    # identifiers until after metadata persistence.
-    # We will need to move this operation up a layer.
+    upsert_pending_license_acceptors(cursor, pending_id)
+    upsert_pending_roles(cursor, pending_id)
+    return pending_ident_hash
+
+
+def add_pending_model_content(cursor, publication_id, model):
+    """Updates the pending model's content.
+    This is a secondary step not in ``add_pending_model, because
+    content reference resolution requires the identifiers as they
+    will appear in the end publication.
+    """
     if isinstance(model, cnxepub.Document):
         for resource in model.resources:
             add_pending_resource(cursor, resource)
@@ -264,27 +268,26 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             if reference._bound_model:
                 reference.bind(reference._bound_model, '/resources/{}')
 
-        args = (json.dumps(model.metadata),
-                psycopg2.Binary(model.content.encode('utf-8')),
-                pending_id,)
+        args = (psycopg2.Binary(model.content.encode('utf-8')),
+                publication_id, model.id,)
         stmt = """\
             UPDATE "pending_documents"
-            SET ("metadata", "content") = (%s, %s)
-            WHERE "id" = %s"""
+            SET ("content") = (%s)
+            WHERE "publication_id" = %s AND "uuid" = %s"""
     else:
         metadata = model.metadata.copy()
         # Insert the tree into the metadata.
         metadata['_tree'] = cnxepub.model_to_tree(model)
-        args = (json.dumps(metadata), pending_id,)
+        args = (json.dumps(metadata),
+                None,  # TODO Render the HTML tree at ``model.content``.
+                publication_id, model.id,)
+        # Must pave over metadata because postgresql lacks built-in
+        # json update functions.
         stmt = """\
             UPDATE "pending_documents"
-            SET metadata = %s
-            WHERE "id" = %s"""
-
+            SET ("metadata", "content") = (%s, %s)
+            WHERE "publication_id" = %s AND "uuid" = %s"""
     cursor.execute(stmt, args)
-    upsert_pending_license_acceptors(cursor, pending_id)
-    upsert_pending_roles(cursor, pending_id)
-    return pending_ident_hash
 
 
 def add_publication(cursor, epub, epub_file):
@@ -303,17 +306,27 @@ RETURNING id
     publication_id = cursor.fetchone()[0]
     insert_mapping = {}
 
+    models = set([])
     for package in epub:
         binder = cnxepub.adapt_package(package)
+        if binder in models:
+            continue
         for document in cnxepub.flatten_to_documents(binder):
-            ident_hash = add_pending_model(cursor, publication_id, document)
-            insert_mapping[document.id] = ident_hash
+            if document not in models:
+                ident_hash = add_pending_model(cursor, publication_id, document)
+                insert_mapping[document.id] = ident_hash
+                models.add(document)
         # The binding object could be translucent/see-through,
         # (case for a binder that only contains loose-documents).
         # Otherwise we should also publish the the binder.
         if not binder.is_translucent:
             ident_hash = add_pending_model(cursor, publication_id, binder)
             insert_mapping[binder.id] = ident_hash
+            models.add(binder)
+    for model in models:
+        # Now that all models have been given an identifier
+        # we can write the content to the database.
+        add_pending_model_content(cursor, publication_id, model)
     return publication_id, insert_mapping
 
 
