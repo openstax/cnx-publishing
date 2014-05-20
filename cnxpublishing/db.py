@@ -5,7 +5,9 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+from __future__ import print_function
 import os
+import sys
 import io
 import json
 import uuid
@@ -186,6 +188,42 @@ SELECT md5(%(data)s);
     resource.id = cursor.fetchone()[0]
 
 
+# FIXME Cache this this function. There is no reason it needs to run
+#       more than once in a 24hr period.
+def obtain_licenses():
+    """Obtain the licenses in a dictionary form, keyed by url."""
+    settings = get_current_registry().settings
+    with psycopg2.connect(settings[CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT combined_row.url, row_to_json(combined_row) FROM (
+  SELECT "code", "version", "name", "url", "is_valid_for_publication"
+  FROM licenses) AS combined_row""")
+            licenses = {r[0]:r[1] for r in cursor.fetchall()}
+    return licenses
+
+
+def _validate_license(model):
+    """Given the model, check the license is one valid for publication."""
+    license_mapping = obtain_licenses()
+    license_url = model.metadata['license_url']
+    try:
+        license = license_mapping[license_url]
+    except KeyError:
+        raise exceptions.InvalidLicense(
+            message="License '{}' not found.".format(license_url))
+    if not license['is_valid_for_publication']:
+        raise exceptions.InvalidLicense(
+            message="License '{}' is not valid for contemporary "
+                    "publications.".format(license_url))
+
+
+def validate_model(model):
+    """Validates the model using a series of checks on bits of the data."""
+    # Check the license is one valid for publication.
+    _validate_license(model)
+
+
 def add_pending_model(cursor, publication_id, model):
     """Adds a model (binder or document) that is awaiting publication
     to the database.
@@ -290,6 +328,27 @@ def add_pending_model_content(cursor, publication_id, model):
     cursor.execute(stmt, args)
 
 
+def set_publication_failure(cursor, exc):
+    """Given a publication exception, set the publication as failed and
+    append the failure message to the publication record.
+    """
+    publication_id = exc.publication_id
+    if publication_id is None:
+        raise ValueError("Exception must have a ``publication_id`` value.")
+    cursor.execute("""\
+SELECT "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+    try:
+        state_messages = cursor.fetchone()[0]
+    except TypeError:  # NoneType
+        state_messages = []
+    state_messages.append(exc.to_json())
+    cursor.execute("""\
+UPDATE publications SET ("state", "state_messages") = (%s, %s)
+WHERE id = %s""", ('Failed/Error', state_messages, publication_id,))
+
+
 def add_publication(cursor, epub, epub_file):
     """Adds a publication entry and makes each item
     a pending document.
@@ -313,6 +372,23 @@ RETURNING id
             continue
         for document in cnxepub.flatten_to_documents(binder):
             if document not in models:
+                try:
+                    validate_model(document)
+                except exceptions.PublicationException as exc:
+                    exc_info = sys.exc_info()
+                    exc.publication_id = publication_id
+                    exc.epub_filename = document.id
+                    try:
+                        set_publication_failure(exc)
+                    except:
+                        import traceback
+                        print_function("Critical data error. "
+                                       "Immediate attention is "
+                                       "required. On publication at '{}'." \
+                                       .format(publication_id),
+                                       file=sys.stderr)
+                        traceback.print_exc()
+                    raise exc_info[0], exc_info[1], exc_info[2]
                 ident_hash = add_pending_model(cursor, publication_id, document)
                 insert_mapping[document.id] = ident_hash
                 models.add(document)
@@ -388,14 +464,15 @@ def poke_publication_state(publication_id, current_state=None):
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             if current_state is None:
-                cursor.execute(
-                    """SELECT "state" FROM publications WHERE id = %s""",
-                    (publication_id,))
-                current_state = cursor.fetchone()[0]
-    if current_state in ('Publishing', 'Done/Success',):
+                cursor.execute("""\
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                current_state, messages = cursor.fetchone()
+    if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
         # Bailout early, because the publication is either in progress
         # or has been completed.
-        return current_state
+        return current_state, messages
 
     # Check for acceptance...
     with psycopg2.connect(conn_str) as db_conn:
@@ -450,9 +527,9 @@ WHERE p.id = %s
 UPDATE publications
 SET state = %s
 WHERE id = %s
-RETURNING state""", (change_state, publication_id,))
-                publication_state = cursor.fetchone()[0]
-    return publication_state
+RETURNING state, state_messages""", (change_state, publication_id,))
+                publication_state, messages = cursor.fetchone()
+    return publication_state, messages
 
 
 def check_publication_state(publication_id):
@@ -461,11 +538,12 @@ def check_publication_state(publication_id):
     conn_str = registry.settings[CONNECTION_STRING]
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute(
-                """SELECT "state" FROM publications WHERE id = %s""",
-                (publication_id,))
-            publication_state = cursor.fetchone()[0]
-    return publication_state
+            cursor.execute("""\
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+            publication_state, publication_messages = cursor.fetchone()
+    return publication_state, publication_messages
 
 
 def _node_to_model(tree_or_item, metadata=None, parent=None,

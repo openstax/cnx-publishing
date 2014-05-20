@@ -12,7 +12,8 @@ CREATE TABLE publications (
   "publication_message" TEXT NOT NULL,
   "epub" BYTEA NOT NULL,
   -- State information, included an optional message.
-  "state" publication_states DEFAULT 'Processing'
+  "state" publication_states DEFAULT 'Processing',
+  "state_messages" JSON
 );
 
 

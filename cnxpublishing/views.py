@@ -44,12 +44,13 @@ def publish(request):
                                                            epub_upload.file)
 
     # Poke at the publication & lookup its state.
-    state = poke_publication_state(publication_id)
+    state, messages = poke_publication_state(publication_id)
 
     response_data = {
         'publication': publication_id,
         'mapping': publications,
         'state': state,
+        'messages': messages,
         }
     return response_data
 
@@ -59,10 +60,11 @@ def publish(request):
 def get_publication(request):
     """Lookup publication state"""
     publication_id = request.matchdict['id']
-    state = check_publication_state(publication_id)
+    state, messages = check_publication_state(publication_id)
     response_data = {
         'publication': publication_id,
         'state': state,
+        'messages': messages,
         }
     return response_data
 
