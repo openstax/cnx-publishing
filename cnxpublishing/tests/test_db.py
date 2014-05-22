@@ -19,7 +19,7 @@ from .testing import integration_test_settings
 VALID_LICENSE_URL = "http://creativecommons.org/licenses/by/4.0/"
 
 
-class DatabaseIntegrationTestCase(unittest.TestCase):
+class BaseDatabaseIntegrationTestCase(unittest.TestCase):
     """Verify database interactions"""
 
     settings = None
@@ -80,6 +80,10 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
             with db_conn.cursor() as cursor:
                 document_ident_hash = add_pending_document(
                     cursor, publication_id, document)
+
+
+class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify database interactions"""
 
     def test_add_new_pending_document(self):
         """Add a pending document to the database."""
@@ -171,7 +175,7 @@ WHERE
         self.assertEqual(is_license_accepted, True)
         self.assertEqual(are_roles_accepted, True)
 
-    def test_add_new_pending_document_w_invalid_license(self):
+    def test_add_pending_document_w_invalid_license(self):
         """Add a pending document to the database."""
         invalid_license_url = 'http://creativecommons.org/licenses/by-sa/1.0'
 
@@ -206,9 +210,7 @@ FROM publications
 WHERE id = %s""", (publication_id,))
                 state, state_messages = cursor.fetchone()
         self.assertEqual(state, 'Failed/Error')
-        expected_message = u"License '{}' is not valid for " \
-                           "contemporary publications." \
-                               .format(invalid_license_url)
+        expected_message = u"Invalid license: {}".format(invalid_license_url)
         expected_state_messages = [
             {u'code': 10,
              u'publication_id': 1,
@@ -216,6 +218,137 @@ WHERE id = %s""", (publication_id,))
              u'pending_document_id': 1,
              u'pending_ident_hash': unicode(expected_ident_hash),
              u'type': u'InvalidLicense',
-             u'message': expected_message
+             u'message': expected_message,
+             u'value': invalid_license_url,
              }]
         self.assertEqual(state_messages, expected_state_messages)
+
+    def test_add_pending_document_w_invalid_role(self):
+        """Add a pending document to the database with an invalid role."""
+        publication_id = self.make_publication()
+
+        # Create and add a document for the publication.
+        author_value = {u'id': u'able', u'type': u'diaspora-id'}
+        metadata = {'authors': [author_value],
+                    'license_url': VALID_LICENSE_URL,
+                    }
+        document = self.make_document(metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                document_ident_hash = add_pending_model(
+                    cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+                expected_ident_hash = cursor.fetchone()[0]
+                cursor.execute("""
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                state, state_messages = cursor.fetchone()
+        self.assertEqual(state, 'Failed/Error')
+        expected_message = u"Invalid role for 'authors': {}" \
+                           .format(repr(author_value))
+
+        expected_state_messages = [
+            {u'code': 11,
+             u'publication_id': 1,
+             u'epub_filename': None,
+             u'pending_document_id': 1,
+             u'pending_ident_hash': unicode(expected_ident_hash),
+             u'type': u'InvalidRole',
+             u'message': expected_message,
+             u'key': u'authors',
+             u'value': author_value,
+             }]
+        self.assertEqual(state_messages, expected_state_messages)
+
+
+class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify model validations"""
+    # Nameing convension for these tests is:
+    #   test_{exception-code}_{point-of-interest}
+
+    def test_9_license_url(self):
+        """Check for raised exception when license is missing."""
+        # Create a Document model.
+        model = self.make_document()
+
+        # Call the in-question validator.
+        from ..exceptions import MissingRequiredMetadata
+        from ..db import _validate_license as validator
+        with self.assertRaises(MissingRequiredMetadata) as caught_exc:
+            validator(model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['key'], 'license_url')
+
+    def test_9_authors(self):
+        """Check for raised exception when authors are missing."""
+        # Create a Document model.
+        model = self.make_document()
+
+        # Call the in-question validator.
+        from ..exceptions import MissingRequiredMetadata
+        from ..db import _validate_roles as validator
+        with self.assertRaises(MissingRequiredMetadata) as caught_exc:
+            validator(model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['key'], 'authors')
+
+    def test_9_publishers(self):
+        """Check for raised exception when publishers are missing."""
+        # Create a Document model.
+        metadata = {'authors': [{u'type': u'cnx-id', u'id': u'able'}]}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import MissingRequiredMetadata
+        from ..db import _validate_roles as validator
+        with self.assertRaises(MissingRequiredMetadata) as caught_exc:
+            validator(model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['key'], 'publishers')
+
+    def test_10_license_not_found(self):
+        """Check for raised exception when the given license doesn't match
+        any of the known licenses.
+        """
+        # Create a Document model.
+        invalid_license_url = u"http://example.org/public-domain"
+        metadata = {u'license_url': invalid_license_url}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidLicense
+        from ..db import _validate_license as validator
+        with self.assertRaises(InvalidLicense) as caught_exc:
+            validator(model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_license_url)
+
+    def test_10_not_valid_for_publication(self):
+        """Check for raised exception when the given license is not fit
+        for new publications.
+        """
+        # Create a Document model.
+        invalid_license_url = u"http://creativecommons.org/licenses/by/1.0"
+        metadata = {u'license_url': invalid_license_url}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidLicense
+        from ..db import _validate_license as validator
+        with self.assertRaises(InvalidLicense) as caught_exc:
+            validator(model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_license_url)
