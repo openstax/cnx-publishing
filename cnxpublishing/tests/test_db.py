@@ -6,9 +6,14 @@
 # See LICENCE.txt for details.
 # ###
 import os
+import sys
 import io
 import uuid
 import unittest
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 import psycopg2
 from pyramid import testing
@@ -17,6 +22,13 @@ from .testing import integration_test_settings
 
 
 VALID_LICENSE_URL = "http://creativecommons.org/licenses/by/4.0/"
+# This version checking is required because python's ``traceback`` module
+# does not write unicode to ``sys.stderr``, which ``io.StringIO`` requires.
+if sys.version_info > (3,):
+    STDERR_MOCK_CLASS = io.StringIO
+else:
+    from StringIO import StringIO
+    STDERR_MOCK_CLASS = StringIO
 
 
 class BaseDatabaseIntegrationTestCase(unittest.TestCase):
@@ -272,6 +284,37 @@ WHERE id = %s""", (publication_id,))
              u'value': author_value,
              }]
         self.assertEqual(state_messages, expected_state_messages)
+
+    @mock.patch('sys.stderr', new_callable=STDERR_MOCK_CLASS)
+    def test_add_pending_document_w_critical_error(self, stderr):
+        """Add a pending document to the database with an invalid role."""
+        publication_id = self.make_publication()
+
+        # No metadata, so some exception related to that will be raised.
+        document = self.make_document()
+
+        def raise_exception(*args, **kwargs):
+            raise Exception("*** test exception ***")
+
+        patch_args = {
+            'target': 'cnxpublishing.db.set_publication_failure',
+            'new': raise_exception,
+            }
+
+        from ..exceptions import PublicationException
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                with mock.patch(**patch_args):
+                    # This insures that we raise the original exception.
+                    with self.assertRaises(PublicationException):
+                        document_ident_hash = add_pending_model(
+                            cursor, publication_id, document)
+        # Check ``sys.stderr`` for the inner exception that caused
+        # the critical failure.
+        stderr.seek(0)
+        self.assertTrue(stderr.read().find("*** test exception ***") >= 0)
 
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):

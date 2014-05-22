@@ -313,6 +313,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     try:
         validate_model(model)
     except exceptions.PublicationException as exc:
+        exc_info = sys.exc_info()
         exc.publication_id = publication_id
         exc.pending_document_id = pending_id
         exc.pending_ident_hash = pending_ident_hash
@@ -320,11 +321,14 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             set_publication_failure(cursor, exc)
         except:
             import traceback
-            print("Critical data error. Immediate attention is "
+            print("Critical data error. Immediate attention is " \
                   "required. On publication at '{}'." \
                   .format(publication_id),
                   file=sys.stderr)
+            # Print the critical exception.
             traceback.print_exc()
+            # Raise the previous exception, so we know the original cause.
+            raise exc_info[0], exc_info[1], exc_info[2]
     else:
         upsert_pending_license_acceptors(cursor, pending_id)
         upsert_pending_roles(cursor, pending_id)
