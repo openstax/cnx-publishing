@@ -21,6 +21,7 @@ from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
 
+from . import exceptions
 from .config import CONNECTION_STRING
 from .utils import parse_archive_uri, parse_user_uri
 from .publish import publish_model
@@ -30,7 +31,7 @@ __all__ = (
     'initdb',
     'add_publication',
     'poke_publication_state', 'check_publication_state',
-    'add_pending_document',
+    'add_pending_model',
     'accept_publication_license',
     )
 
@@ -231,6 +232,7 @@ def add_pending_model(cursor, publication_id, model):
     # FIXME Too much happening here...
     assert isinstance(model, (cnxepub.Document, cnxepub.Binder,))
     uri = model.get_uri('cnx-archive')
+
     if uri is not None:
         ident_hash = parse_archive_uri(uri)
         id, version = split_ident_hash(ident_hash, split_version=True)
@@ -287,8 +289,24 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     path = request.route_path('get-content', ident_hash=pending_ident_hash)
     model.set_uri('cnx-archive', path)
 
-    upsert_pending_license_acceptors(cursor, pending_id)
-    upsert_pending_roles(cursor, pending_id)
+    try:
+        validate_model(model)
+    except exceptions.PublicationException as exc:
+        exc.publication_id = publication_id
+        exc.pending_document_id = pending_id
+        exc.pending_ident_hash = pending_ident_hash
+        try:
+            set_publication_failure(cursor, exc)
+        except:
+            import traceback
+            print("Critical data error. Immediate attention is "
+                  "required. On publication at '{}'." \
+                  .format(publication_id),
+                  file=sys.stderr)
+            traceback.print_exc()
+    else:
+        upsert_pending_license_acceptors(cursor, pending_id)
+        upsert_pending_roles(cursor, pending_id)
     return pending_ident_hash
 
 
@@ -339,11 +357,11 @@ def set_publication_failure(cursor, exc):
 SELECT "state_messages"
 FROM publications
 WHERE id = %s""", (publication_id,))
-    try:
-        state_messages = cursor.fetchone()[0]
-    except TypeError:  # NoneType
+    state_messages = cursor.fetchone()[0]
+    if state_messages is None:
         state_messages = []
-    state_messages.append(exc.to_json())
+    state_messages.append(exc.to_dict())
+    state_messages = json.dumps(state_messages)
     cursor.execute("""\
 UPDATE publications SET ("state", "state_messages") = (%s, %s)
 WHERE id = %s""", ('Failed/Error', state_messages, publication_id,))
@@ -372,23 +390,6 @@ RETURNING id
             continue
         for document in cnxepub.flatten_to_documents(binder):
             if document not in models:
-                try:
-                    validate_model(document)
-                except exceptions.PublicationException as exc:
-                    exc_info = sys.exc_info()
-                    exc.publication_id = publication_id
-                    exc.epub_filename = document.id
-                    try:
-                        set_publication_failure(exc)
-                    except:
-                        import traceback
-                        print_function("Critical data error. "
-                                       "Immediate attention is "
-                                       "required. On publication at '{}'." \
-                                       .format(publication_id),
-                                       file=sys.stderr)
-                        traceback.print_exc()
-                    raise exc_info[0], exc_info[1], exc_info[2]
                 ident_hash = add_pending_model(cursor, publication_id, document)
                 insert_mapping[document.id] = ident_hash
                 models.add(document)

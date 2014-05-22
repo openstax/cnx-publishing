@@ -16,10 +16,12 @@ class PublicationException(Exception):
     """
 
     def __init__(self, publication_id=None, message=None,
-                 epub_filename=None, pending_document_id=None):
+                 epub_filename=None, pending_document_id=None,
+                 pending_ident_hash=None):
         self.publication_id = publication_id
         self.epub_filename = epub_filename
         self.pending_document_id = pending_document_id
+        self.pending_ident_hash = pending_ident_hash
         self._message = message
 
     @property
@@ -27,9 +29,9 @@ class PublicationException(Exception):
         # TODO Setting the logger level to 'debug' should dump as much
         # information about the publication and model as possible.
         desc = "publication_id = {} & pending_document_id = {} " \
-               "& epub_filename = {} " \
+               "& epub_filename = {} & pending_ident_hash = {}" \
                .format(self.publication_id, self.pending_document_id,
-                       self.epub_filename)
+                       self.epub_filename, self.pending_ident_hash)
         return desc
 
     @property
@@ -40,20 +42,22 @@ class PublicationException(Exception):
             message_arg = self.description
         return (message_arg,)
 
-    def to_json(self):
+    def to_dict(self):
         """Render the except to json"""
         data = {
             'publication_id': self.publication_id,
             'epub_filename': self.epub_filename,
             'pending_document_id': self.pending_document_id,
+            'pending_ident_hash': self.pending_ident_hash,
+            'code': self.code,
+            'type': self.__class__.__name__,
             'message': self._message,
             }
-        return json.dumps(data)
+        return data
 
 
 class InvalidLicense(PublicationException):
     """Raised when a incoming publication is itself under or
     child contents under an invalid/unrecognized license.
     """
-
-    
+    code = 10

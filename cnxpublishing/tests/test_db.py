@@ -16,6 +16,9 @@ from pyramid import testing
 from .testing import integration_test_settings
 
 
+VALID_LICENSE_URL = "http://creativecommons.org/licenses/by/4.0/"
+
+
 class DatabaseIntegrationTestCase(unittest.TestCase):
     """Verify database interactions"""
 
@@ -83,7 +86,10 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
         publication_id = self.make_publication()
 
         # Create and add a document for the publication.
-        metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}]}
+        metadata = {
+            'authors': [{'id': 'able', 'type': 'cnx-id'}],
+            'license_url': VALID_LICENSE_URL,
+            }
         document = self.make_document(metadata=metadata)
 
         # Here we are testing the function of add_pending_document.
@@ -127,6 +133,7 @@ WHERE
                  'name': 'smOO chIE',
                  'type': 'cnx-id'}],
             'cnx-archive-uri': uri,
+            'license_url': VALID_LICENSE_URL,
             }
 
         # Create a publication and an acceptance record.
@@ -163,3 +170,52 @@ WHERE
         self.assertEqual(type_, 'Document')
         self.assertEqual(is_license_accepted, True)
         self.assertEqual(are_roles_accepted, True)
+
+    def test_add_new_pending_document_w_invalid_license(self):
+        """Add a pending document to the database."""
+        invalid_license_url = 'http://creativecommons.org/licenses/by-sa/1.0'
+
+        publication_id = self.make_publication()
+
+        # Create and add a document for the publication.
+        metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
+                    'license_url': invalid_license_url,
+                    }
+        document = self.make_document(metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                document_ident_hash = add_pending_model(
+                    cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+                expected_ident_hash = cursor.fetchone()[0]
+                cursor.execute("""
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                state, state_messages = cursor.fetchone()
+        self.assertEqual(state, 'Failed/Error')
+        expected_message = u"License '{}' is not valid for " \
+                           "contemporary publications." \
+                               .format(invalid_license_url)
+        expected_state_messages = [
+            {u'code': 10,
+             u'publication_id': 1,
+             u'epub_filename': None,
+             u'pending_document_id': 1,
+             u'pending_ident_hash': unicode(expected_ident_hash),
+             u'type': u'InvalidLicense',
+             u'message': expected_message
+             }]
+        self.assertEqual(state_messages, expected_state_messages)
