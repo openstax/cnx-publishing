@@ -11,6 +11,7 @@ import json
 import shutil
 import unittest
 import zipfile
+from copy import deepcopy
 
 import psycopg2
 import cnxepub
@@ -391,3 +392,44 @@ GROUP BY user_id, acceptance
 
         # 4. (manual)
         self._check_published_to_archive(use_cases.BOOK)
+
+    def test_new_trusted_to_publication_w_exceptions(self):
+        """\
+        Publish *new* *invalid* documents from an *trusted* application.
+        This proves that the publication creates identifiers for
+        the failing content and provides an exception gob in the response.
+        This includes application and user interactions with publishing.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        2. Verify the failure messages exist and the content entries
+           have been created.
+
+        """
+        publisher = u'ream'
+        use_case = deepcopy(use_cases.BOOK)
+        # Set the 'license_url' to something invalid.
+        use_case.metadata['license_url'] = 'http://example.com/public-domain'
+        # Set an author value to an invalid type.
+        authors = use_case[0][0][0].metadata['authors']
+        authors[0]['type'] = 'diaspora-id'
+        epub_filepath = self.make_epub(use_case, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Failed/Error')
+        publication_id = resp.json['publication']
+        messages = resp.json['messages']
+        codes = sorted([(m['code'], m['type'],) for m in messages])
+        self.assertEqual(codes,
+                         [(10, u'InvalidLicense'), (11, u'InvalidRole')])
+
+        # *. --
+        self.app_check_state(publication_id, 'Failed/Error',
+                             headers=api_key_headers)
