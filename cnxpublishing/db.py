@@ -5,7 +5,9 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+from __future__ import print_function
 import os
+import sys
 import io
 import json
 import uuid
@@ -19,6 +21,7 @@ from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
 
+from . import exceptions
 from .config import CONNECTION_STRING
 from .utils import parse_archive_uri, parse_user_uri
 from .publish import publish_model
@@ -28,7 +31,7 @@ __all__ = (
     'initdb',
     'add_publication',
     'poke_publication_state', 'check_publication_state',
-    'add_pending_document',
+    'add_pending_model',
     'accept_publication_license',
     )
 
@@ -186,6 +189,42 @@ SELECT md5(%(data)s);
     resource.id = cursor.fetchone()[0]
 
 
+# FIXME Cache this this function. There is no reason it needs to run
+#       more than once in a 24hr period.
+def obtain_licenses():
+    """Obtain the licenses in a dictionary form, keyed by url."""
+    settings = get_current_registry().settings
+    with psycopg2.connect(settings[CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT combined_row.url, row_to_json(combined_row) FROM (
+  SELECT "code", "version", "name", "url", "is_valid_for_publication"
+  FROM licenses) AS combined_row""")
+            licenses = {r[0]:r[1] for r in cursor.fetchall()}
+    return licenses
+
+
+def _validate_license(model):
+    """Given the model, check the license is one valid for publication."""
+    license_mapping = obtain_licenses()
+    license_url = model.metadata['license_url']
+    try:
+        license = license_mapping[license_url]
+    except KeyError:
+        raise exceptions.InvalidLicense(
+            message="License '{}' not found.".format(license_url))
+    if not license['is_valid_for_publication']:
+        raise exceptions.InvalidLicense(
+            message="License '{}' is not valid for contemporary "
+                    "publications.".format(license_url))
+
+
+def validate_model(model):
+    """Validates the model using a series of checks on bits of the data."""
+    # Check the license is one valid for publication.
+    _validate_license(model)
+
+
 def add_pending_model(cursor, publication_id, model):
     """Adds a model (binder or document) that is awaiting publication
     to the database.
@@ -193,6 +232,7 @@ def add_pending_model(cursor, publication_id, model):
     # FIXME Too much happening here...
     assert isinstance(model, (cnxepub.Document, cnxepub.Binder,))
     uri = model.get_uri('cnx-archive')
+
     if uri is not None:
         ident_hash = parse_archive_uri(uri)
         id, version = split_ident_hash(ident_hash, split_version=True)
@@ -229,21 +269,19 @@ LIMIT 1
         has_permission('publish.trusted-role-assigner',
                        context, request))
 
+    model.id = str(id)
+    model.metadata['version'] = '.'.join([str(v) for v in version if v])
     args = [publication_id, id, version[0], version[1], type_,
-            is_license_accepted, are_roles_accepted,]
+            is_license_accepted, are_roles_accepted,
+            json.dumps(model.metadata)]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
-   "license_accepted", "roles_accepted")
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+    "license_accepted", "roles_accepted", "metadata")
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
 """, args)
     pending_id, id, version = cursor.fetchone()
-    # FIXME Reassigning the ID and version here is probably not the
-    #       greatest approach to this.
-    model.metadata['version'] = version
-    model.id = str(id)
-
     pending_ident_hash = join_ident_hash(id, version)
 
     # Assign the new ident-hash to the document for later use.
@@ -251,11 +289,33 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     path = request.route_path('get-content', ident_hash=pending_ident_hash)
     model.set_uri('cnx-archive', path)
 
-    # FIXME This can't be here, because content reference resolution will need
-    # to write updates to the document after all document metadata
-    # has been added. This is because not all documents will have system
-    # identifiers until after metadata persistence.
-    # We will need to move this operation up a layer.
+    try:
+        validate_model(model)
+    except exceptions.PublicationException as exc:
+        exc.publication_id = publication_id
+        exc.pending_document_id = pending_id
+        exc.pending_ident_hash = pending_ident_hash
+        try:
+            set_publication_failure(cursor, exc)
+        except:
+            import traceback
+            print("Critical data error. Immediate attention is "
+                  "required. On publication at '{}'." \
+                  .format(publication_id),
+                  file=sys.stderr)
+            traceback.print_exc()
+    else:
+        upsert_pending_license_acceptors(cursor, pending_id)
+        upsert_pending_roles(cursor, pending_id)
+    return pending_ident_hash
+
+
+def add_pending_model_content(cursor, publication_id, model):
+    """Updates the pending model's content.
+    This is a secondary step not in ``add_pending_model, because
+    content reference resolution requires the identifiers as they
+    will appear in the end publication.
+    """
     if isinstance(model, cnxepub.Document):
         for resource in model.resources:
             add_pending_resource(cursor, resource)
@@ -264,27 +324,47 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             if reference._bound_model:
                 reference.bind(reference._bound_model, '/resources/{}')
 
-        args = (json.dumps(model.metadata),
-                psycopg2.Binary(model.content.encode('utf-8')),
-                pending_id,)
+        args = (psycopg2.Binary(model.content.encode('utf-8')),
+                publication_id, model.id,)
         stmt = """\
             UPDATE "pending_documents"
-            SET ("metadata", "content") = (%s, %s)
-            WHERE "id" = %s"""
+            SET ("content") = (%s)
+            WHERE "publication_id" = %s AND "uuid" = %s"""
     else:
         metadata = model.metadata.copy()
         # Insert the tree into the metadata.
         metadata['_tree'] = cnxepub.model_to_tree(model)
-        args = (json.dumps(metadata), pending_id,)
+        args = (json.dumps(metadata),
+                None,  # TODO Render the HTML tree at ``model.content``.
+                publication_id, model.id,)
+        # Must pave over metadata because postgresql lacks built-in
+        # json update functions.
         stmt = """\
             UPDATE "pending_documents"
-            SET metadata = %s
-            WHERE "id" = %s"""
-
+            SET ("metadata", "content") = (%s, %s)
+            WHERE "publication_id" = %s AND "uuid" = %s"""
     cursor.execute(stmt, args)
-    upsert_pending_license_acceptors(cursor, pending_id)
-    upsert_pending_roles(cursor, pending_id)
-    return pending_ident_hash
+
+
+def set_publication_failure(cursor, exc):
+    """Given a publication exception, set the publication as failed and
+    append the failure message to the publication record.
+    """
+    publication_id = exc.publication_id
+    if publication_id is None:
+        raise ValueError("Exception must have a ``publication_id`` value.")
+    cursor.execute("""\
+SELECT "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+    state_messages = cursor.fetchone()[0]
+    if state_messages is None:
+        state_messages = []
+    state_messages.append(exc.to_dict())
+    state_messages = json.dumps(state_messages)
+    cursor.execute("""\
+UPDATE publications SET ("state", "state_messages") = (%s, %s)
+WHERE id = %s""", ('Failed/Error', state_messages, publication_id,))
 
 
 def add_publication(cursor, epub, epub_file):
@@ -303,17 +383,27 @@ RETURNING id
     publication_id = cursor.fetchone()[0]
     insert_mapping = {}
 
+    models = set([])
     for package in epub:
         binder = cnxepub.adapt_package(package)
+        if binder in models:
+            continue
         for document in cnxepub.flatten_to_documents(binder):
-            ident_hash = add_pending_model(cursor, publication_id, document)
-            insert_mapping[document.id] = ident_hash
+            if document not in models:
+                ident_hash = add_pending_model(cursor, publication_id, document)
+                insert_mapping[document.id] = ident_hash
+                models.add(document)
         # The binding object could be translucent/see-through,
         # (case for a binder that only contains loose-documents).
         # Otherwise we should also publish the the binder.
         if not binder.is_translucent:
             ident_hash = add_pending_model(cursor, publication_id, binder)
             insert_mapping[binder.id] = ident_hash
+            models.add(binder)
+    for model in models:
+        # Now that all models have been given an identifier
+        # we can write the content to the database.
+        add_pending_model_content(cursor, publication_id, model)
     return publication_id, insert_mapping
 
 
@@ -375,14 +465,15 @@ def poke_publication_state(publication_id, current_state=None):
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             if current_state is None:
-                cursor.execute(
-                    """SELECT "state" FROM publications WHERE id = %s""",
-                    (publication_id,))
-                current_state = cursor.fetchone()[0]
-    if current_state in ('Publishing', 'Done/Success',):
+                cursor.execute("""\
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                current_state, messages = cursor.fetchone()
+    if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
         # Bailout early, because the publication is either in progress
         # or has been completed.
-        return current_state
+        return current_state, messages
 
     # Check for acceptance...
     with psycopg2.connect(conn_str) as db_conn:
@@ -437,9 +528,9 @@ WHERE p.id = %s
 UPDATE publications
 SET state = %s
 WHERE id = %s
-RETURNING state""", (change_state, publication_id,))
-                publication_state = cursor.fetchone()[0]
-    return publication_state
+RETURNING state, state_messages""", (change_state, publication_id,))
+                publication_state, messages = cursor.fetchone()
+    return publication_state, messages
 
 
 def check_publication_state(publication_id):
@@ -448,11 +539,12 @@ def check_publication_state(publication_id):
     conn_str = registry.settings[CONNECTION_STRING]
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute(
-                """SELECT "state" FROM publications WHERE id = %s""",
-                (publication_id,))
-            publication_state = cursor.fetchone()[0]
-    return publication_state
+            cursor.execute("""\
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+            publication_state, publication_messages = cursor.fetchone()
+    return publication_state, publication_messages
 
 
 def _node_to_model(tree_or_item, metadata=None, parent=None,
