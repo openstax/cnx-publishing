@@ -207,22 +207,43 @@ SELECT combined_row.url, row_to_json(combined_row) FROM (
 def _validate_license(model):
     """Given the model, check the license is one valid for publication."""
     license_mapping = obtain_licenses()
-    license_url = model.metadata['license_url']
+    try:
+        license_url = model.metadata['license_url']
+    except KeyError:
+        raise exceptions.MissingRequiredMetadata('license_url')
     try:
         license = license_mapping[license_url]
     except KeyError:
-        raise exceptions.InvalidLicense(
-            message="License '{}' not found.".format(license_url))
+        raise exceptions.InvalidLicense(license_url)
     if not license['is_valid_for_publication']:
-        raise exceptions.InvalidLicense(
-            message="License '{}' is not valid for contemporary "
-                    "publications.".format(license_url))
+        raise exceptions.InvalidLicense(license_url)
+
+
+def _validate_roles(model):
+    """Given the model, check that all the metadata role values
+    have valid information in them and any required metadata fields
+    contain values.
+    """
+    required_roles = (ATTRIBUTED_ROLE_KEYS[0], ATTRIBUTED_ROLE_KEYS[4],)
+    for role_key in ATTRIBUTED_ROLE_KEYS:
+        try:
+            roles = model.metadata[role_key]
+        except KeyError:
+            if role_key in required_roles:
+                raise exceptions.MissingRequiredMetadata(role_key)
+        else:
+            if role_key in required_roles and len(roles) == 0:
+                raise exceptions.MissingRequiredMetadata(role_key)
+        for role in roles:
+            if role.get('type') != 'cnx-id':
+                raise exceptions.InvalidRole(role_key, role)
 
 
 def validate_model(model):
     """Validates the model using a series of checks on bits of the data."""
     # Check the license is one valid for publication.
     _validate_license(model)
+    _validate_roles(model)
 
 
 def add_pending_model(cursor, publication_id, model):
@@ -292,6 +313,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     try:
         validate_model(model)
     except exceptions.PublicationException as exc:
+        exc_info = sys.exc_info()
         exc.publication_id = publication_id
         exc.pending_document_id = pending_id
         exc.pending_ident_hash = pending_ident_hash
@@ -299,11 +321,14 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             set_publication_failure(cursor, exc)
         except:
             import traceback
-            print("Critical data error. Immediate attention is "
+            print("Critical data error. Immediate attention is " \
                   "required. On publication at '{}'." \
                   .format(publication_id),
                   file=sys.stderr)
+            # Print the critical exception.
             traceback.print_exc()
+            # Raise the previous exception, so we know the original cause.
+            raise exc_info[0], exc_info[1], exc_info[2]
     else:
         upsert_pending_license_acceptors(cursor, pending_id)
         upsert_pending_roles(cursor, pending_id)
@@ -360,7 +385,9 @@ WHERE id = %s""", (publication_id,))
     state_messages = cursor.fetchone()[0]
     if state_messages is None:
         state_messages = []
-    state_messages.append(exc.to_dict())
+    entry = exc.__dict__
+    entry['message'] = exc.message
+    state_messages.append(entry)
     state_messages = json.dumps(state_messages)
     cursor.execute("""\
 UPDATE publications SET ("state", "state_messages") = (%s, %s)
