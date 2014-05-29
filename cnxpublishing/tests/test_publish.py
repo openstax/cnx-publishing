@@ -184,6 +184,7 @@ WHERE mor.module_ident = (SELECT module_ident from module)
         id, version = '3a70f722-b7b0-4b41-83dd-2790cee98c39', '1'
         expected_ident_hash = join_ident_hash(id, version)
         metadata = {
+            'version': version,
             'title': "Dingbat's Dilemma",
             'language': 'en-us',
             'summary': "The options are limitless.",
