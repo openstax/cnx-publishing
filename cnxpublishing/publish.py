@@ -47,7 +47,7 @@ module_insertion AS (
   VALUES
     ({__uuid__}, {__major_version__}, {__minor_version__},
      DEFAULT, %(_portal_type)s, DEFAULT,
-     %(title)s, %(created)s, %(revised)s, %(language)s,
+     %(title)s, %(created)s, CURRENT_TIMESTAMP, %(language)s,
      %(publisher)s, %(publication_message)s,
      (SELECT abstractid FROM abstract_insertion),
      (SELECT licenseid FROM license_lookup),
