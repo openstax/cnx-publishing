@@ -9,7 +9,7 @@ import json
 from copy import deepcopy
 
 import cnxepub
-from cnxarchive.utils import join_ident_hash
+from cnxarchive.utils import join_ident_hash, split_ident_hash
 
 
 # ############# #
@@ -177,21 +177,25 @@ def check_REVISED_BOOK_in_archive(test_case, cursor):
 SELECT uuid, moduleid, major_version, minor_version, version
 FROM modules ORDER BY major_version ASC""")
     records = {}
+    key_sep = '--'
     for row in cursor.fetchall():
-        key = row[:1]
-        value = row[2:]
+        key = key_sep.join([str(x) for x in row[:2]])
+        value = list(row[2:])
         if key not in records:
             records[key] = []
         records[key].append(value)
+    binder_uuid = split_ident_hash(binder.id)[0]
+    document_uuid = split_ident_hash(document.id)[0]
     expected_records = {
         # [uuid, moduleid]: [[major_version, minor_version, version], ...]
-        [binder.id, 'col10000']: [
-            ['1', '1', '1.1'],
-            ['2', '1', '2.1'],
+        key_sep.join([binder_uuid, 'col10000']): [
+            [1, 1, '1.1'],  # BOOK
+            [1, 2, '2.1'],  # REVISED_BOOK
+            [2, 1, '1.2'],  # republished on document insertion.
             ],
-        [document.id, 'm10000']: [
-            ['1', None, '1.1'],
-            ['2', None, '2.1'],
+        key_sep.join([document_uuid, 'm10000']): [
+            [1, None, '1.1'],
+            [2, None, '1.2'],
             ],
         }
     test_case.assertEqual(expected_records, records)
