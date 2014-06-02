@@ -190,8 +190,8 @@ FROM modules ORDER BY major_version ASC""")
         # [uuid, moduleid]: [[major_version, minor_version, version], ...]
         key_sep.join([binder_uuid, 'col10000']): [
             [1, 1, '1.1'],  # BOOK
-            [1, 2, '2.1'],  # REVISED_BOOK
-            [2, 1, '1.2'],  # republished on document insertion.
+            [1, 2, '1.1'],  # republished on document insertion.
+            [2, 1, '1.2'],  # REVISED_BOOK
             ],
         key_sep.join([document_uuid, 'm10000']): [
             [1, None, '1.1'],
@@ -201,19 +201,23 @@ FROM modules ORDER BY major_version ASC""")
     test_case.assertEqual(expected_records, records)
 
     # Check the tree...
-    binder_ident_hash = join_ident_hash(binder.id, (2, 1,))
-    document_ident_hash = join_ident_hash(document.id, (2, None,))
+    # This also proves that the REVISED_BOOK is in latest_modules
+    # by virtual of using the tree_to_json function.
+    binder_ident_hash = join_ident_hash(split_ident_hash(binder.id)[0],
+                                        (2, 1,))
+    document_ident_hash = join_ident_hash(split_ident_hash(document.id)[0],
+                                          (2, None,))
     expected_tree = {
-        "id": binder_ident_hash,
-        "title": "Book of Infinity",
-        "contents": [
-            {"id": "subcol",
-             "title": REVISED_BOOK[0].metadata['title'],
-             "contents": [
-                 {"id": document_ident_hash,
-                  "title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
+        u"id": unicode(binder_ident_hash),
+        u"title": u"Book of Infinity",
+        u"contents": [
+            {u"id": u"subcol",
+             u"title": REVISED_BOOK[0].metadata['title'],
+             u"contents": [
+                 {u"id": unicode(document_ident_hash),
+                  u"title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
     cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version))
 FROM latest_modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
