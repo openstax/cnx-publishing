@@ -125,7 +125,8 @@ SELECT
   m.name, m.language, a.abstract, l.url,
   m.major_version, m.minor_version,
   m.authors, m.submitter, m.submitlog, m.maintainers,
-  m.licensors, m.parentauthors, m.google_analytics, m.buylink
+  m.licensors, m.parentauthors, m.google_analytics, m.buylink,
+  m.created, m.revised
 FROM
   modules AS m
   NATURAL JOIN abstracts AS a
@@ -150,6 +151,14 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         self.assertEqual(module[11], None)  # TODO parent authors?
         self.assertEqual(module[12], None)  # TODO analytics code?
         self.assertEqual(module[13], None)  # TODO buy link?
+
+        # datetimes in UTC
+        created = datetime.datetime(1420, 2, 4, 4, 36)
+        revised = datetime.datetime.utcnow()
+        self.assertEqual(module[14].utctimetuple()[:5],
+                         created.timetuple()[:5])
+        self.assertEqual(module[15].utctimetuple()[:5],
+                         revised.timetuple()[:5])
 
         # Check the roles...
         with self.db_connect() as db_conn:
