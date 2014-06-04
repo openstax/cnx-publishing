@@ -190,7 +190,6 @@ FROM modules ORDER BY major_version ASC""")
         # [uuid, moduleid]: [[major_version, minor_version, version], ...]
         key_sep.join([binder_uuid, 'col10000']): [
             [1, 1, '1.1'],  # BOOK
-            [1, 2, '1.1'],  # republished on document insertion.
             [2, 1, '1.2'],  # REVISED_BOOK
             ],
         key_sep.join([document_uuid, 'm10000']): [
