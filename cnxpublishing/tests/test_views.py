@@ -423,6 +423,125 @@ GROUP BY user_id, acceptance
         # 4. (manual)
         self._check_published_to_archive(use_cases.BOOK)
 
+    def test_untrusted_revision(self):
+        """\
+        Publish *new* documents from an *untrusted* application.
+        This includes application and user interactions with publishing.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        2. For each *attributed role*...
+
+           - As the publisher, accept the license.
+           - As the copyright-holder, accept the license.
+           - As [other attributed roles], accept the license.
+
+        3. For each *attributed role*...
+
+           - As [an attributed role], accept my attribution
+             on these documents/binders in this publication.
+
+        4. Verify documents are in the archive. [HACKED]
+
+        """
+        # Insert the BOOK use-case in order to make a revision of it.
+        self._setup_to_archive(use_cases.BOOK)
+
+        publisher = u'ream'
+        epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
+        publication_id = resp.json['publication']
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
+
+        # 2. --
+        # TODO This uses the JSON get/post parts; revision publications
+        #      should attempt to use the HTML form.
+        #      Check the form contains for the correct documents and default
+        #      values. This is going to be easier to look
+        #      at and verify in a revision publication, where we can depend
+        #      on known uuid values.
+        uids = (
+            'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
+            'rings', 'sarblyth',
+            )
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_license_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_license_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, acceptance
+FROM publications_license_acceptance
+GROUP BY user_id, acceptance
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "the licenses.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
+
+        # 3. --
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_role_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_role_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, acceptance
+FROM publications_role_acceptance
+GROUP BY user_id, acceptance
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "role attribution.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # *. --
+        # This is publication completion,
+        # because all licenses and roles have been accepted.
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
+
+        # 4. (manual)
+        self._check_published_to_archive(use_cases.REVISED_BOOK)
+
     def test_new_trusted_to_publication_w_exceptions(self):
         """\
         Publish *new* *invalid* documents from an *trusted* application.
