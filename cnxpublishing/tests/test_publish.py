@@ -203,6 +203,7 @@ WHERE mor.module_ident = (SELECT module_ident from module)
             'copyright_holders': [{'id': 'ream', 'type': None}],
             'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
             'keywords': ['dingbat', 'bates', 'dilemma'],
+            'version': version,
             }
         publisher = 'ream'
         message = 'no msg'

@@ -251,27 +251,26 @@ def add_pending_model(cursor, publication_id, model):
     to the database.
     """
     # FIXME Too much happening here...
-    assert isinstance(model, (cnxepub.Document, cnxepub.Binder,))
+    assert isinstance(model, (cnxepub.Document, cnxepub.Binder,)), type(model)
     uri = model.get_uri('cnx-archive')
 
     if uri is not None:
         ident_hash = parse_archive_uri(uri)
         id, version = split_ident_hash(ident_hash, split_version=True)
-        if version is None or version == (None, None):
-            cursor.execute("""\
+        cursor.execute("""\
 SELECT major_version + 1 as next_version
-FROM modules
+FROM latest_modules
 WHERE uuid = %s
 UNION ALL
 SELECT 1 as next_version
 ORDER BY next_version DESC
 LIMIT 1
 """, (id,))
-            next_major_version = cursor.fetchone()[0]
-            if isinstance(model, cnxepub.Document):
-                version = (next_major_version, None,)
-            else: # ...assume it's a binder.
-                version = (next_major_version, 1,)
+        next_major_version = cursor.fetchone()[0]
+        if isinstance(model, cnxepub.Document):
+            version = (next_major_version, None,)
+        else:  # ...assume it's a binder.
+            version = (next_major_version, 1,)
     else:
         id = uuid.uuid4()
         if isinstance(model, cnxepub.Document):
