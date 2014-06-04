@@ -9,6 +9,10 @@ try:
     from urllib.parse import urlparse
 except ImportError:
     from urlparse import urlparse
+try:
+    from urllib.parse import unquote
+except ImportError:
+    from urllib2 import unquote
 
 
 __all__ = (
@@ -25,6 +29,7 @@ def parse_archive_uri(uri):
     except:
         raise ValueError("Expected a path like /contents/{ident_hash}, "
                          "got '{}' instead.".format(path))
+    ident_hash = unquote(ident_hash)
     return ident_hash
 
 
