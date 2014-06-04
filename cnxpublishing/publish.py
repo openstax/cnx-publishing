@@ -46,7 +46,7 @@ module_insertion AS (
      stateid, doctype)
   VALUES
     ({__uuid__}, {__major_version__}, {__minor_version__},
-     DEFAULT, %(_portal_type)s, DEFAULT,
+     DEFAULT, %(_portal_type)s, {__moduleid__},
      %(title)s, %(created)s, CURRENT_TIMESTAMP, %(language)s,
      %(publisher)s, %(publication_message)s,
      (SELECT abstractid FROM abstract_insertion),
@@ -170,11 +170,24 @@ def _insert_metadata(cursor, model, publisher, message):
                                          split_version=True)
         params['_uuid'] = uuid
         params['_major_version'], params['_minor_version'] = version
+        # Lookup legacy ``moduleid``.
+        cursor.execute("SELECT moduleid FROM latest_modules WHERE uuid = %s",
+                       (uuid,))
+        # There is the chance that a uuid and version have been set,
+        #   but a previous publication does not exist. Therefore the
+        #   moduleid will not be found. This happens on a pre-publication.
+        try:
+            moduleid = cursor.fetchone()[0]
+        except TypeError as exc:  # NoneType
+            moduleid = None
+        params['_moduleid'] = moduleid
+
         # Format the statement to accept the identifiers.
         stmt = MODULE_INSERTION_TEMPLATE.format(**{
             '__uuid__': "%(_uuid)s::uuid",
             '__major_version__': "%(_major_version)s",
             '__minor_version__': "%(_minor_version)s",
+            '__moduleid__': moduleid is None and "DEFAULT" or "%(_moduleid)s",
             })
     else:
         # Format the statement for defaults.
@@ -182,6 +195,7 @@ def _insert_metadata(cursor, model, publisher, message):
             '__uuid__': "DEFAULT",
             '__major_version__': "DEFAULT",
             '__minor_version__': "DEFAULT",
+            '__moduleid__': "DEFAULT",
             })
 
     cursor.execute(stmt, params)
