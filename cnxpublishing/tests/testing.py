@@ -6,12 +6,13 @@
 # See LICENCE.txt for details.
 # ###
 import os
+import functools
 
 import psycopg2
 from pyramid.paster import get_appsettings
 
 
-__all__ = ('integration_test_settings', 'db_connection_factory',)
+__all__ = ('integration_test_settings', 'db_connection_factory', 'db_connect',)
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -37,3 +38,21 @@ def db_connection_factory(connection_string=None):
         return psycopg2.connect(connection_string)
 
     return db_connect
+
+
+def db_connect(method):
+    """Decorator for methods that need to use the database
+
+    Example:
+    @db_connect
+    def setUp(self, cursor):
+        cursor.execute(some_sql)
+        # some other code
+    """
+    @functools.wraps(method)
+    def wrapped(self, *args, **kwargs):
+        connect = db_connection_factory()
+        with connect() as db_connection:
+            with db_connection.cursor() as cursor:
+                return method(self, cursor, *args, **kwargs)
+    return wrapped
