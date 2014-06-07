@@ -10,15 +10,18 @@ import sys
 import io
 import uuid
 import unittest
+from copy import deepcopy
 try:
     from unittest import mock
 except ImportError:
     import mock
 
 import psycopg2
+import cnxepub
 from pyramid import testing
 
-from .testing import integration_test_settings
+from . import use_cases
+from .testing import db_connect, integration_test_settings
 
 
 VALID_LICENSE_URL = "http://creativecommons.org/licenses/by/4.0/"
@@ -86,12 +89,11 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
                             metadata=metadata)
         return document
 
-    def persist_document(self, publication_id, document):
-        from ..db import add_pending_document
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_document(
-                    cursor, publication_id, document)
+    @db_connect
+    def persist_model(self, cursor, publication_id, model):
+        from ..db import add_pending_model, add_pending_model_content
+        ident_hash = add_pending_model(cursor, publication_id, model)
+        add_pending_model_content(cursor, publication_id, model)
 
 
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
@@ -395,3 +397,107 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
             validator(model)
         exc = caught_exc.exception
         self.assertEqual(exc.__dict__['value'], invalid_license_url)
+
+
+class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify database interactions with a *Connexions Archive*
+    Most of the minor details for this interaction are handled in the
+    publish module tests. These tests bridge those a slightly,
+    when trying to test overall logic that needs to know
+    the complete publication context.
+    """
+    # These tests push to archive defined tables, which
+    # DatabaseIntegrationTestCase tests do not do.
+    # In other words this works against the ``publish_pending`` function.
+
+    @db_connect
+    def test_republish(self, cursor):
+        """Ensure republication of binders that share documents."""
+        shared_book_setup = use_cases.setup_COMPLEX_BOOK_ONE_in_archive
+        shared_binder = shared_book_setup(self, cursor)
+        # We will republish book two.
+        binder = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(binder):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, binder)
+
+        # * Fire the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was only published once due to the publication
+        # request and the shared binder was republished as a minor revision.
+        cursor.execute("SELECT count(*) FROM modules WHERE uuid = %s",
+                       (binder.id,))
+        shared_binder_publication_count = cursor.fetchone()[0]
+        self.assertEqual(shared_binder_publication_count, 2)
+        # Check the shared binder got a minor version bump.
+        cursor.execute("""\
+SELECT uuid::text, major_version, minor_version
+FROM modules
+WHERE portal_type = 'Collection'
+ORDER BY major_version ASC, minor_version ASC""")
+        versions = {}
+        for row in cursor.fetchall():
+            versions.setdefault(row[0], [])
+            versions[row[0]].append(tuple(row[1:]))
+        expected_versions = {
+            'dbb28a6b-cad2-4863-986f-6059da93386b': [(1, 1,), (2, 1,)],
+            'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408': [(1, 1,), (1, 2,)],
+            }
+        self.assertEqual(versions, expected_versions)
+
+        # Check the shared binder's tree got updated.
+        cursor.execute("SELECT tree_to_json(%s, '1.2')::json",
+                       (shared_binder.id,))
+        tree = cursor.fetchone()[0]
+        expected_tree = {
+            u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
+            u'title': u'Book of Infinity',
+            u'contents': [
+                {u'id': u'subcol',
+                 u'title': u'Part One',
+                 u'contents': [
+                     {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@2',
+                      u'title': u'Document One'},
+                     {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'title': u'Document Two'}],
+                 },
+                {u'id': u'subcol',
+                 u'title': u'Part Two',
+                 u'contents': [
+                     {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@2',
+                      u'title': u'Document Three'},
+                     {u'id': u'deadbeef-a927-4652-9a8d-deb2d28fb801@1',
+                      u'title': u'Document Four'}],
+                 }],
+            }
+        self.assertEqual(tree, expected_tree)
+        cursor.execute("SELECT tree_to_json(%s, '2.1')::json",
+                       (binder.id,))
+        tree = cursor.fetchone()[0]
+        expected_tree = {
+            u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@2.1',
+            u'title': u'Book of Infinity',
+            u'contents': [
+                {u'id': u'subcol',
+                 u'title': u'Part One',
+                 u'contents': [
+                     {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'title': u'Document One'},
+                     {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@2',
+                      u'title': u'Document Two'}],
+                 },
+                {u'id': u'subcol',
+                 u'title': u'Part Two',
+                 u'contents': [
+                     {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@2',
+                      u'title': u'Document Three'}],
+                 }],
+            }
+        self.assertEqual(tree, expected_tree)
