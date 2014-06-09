@@ -51,7 +51,7 @@ HTTP API
                 in the EPUB with values that identify where the content will be
                 published.
 
-:/publications/{id}: Poll and poke the state of the publication.
+:/publications/{id}: Poll and poke the state of the publication. #main API point
 
 :/publications/{id}/license-acceptances/{uid}: Route for retrieving and posting
     information about a particular user's license acceptance. Only the user
