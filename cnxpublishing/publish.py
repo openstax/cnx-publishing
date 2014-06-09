@@ -293,6 +293,7 @@ def publish_model(cursor, model, publisher, message):
                          .format(len(publishers), publishers))
     module_ident, ident_hash = _insert_metadata(cursor, model, publisher, message)
     if isinstance(model, Document):
+        cursor.execute("select uuid || '@' || concat_ws('.', major_version, minor_version) from modules")
         files = [
                 {
                     'filename': 'index.cnxml.html',
@@ -301,11 +302,12 @@ def publish_model(cursor, model, publisher, message):
                     },
                 ]
         for resource in model.resources:
-            files.append({
-                'filename': resource.filename,
-                'mimetype': resource.media_type,
-                'data': resource.data.read(),
-                })
+            with resource.open() as data:
+                files.append({
+                    'filename': resource.filename,
+                    'mimetype': resource.media_type,
+                    'data': data.read(),
+                    })
         file_hashes = _insert_files(cursor, module_ident, files)
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
