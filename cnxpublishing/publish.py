@@ -301,11 +301,13 @@ def publish_model(cursor, model, publisher, message):
                     },
                 ]
         for resource in model.resources:
-            files.append({
+            file_data = {
                 'filename': resource.filename,
                 'mimetype': resource.media_type,
-                'data': resource.data.read(),
-                })
+                }
+            with resource.open() as data:
+                file_data['data'] = data.read()
+            files.append(file_data)
         file_hashes = _insert_files(cursor, module_ident, files)
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)

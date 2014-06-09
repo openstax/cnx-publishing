@@ -177,9 +177,11 @@ def _get_type_name(model):
 
 def add_pending_resource(cursor, resource):
     args = {
-            'data': psycopg2.Binary(resource.data.read()),
-            'media_type': resource.media_type,
-            }
+        'media_type': resource.media_type,
+        }
+    with resource.open() as data:
+        args['data'] = psycopg2.Binary(data.read()),
+
     cursor.execute("""\
 INSERT INTO pending_resources
   (data, media_type)
@@ -345,8 +347,8 @@ def add_pending_model_content(cursor, publication_id, model):
             add_pending_resource(cursor, resource)
 
         for reference in model.references:
-            if reference._bound_model:
-                reference.bind(reference._bound_model, '/resources/{}')
+            if reference.is_bound:
+                reference.bind(reference.bound_model, '/resources/{}')
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
