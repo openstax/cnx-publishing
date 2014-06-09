@@ -307,3 +307,67 @@ WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
         self.assertEqual(title, "Copy of Dingbat's Dilemma")
         self.assertEqual(parent, ident_hash)
         self.assertEqual(parentauthors, ['rbates'])
+
+    def test_publish_model(self):
+        from cnxepub import Resource
+        metadata = {
+            'title': "Dingbat's Dilemma",
+            'language': 'en-us',
+            'summary': "The options are limitless.",
+            'created': '1420-02-03 23:36:20.583149-05',
+            'revised': '1420-02-03 23:36:20.583149-05',
+            'license_url': 'http://creativecommons.org/licenses/by/3.0/',
+            # XXX We don't have a mapping.
+            'publishers': [{'id': 'ream', 'type': None}],
+            'authors': [{'id': 'rbates', 'type': 'cnx-id',
+                         'name': 'Richard Bates'},],
+            'editors': [{'id': 'jone', 'type': None},
+                        {'id': 'kahn', 'type': None}],
+            # XXX We don't have a mapping.
+            'illustrators': [{'id': 'AbagaleBates', 'type': None}],
+            'translators': [{'id': 'RhowandaOkofarBates', 'type': None},
+                            {'id': 'JamesOrwel', 'type': None}],
+            'copyright_holders': [{'id': 'ream', 'type': None}],
+            'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
+            'keywords': ['dingbat', 'bates', 'dilemma'],
+            }
+        publisher = 'ream'
+        message = 'no msg'
+        content = """\
+<p>Document with some resources</p>
+<p><a href="http://cnx.org/">external link</a></p>
+<p><a href="../resources/a.txt">internal link</a></p>
+"""
+        resource = Resource('a.txt', io.BytesIO('asdf\n'), 'text/plain',
+                filename='a.txt')
+        document = self.make_document(content=content, metadata=metadata)
+        document.resources = [resource]
+        document.references[-1].bind(resource, '../resources/{}')
+
+        from ..publish import publish_model
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                ident_hash = publish_model(cursor, document,
+                        publisher, message)
+
+        # Make sure resources are published
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT
+  mf.filename, f.file
+FROM
+  modules AS m
+  LEFT JOIN module_files AS mf ON mf.module_ident = m.module_ident
+  LEFT JOIN files AS f ON mf.fileid = f.fileid
+WHERE
+  m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
+ORDER BY mf.filename
+""", (ident_hash,))
+                file_data = cursor.fetchall()
+
+        self.assertEqual(len(file_data), 2)
+        self.assertEqual(file_data[0][0], 'a.txt')
+        self.assertEqual(file_data[0][1][:], 'asdf\n')
+        self.assertEqual(file_data[1][0], 'index.cnxml.html')
+        self.assertEqual(file_data[1][1][:], document.html)

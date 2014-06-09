@@ -316,6 +316,57 @@ WHERE id = %s""", (publication_id,))
         stderr.seek(0)
         self.assertTrue(stderr.read().find("*** test exception ***") >= 0)
 
+    def test_add_pending_model_content(self):
+        publication_id = self.make_publication()
+
+        # Create and add a document for the publication.
+        metadata = {
+            'authors': [{'id': 'able', 'type': 'cnx-id'}],
+            'license_url': VALID_LICENSE_URL,
+            }
+        import md5
+        from cnxepub import Resource
+        content = """\
+<p>Document with some resources</p>
+<p><a href="http://cnx.org/">external link</a></p>
+<p><a href="../resources/a.txt">internal link</a></p>
+"""
+        resource = Resource('a.txt', io.BytesIO('asdf\n'), 'text/plain')
+        resource_md5 = md5.md5('asdf\n').hexdigest()
+        document = self.make_document(id=str(uuid.uuid4()), content=content,
+                metadata=metadata)
+        document.resources = [resource]
+        document.references[-1].bind(resource, '../resources/{}')
+
+        # Here we are testing the function of add_pending_model_content
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                add_pending_model(cursor, publication_id, document)
+                add_pending_model_content(cursor, publication_id, document)
+
+        # Confirm the addition of pending document and resources
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT content
+FROM pending_documents
+WHERE publication_id = %s AND uuid = %s
+""", (publication_id, document.id))
+                content = cursor.fetchone()[0]
+                self.assertEqual(content[:], document.content)
+                self.assertTrue('href="/resources/{}"'.format(resource_md5)
+                        in content[:])
+
+                cursor.execute("""\
+SELECT data, media_type
+FROM pending_resources
+WHERE hash = %s
+""", (resource_md5,))
+                data, media_type = cursor.fetchone()
+                self.assertEqual(data[:], 'asdf\n')
+                self.assertEqual(media_type, 'text/plain')
+
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""

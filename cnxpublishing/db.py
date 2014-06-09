@@ -176,8 +176,9 @@ def _get_type_name(model):
 
 
 def add_pending_resource(cursor, resource):
-    args = {
-            'data': psycopg2.Binary(resource.data.read()),
+    with resource.open() as data:
+        args = {
+            'data': psycopg2.Binary(data.read()),
             'media_type': resource.media_type,
             }
     cursor.execute("""\
