@@ -39,8 +39,10 @@ CREATE TABLE pending_resources (
   "id" SERIAL PRIMARY KEY,
   "data" BYTEA,
   -- TODO ``CONSTRAINT unique_file_hash UNIQUE``, to be put in archive as well.
-  "hash" TEXT UNIQUE,  -- Trigger updated.
-  "media_type" TEXT NOT NULL
+  "hash" TEXT UNIQUE,  -- SHA1 hash
+  "md5" TEXT,  -- Legacy MD5 hash
+  "media_type" TEXT NOT NULL,
+  "exists_in_archive" BOOLEAN DEFAULT 'f'
 );
 
 

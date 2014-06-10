@@ -178,15 +178,16 @@ def _get_type_name(model):
 def add_pending_resource(cursor, resource):
     args = {
         'media_type': resource.media_type,
+        'hash': resource.hash,
         }
     with resource.open() as data:
         args['data'] = psycopg2.Binary(data.read()),
 
     cursor.execute("""\
 INSERT INTO pending_resources
-  (data, media_type)
-VALUES (%(data)s, %(media_type)s);
-SELECT md5(%(data)s);
+  (data, hash, media_type)
+VALUES (%(data)s, %(hash)s, %(media_type)s)
+RETURNING hash;
 """, args)
     resource.id = cursor.fetchone()[0]
 
