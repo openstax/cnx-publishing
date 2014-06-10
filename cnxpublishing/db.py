@@ -24,7 +24,7 @@ from pyramid.threadlocal import (
 from . import exceptions
 from .config import CONNECTION_STRING
 from .utils import parse_archive_uri, parse_user_uri
-from .publish import publish_model
+from .publish import publish_model, republish_binders
 
 
 __all__ = (
@@ -620,6 +620,8 @@ WHERE id = %s""",
     publisher, message = cursor.fetchone()
     cursor.connection.commit()
 
+    all_models = []
+
     # Commit documents one at a time...
     type_ = cnxepub.Document.__name__
     cursor.execute("""\
@@ -650,6 +652,7 @@ WHERE hash = %s""", (hash,))
                     hash, io.BytesIO(data), media_type, filename=hash))
 
         ident_hash = publish_model(cursor, document, publisher, message)
+        all_models.append(document)
 
     # And now the binders, one at a time...
     type_ = cnxepub.Binder.__name__
@@ -662,6 +665,10 @@ WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
         tree = metadata['_tree']
         binder = _reassemble_binder(str(id), tree, metadata)
         ident_hash = publish_model(cursor, binder, publisher, message)
+        all_models.append(binder)
+
+    # Republish binders containing shared documents.
+    republished_ident_hashes = republish_binders(cursor, all_models)
 
     # Lastly, update the publication status.
     cursor.execute("""\

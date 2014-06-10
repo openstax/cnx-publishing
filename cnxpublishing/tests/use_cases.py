@@ -116,6 +116,276 @@ REVISED_BOOK[0].metadata['title'] = u"Stifled with Good Inténsions"
 REVISED_BOOK[0].set_title_for_node(REVISED_BOOK[0][0], u"Infinity Plus")
 
 
+PAGE_ONE = cnxepub.Document(
+    id=u'2cf4d7d3@draft',
+    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    metadata={
+        u'title': u'Document One of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [u'South Africa'],
+        u'subjects': [u'Science and Mathematics'],
+        u'summary': u'<span>descriptive text</span>',
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [{u'id': u'marknewlyn',
+                      u'name': u'Mark Horner',
+                      u'type': u'cnx-id'},
+                     {u'id': u'charrose',
+                      u'name': u'Charmaine St. Rose',
+                      u'type': u'cnx-id'},
+                     {u'id': u'sarblyth',
+                      u'name': u'Sarah Blyth',
+                      u'type': u'cnx-id'}],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}],
+        u'editors': [{u'id': u'impicky',
+                      u'name': u'I. M. Picky',
+                      u'type': u'cnx-id'}],
+        u'illustrators': [{u'id': u'frahablar',
+                           u'name': u'Francis Hablar',
+                           u'type': u'cnx-id'}],
+        u'publishers': [{u'id': u'ream',
+                         u'name': u'Ream',
+                         u'type': u'cnx-id'},
+                        {u'id': u'rings',
+                         u'name': u'Rings',
+                         u'type': u'cnx-id'}],
+        u'translators': [{u'id': u'frahablar',
+                          u'name': u'Francis Hablar',
+                          u'type': u'cnx-id'}]}
+    )
+
+PAGE_TWO = cnxepub.Document(
+    id=u'c24fe396@draft',
+    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    metadata={
+        u'title': u'Document Two of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [u'South Africa'],
+        u'subjects': [u'Science and Mathematics'],
+        u'summary': u'<span>descriptive text</span>',
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [{u'id': u'marknewlyn',
+                      u'name': u'Mark Horner',
+                      u'type': u'cnx-id'},
+                     ],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}],
+        u'editors': [{u'id': u'impicky',
+                      u'name': u'I. M. Picky',
+                      u'type': u'cnx-id'}],
+        u'illustrators': [{u'id': u'frahablar',
+                           u'name': u'Francis Hablar',
+                           u'type': u'cnx-id'}],
+        u'publishers': [{u'id': u'ream',
+                         u'name': u'Ream',
+                         u'type': u'cnx-id'},
+                        {u'id': u'rings',
+                         u'name': u'Rings',
+                         u'type': u'cnx-id'}],
+        u'translators': [{u'id': u'frahablar',
+                          u'name': u'Francis Hablar',
+                          u'type': u'cnx-id'}]}
+    )
+
+PAGE_THREE = cnxepub.Document(
+    id=u'e12b72ac@draft',
+    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    metadata={
+        u'title': u'Document Three of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [u'South Africa'],
+        u'subjects': [u'Science and Mathematics'],
+        u'summary': u'<span>descriptive text</span>',
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [{u'id': u'charrose',
+                      u'name': u'Charmaine St. Rose',
+                      u'type': u'cnx-id'},
+                     {u'id': u'sarblyth',
+                      u'name': u'Sarah Blyth',
+                      u'type': u'cnx-id'}],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}],
+        u'editors': [{u'id': u'impicky',
+                      u'name': u'I. M. Picky',
+                      u'type': u'cnx-id'}],
+        u'illustrators': [{u'id': u'frahablar',
+                           u'name': u'Francis Hablar',
+                           u'type': u'cnx-id'}],
+        u'publishers': [{u'id': u'ream',
+                         u'name': u'Ream',
+                         u'type': u'cnx-id'},
+                        ],
+        u'translators': [{u'id': u'frahablar',
+                          u'name': u'Francis Hablar',
+                          u'type': u'cnx-id'}]}
+    )
+
+PAGE_FOUR = cnxepub.Document(
+    id=u'deadbeef@draft',
+    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    metadata={
+        u'title': u'Document Four of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [u'South Africa'],
+        u'subjects': [u'Science and Mathematics'],
+        u'summary': u'<span>descriptive text</span>',
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [{u'id': u'butcher',
+                      u'name': u'James Doakes',
+                      u'type': u'cnx-id'},
+                      ],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [{u'id': u'ream',
+                         u'name': u'Ream',
+                         u'type': u'cnx-id'},
+                        {u'id': u'rings',
+                         u'name': u'Rings',
+                         u'type': u'cnx-id'}],
+        u'translators': []
+        }
+    )
+
+COMPLEX_BOOK_ONE = cnxepub.Binder(
+    id='94f4d0f5@draft',
+    metadata={
+        u'title': u'Book of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': [u'Science and Mathematics'],
+        u'authors': [
+            {u'id': u'marknewlyn', u'name': u'Mark Horner',
+             u'type': u'cnx-id'},
+            {u'id': u'charrose', u'name': u'Charmaine St. Rose',
+             u'type': u'cnx-id'}],
+        u'copyright_holders': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
+        u'editors': [
+            {u'id': u'impicky', u'name': u'I. M. Picky',
+             u'type': u'cnx-id'}],
+        u'illustrators': [{u'id': u'frahablar',
+                           u'name': u'Francis Hablar',
+                           u'type': u'cnx-id'}],
+        u'publishers': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'},
+            {u'id': u'rings', u'name': u'Rings', u'type': u'cnx-id'}],
+        u'translators': [{u'id': u'frahablar',
+                          u'name': u'Francis Hablar',
+                          u'type': u'cnx-id'}],
+        u'summary': "<span>Book summary</span>",
+        },
+    nodes=[
+        cnxepub.TranslucentBinder(
+            metadata={u'title': u'Part One'},
+            title_overrides=['Document One', 'Document Two'],
+            nodes=[PAGE_ONE, PAGE_TWO],
+            ),
+        cnxepub.TranslucentBinder(
+            metadata={u'title': u'Part Two'},
+            title_overrides=['Document Three', 'Document Four'],
+            nodes=[PAGE_THREE, PAGE_FOUR],
+            ),
+        ])
+
+COMPLEX_BOOK_TWO = cnxepub.Binder(
+    id='94f4d0f5@draft',
+    metadata={
+        u'title': u'Book of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': [u'Science and Mathematics'],
+        u'authors': [
+            {u'id': u'marknewlyn', u'name': u'Mark Horner',
+             u'type': u'cnx-id'},
+            {u'id': u'charrose', u'name': u'Charmaine St. Rose',
+             u'type': u'cnx-id'}],
+        u'copyright_holders': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
+        u'editors': [
+            {u'id': u'impicky', u'name': u'I. M. Picky',
+             u'type': u'cnx-id'}],
+        u'illustrators': [{u'id': u'frahablar',
+                           u'name': u'Francis Hablar',
+                           u'type': u'cnx-id'}],
+        u'publishers': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'},
+            {u'id': u'rings', u'name': u'Rings', u'type': u'cnx-id'}],
+        u'translators': [{u'id': u'frahablar',
+                          u'name': u'Francis Hablar',
+                          u'type': u'cnx-id'}],
+        u'summary': "<span>Book summary</span>",
+        },
+    nodes=[
+        cnxepub.TranslucentBinder(
+            metadata={u'title': u'Part One'},
+            title_overrides=['Document One', 'Document Two'],
+            nodes=[PAGE_TWO, PAGE_THREE],
+            ),
+        cnxepub.TranslucentBinder(
+            metadata={u'title': u'Part Two'},
+            title_overrides=['Document Three'],
+            nodes=[PAGE_ONE],
+            ),
+        ])
+
+COMPLEX_BOOK_THREE = cnxepub.Binder(
+    id='defc01ef@draft',
+    metadata={
+        u'title': u'Book of Infinity',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': [],
+        u'authors': [
+            {u'id': u'charrose', u'name': u'Charmaine St. Rose',
+             u'type': u'cnx-id'}],
+        u'copyright_holders': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [
+            {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
+        u'translators': [],
+        u'summary': "<span>Book summary</span>",
+        },
+    title_overrides=['D One', 'D Two'],
+    nodes=[PAGE_TWO, PAGE_FOUR],
+    )
+
+
 # ################### #
 #   Use case checks   #
 # ################### #
@@ -235,12 +505,33 @@ WHERE portal_type = 'Collection'""")
 #
 #   def setup_<use-case-name>_in_archive(test_case, cursor):
 #       ...
+#
+# These assume that the identifiers for the respective REVISED_* use case
+# are used when inputting the model in the archive database.
+# This assumption is made because the use cases are meant to work together.
+
+
+def _is_published(ident_hash, cursor):
+    cursor.execute("""\
+SELECT module_ident
+FROM modules
+WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s""",
+                   (ident_hash,))
+    try:
+        ident = cursor.fetchone()[0]
+    except TypeError:
+        return False
+    return True
+
+
+def _set_uri(model):
+    """Set the system uri on the model."""
+    uri = "https://cnx.org/contents/{}".format(model.ident_hash)
+    model.set_uri('cnx-archive', uri)
+
 
 def setup_BOOK_in_archive(test_case, cursor):
-    """This assumes that the identifiers used within REVISED_BOOK
-    are used while inputting this into the database. This assumption
-    is made because the two use cases are meant to work together.
-    """
+    """Set up BOOK"""
     binder = deepcopy(BOOK)
     # FIXME Use the REVISED_BOOK id when it exists.
     binder.id = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
@@ -255,4 +546,147 @@ def setup_BOOK_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     publish_model(cursor, document, publisher, publication_message)
+    _set_uri(document)
     publish_model(cursor, binder, publisher, publication_message)
+    _set_uri(binder)
+    return binder
+
+
+def setup_PAGE_ONE_in_archive(test_case, cursor):
+    """Set up PAGE_ONE"""
+    model = deepcopy(PAGE_ONE)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = '2f2858ea-933c-4707-88d2-2e512e27252f'
+    model.metadata['version'] = '1'
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_PAGE_TWO_in_archive(test_case, cursor):
+    """Set up PAGE_TWO"""
+    model = deepcopy(PAGE_TWO)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = '32b11ecd-a1c2-4141-95f4-7c27f8c71dff'
+    model.metadata['version'] = '1'
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_PAGE_THREE_in_archive(test_case, cursor):
+    """Set up PAGE_THREE"""
+    model = deepcopy(PAGE_THREE)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = '014415de-2ae0-4053-91bc-74c9db2704f5'
+    model.metadata['version'] = '1'
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_PAGE_FOUR_in_archive(test_case, cursor):
+    """Set up PAGE_FOUR"""
+    model = deepcopy(PAGE_FOUR)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'deadbeef-a927-4652-9a8d-deb2d28fb801'
+    model.metadata['version'] = '1'
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
+    """Set up COMPLEX_BOOK_ONE"""
+    model = deepcopy(COMPLEX_BOOK_ONE)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408'
+    model.metadata['version'] = '1.1'
+
+    doc = setup_PAGE_ONE_in_archive(test_case, cursor)
+    model[0][0] = doc
+    doc = setup_PAGE_TWO_in_archive(test_case, cursor)
+    model[0][1] = doc
+    doc = setup_PAGE_THREE_in_archive(test_case, cursor)
+    model[1][0] = doc
+    doc = setup_PAGE_FOUR_in_archive(test_case, cursor)
+    model[1][1] = doc
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
+    """Set up COMPLEX_BOOK_ONE"""
+    model = deepcopy(COMPLEX_BOOK_TWO)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'dbb28a6b-cad2-4863-986f-6059da93386b'
+    model.metadata['version'] = '1.1'
+
+    doc = setup_PAGE_TWO_in_archive(test_case, cursor)
+    model[0][0] = doc
+    doc = setup_PAGE_THREE_in_archive(test_case, cursor)
+    model[0][1] = doc
+    doc = setup_PAGE_ONE_in_archive(test_case, cursor)
+    model[1][0] = doc
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
+def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
+    """Set up COMPLEX_BOOK_THREE"""
+    model = deepcopy(COMPLEX_BOOK_THREE)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'afe84d4c-61e2-404a-bca7-2e7899d21f47'
+    model.metadata['version'] = '1.1'
+
+    doc = setup_PAGE_TWO_in_archive(test_case, cursor)
+    model[0] = doc
+    doc = setup_PAGE_FOUR_in_archive(test_case, cursor)
+    model[1] = doc
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model

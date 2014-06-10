@@ -21,13 +21,12 @@ from cnxarchive.utils import join_ident_hash
 from webob import Request
 from pyramid import testing
 
+from . import use_cases
 from .testing import (
     integration_test_settings,
     db_connection_factory,
+    db_connect,
     )
-
-
-here = os.path.abspath(os.path.dirname(__file__))
 
 
 class PublishUtilityTestCase(unittest.TestCase):
@@ -307,3 +306,110 @@ WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
         self.assertEqual(title, "Copy of Dingbat's Dilemma")
         self.assertEqual(parent, ident_hash)
         self.assertEqual(parentauthors, ['rbates'])
+
+
+class RepublishTestCase(unittest.TestCase):
+    """Verify republication of binders that contain share documents
+    with the publication context.
+    """
+
+    settings = None
+    db_conn_str = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from ..config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+
+    def setUp(self):
+        from cnxarchive.database import initdb
+        initdb({'db-connection-string': self.db_conn_str})
+        from ..db import initdb
+        initdb(self.db_conn_str)
+        self.config = testing.setUp(settings=self.settings)
+
+    def tearDown(self):
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def call_target(self, *args, **kwargs):
+        from ..publish import republish_binders
+        return republish_binders(*args, **kwargs)
+
+    @db_connect
+    def test_republish(self, cursor):
+        """Verify republishing of binders in shared document situations."""
+        # * Set up three collections in the archive. These are used
+        # two of the three will be republished as minor versions.
+        # The other will be part of the main publication context,
+        # who's insertion into archive is outside the scope of this
+        # test case.
+        book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        book_two = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+
+        # * Make a new publication of book three.
+        book_three.metadata['version'] = '2.1'
+        book_three[0].metadata['version'] = '2'
+        book_three[1].metadata['version'] = '2'
+        from ..publish import publish_model
+        for model in (book_three[0], book_three[1], book_three,):
+            ident_hash = publish_model(cursor, model, 'tester', 'test pub')
+            model.set_uri('cnx-archive', '/contents/{}'.format(ident_hash))
+
+        # * Invoke the republish logic.
+        self.call_target(cursor, [book_three])
+
+        # * Ensure book one and two have been republished.
+        # We can ensure this through checking for the existence of the
+        # collection tree and the updated contents.
+        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_one.id,))
+        tree = cursor.fetchone()[0]
+        expected_tree = {
+            u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
+            u'title': u'Book of Infinity',
+            u'contents': [
+                {u'id': u'subcol',
+                 u'title': u'Part One',
+                 u'contents': [
+                     {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@1',
+                      u'title': u'Document One'},
+                     {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'title': u'Document Two'}],
+                 },
+                {u'id': u'subcol',
+                 u'title': u'Part Two',
+                 u'contents': [
+                     {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@1',
+                      u'title': u'Document Three'},
+                     {u'id': u'deadbeef-a927-4652-9a8d-deb2d28fb801@2',
+                      u'title': u'Document Four'}],
+                 }],
+            }
+        self.assertEqual(tree, expected_tree)
+        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_two.id,))
+        tree = cursor.fetchone()[0]
+        expected_tree = {
+            u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@1.2',
+            u'title': u'Book of Infinity',
+            u'contents': [
+                {u'id': u'subcol',
+                 u'title': u'Part One',
+                 u'contents': [
+                     {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'title': u'Document One'},
+                     {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@1',
+                      u'title': u'Document Two'}],
+                 },
+                {u'id': u'subcol',
+                 u'title': u'Part Two',
+                 u'contents': [
+                     {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@1',
+                      u'title': u'Document Three'}],
+                 }],
+            }
+        self.assertEqual(tree, expected_tree)

@@ -10,7 +10,7 @@ Functions used to commit publication works to the archive.
 """
 import cnxepub
 from cnxepub import Document, Binder
-from cnxarchive.utils import split_ident_hash
+from cnxarchive.utils import join_ident_hash, split_ident_hash
 
 from .utils import parse_user_uri
 
@@ -311,3 +311,244 @@ def publish_model(cursor, model, publisher, message):
         tree = cnxepub.model_to_tree(model)
         tree = _insert_tree(cursor, tree)
     return ident_hash
+
+
+def republish_binders(cursor, models):
+    """Republish the Binders that share Documents in the publication context.
+    This needs to be given all the models in the publication context."""
+    documents = set([])
+    binders = set([])
+    history_mapping = {}  # <previous-ident-hash>: <current-ident-hash>
+    if not isinstance(models, (list, tuple, set,)):
+        raise TypeError("``models`` Must be a sequence of model objects." \
+                        "We were given: {}".format(models))
+    for model in models:
+        if isinstance(model, (cnxepub.Binder,)):
+            binders.add(split_ident_hash(model.ident_hash))
+            for doc in cnxepub.flatten_to_documents(model):
+                documents.add(split_ident_hash(doc.ident_hash))
+        else:
+            documents.add(split_ident_hash(model.ident_hash))
+
+    to_be_republished = []
+    # What binders are these documents a part of?
+    for (uuid, version) in documents:
+        ident_hash = join_ident_hash(uuid, version)
+        previous_ident_hash = get_previous_publication(cursor, ident_hash)
+        if previous_ident_hash is None:
+            # Has no prior existence.
+            continue
+        else:
+            history_mapping[previous_ident_hash] = ident_hash
+        cursor.execute("""\
+WITH RECURSIVE t(nodeid, parent_id, documentid, path) AS (
+  SELECT tr.nodeid, tr.parent_id, tr.documentid, ARRAY[tr.nodeid]
+  FROM trees tr
+  WHERE tr.documentid = (
+    SELECT module_ident FROM modules
+    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+UNION ALL
+  SELECT c.nodeid, c.parent_id, c.documentid, path || ARRAY[c.nodeid]
+  FROM trees c JOIN t ON (c.nodeid = t.parent_id)
+  WHERE not c.nodeid = ANY(t.path)
+)
+SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+FROM t JOIN latest_modules m ON (t.documentid = m.module_ident)
+WHERE t.parent_id IS NULL
+""",
+                       (previous_ident_hash,))
+        to_be_republished.extend([split_ident_hash(x[0])
+                                  for x in cursor.fetchall()])
+    to_be_republished = set(to_be_republished)
+
+    republished_ident_hashes = []
+    # Republish the Collections set.
+    for (uuid, version) in to_be_republished:
+        if (uuid, version,) in binders:
+            # This binder is already in the publication context,
+            # don't try to publish it again.
+            continue
+        ident_hash = join_ident_hash(uuid, version)
+        bumped_version = bump_version(cursor, uuid, is_minor_bump=True)
+        republished_ident_hash = republish_collection(cursor, ident_hash,
+                                                      version=bumped_version)
+        # Set the identifier history.
+        history_mapping[ident_hash] = republished_ident_hash
+        rebuild_collection_tree(cursor, ident_hash, history_mapping)
+        republished_ident_hashes.append(republished_ident_hash)
+
+    return republished_ident_hashes
+
+
+def get_previous_publication(cursor, ident_hash):
+    """Get the previous publication of the given
+    publication as an ident-hash.
+    """
+    uuid, version = split_ident_hash(ident_hash)
+    cursor.execute("""\
+WITH contextual_module AS (
+  SELECT uuid, module_ident
+  FROM modules
+  WHERE uuid = %s AND concat_ws('.', major_version, minor_version) = %s)
+SELECT m.uuid||'@'||concat_ws('.', m.major_version, m.minor_version)
+FROM modules AS m JOIN contextual_module AS context ON (m.uuid = context.uuid)
+WHERE
+  m.module_ident < context.module_ident
+ORDER BY revised DESC
+LIMIT 1""",
+                   (uuid, version,))
+    try:
+        previous_ident_hash = cursor.fetchone()[0]
+    except TypeError:  # NoneType
+        previous_ident_hash = None
+    return previous_ident_hash
+
+
+def bump_version(cursor, uuid, is_minor_bump=False):
+    """Bump to the next version of the given content identified
+    by ``uuid``. Returns the next available version as a version tuple,
+    containing major and minor version.
+    If ``is_minor_bump`` is ``True`` the version will minor bump. That is
+    1.2 becomes 1.3 in the case of Collections. And 2 becomes 3 for
+    Modules regardless of this option.
+    """
+    cursor.execute("""\
+SELECT portal_type, major_version, minor_version
+FROM latest_modules
+WHERE uuid = %s::uuid""", (uuid,))
+    type_, major_version, minor_version = cursor.fetchone()
+    incr = 1
+    if type_ == 'Collection' and is_minor_bump:
+        minor_version = minor_version + incr
+    else:
+        major_version = major_version + incr
+    return (major_version, minor_version,)
+
+
+def republish_collection(cursor, ident_hash, version):
+    """Republish the collection identified as ``ident_hash`` with
+    the given ``version``.
+    """
+    if not isinstance(version, (list, tuple,)):
+        split_version = version.split('.')
+        if len(split_version) == 1:
+            split_version.append(None)
+        version = tuple(split_version)
+    major_version, minor_version = version
+
+    cursor.execute("""\
+WITH previous AS (
+  SELECT module_ident
+  FROM modules
+  WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s),
+inserted AS (
+  INSERT INTO modules
+    (uuid, major_version, minor_version, revised,
+     portal_type, moduleid,
+     name, created, language,
+     submitter, submitlog,
+     abstractid, licenseid, parent, parentauthors,
+     authors, maintainers, licensors,
+     google_analytics, buylink,
+     stateid, doctype)
+  SELECT
+    uuid, %s, %s, CURRENT_TIMESTAMP,
+    portal_type, moduleid,
+    name, created, language,
+    submitter, submitlog,
+    abstractid, licenseid, parent, parentauthors,
+    authors, maintainers, licensors,
+    google_analytics, buylink,
+    stateid, doctype
+  FROM modules AS m JOIN previous AS p ON (m.module_ident = p.module_ident)
+  RETURNING
+    uuid||'@'||concat_ws('.', major_version, minor_version) AS ident_hash,
+    module_ident),
+keywords AS (
+  INSERT INTO modulekeywords (module_ident, keywordid)
+  SELECT i.module_ident, keywordid
+  FROM modulekeywords AS mk, inserted AS i, previous AS p
+  WHERE mk.module_ident = p.module_ident),
+tags AS (
+  INSERT INTO moduletags (module_ident, tagid)
+  SELECT i.module_ident, tagid
+  FROM moduletags AS mt, inserted AS i, previous AS p
+  WHERE mt.module_ident = p.module_ident)
+SELECT ident_hash FROM inserted""",
+                   (ident_hash, major_version, minor_version,))
+    repub_ident_hash = cursor.fetchone()[0]
+    return repub_ident_hash
+
+
+def rebuild_collection_tree(cursor, ident_hash, history_map):
+    """Create a new tree for the collection based on the old tree but with
+    new document ids
+    """
+    collection_tree_sql = """\
+WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, ident_hash, path) AS (
+  SELECT
+    tr.nodeid, tr.parent_id, tr.documentid,
+    tr.title, tr.childorder, tr.latest,
+    (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+     FROM modules
+     WHERE module_ident = tr.documentid) AS ident_hash,
+    ARRAY[tr.nodeid]
+  FROM trees AS tr
+  WHERE tr.documentid = (
+    SELECT module_ident
+    FROM modules
+    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+UNION ALL
+  SELECT
+    c.*,
+    (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+     FROM modules
+     WHERE module_ident = c.documentid) AS ident_hash,
+    path || ARRAY[c.nodeid]
+  FROM trees AS c JOIN t ON (c.parent_id = t.nodeid)
+  WHERE not c.nodeid = ANY(t.path)
+)
+SELECT row_to_json(row) FROM (SELECT * FROM t) AS row"""
+
+    tree_insert_sql = """\
+INSERT INTO trees
+  (nodeid, parent_id,
+   documentid,
+   title, childorder, latest)
+VALUES
+  (DEFAULT, %(parent_id)s,
+   (SELECT module_ident
+    FROM modules
+    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %(ident_hash)s),
+   %(title)s, %(childorder)s, %(latest)s)
+RETURNING nodeid"""
+
+    def get_tree():
+        cursor.execute(collection_tree_sql, (ident_hash,))
+        for row in cursor.fetchall():
+            yield row[0]
+
+    def insert(fields):
+        cursor.execute(tree_insert_sql, fields)
+        results = cursor.fetchone()[0]
+        return results
+
+    tree = {} # {<current-nodeid>: {<row-data>...}, ...}
+    children = {} # {<nodeid>: [<child-nodeid>, ...], <child-nodeid>: [...]}
+    for node in get_tree():
+        tree[node['nodeid']] = node
+        children.setdefault(node['parent_id'], [])
+        children[node['parent_id']].append(node['nodeid'])
+
+    def build_tree(nodeid, parent_id):
+        data = tree[nodeid]
+        data['parent_id'] = parent_id
+        if history_map.get(data['ident_hash']) is not None \
+           and data['latest']:
+            data['ident_hash'] = history_map[data['ident_hash']]
+        new_nodeid = insert(data)
+        for child_nodeid in children.get(nodeid, []):
+            build_tree(child_nodeid, new_nodeid)
+
+    root_node = children[None][0]
+    build_tree(root_node, None)
