@@ -25,7 +25,6 @@ AS $$
   if existing_resource:
       if existing_resource[0]['fileid'] is not None:
           TD['new']['exists_in_archive'] = True
-      TD['new']['data'] = None
   return 'MODIFY'
 $$
 LANGUAGE plpythonu;

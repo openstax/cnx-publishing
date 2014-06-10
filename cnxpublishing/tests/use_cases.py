@@ -532,6 +532,28 @@ WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
 
+    resource_hash = hashlib.new(cnxepub.RESOURCE_HASH_TYPE,
+                                _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                           .hexdigest()
+    # FIXME Remove and change assertion after cnx-archive switches to
+    # ``cnxepub.RESOURCE_HASH_TYPE`` as hash. Use ``resource_hash`` in the
+    # check instead of ``file_md5``.
+    file_md5 = hashlib.new('md5',
+                           _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                      .hexdigest()
+    cursor.execute("""\
+SELECT f.file, mf.mimetype,
+       m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
+FROM files as f natural join module_files as mf, latest_modules as m
+WHERE
+  mf.module_ident = m.module_ident
+  AND
+  f.md5 = %s""", (file_md5,))
+    file, mime_type, ident_hash = cursor.fetchone()
+    test_case.assertEqual(mime_type, 'image/png')
+    test_case.assertEqual(ident_hash, document_ident_hash)
+    test_case.assertEqual(file[:], _read_file(RESOURCE_ONE_FILEPATH).read())
+
 
 # ################### #
 #   Use case setups   #
