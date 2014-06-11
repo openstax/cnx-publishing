@@ -5,12 +5,25 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import os
+import io
+import hashlib
 import json
 from copy import deepcopy
 
 import cnxepub
 from cnxarchive.utils import join_ident_hash, split_ident_hash
 
+
+here = os.path.abspath(os.path.dirname(__file__))
+TEST_DATA_DIR = os.path.join(here, 'data')
+RESOURCE_ONE_FILENAME = "e3d625fe.png"
+RESOURCE_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RESOURCE_ONE_FILENAME)
+
+
+def _read_file(filepath, mode='rb'):
+    with open(filepath, mode) as fb:
+        return io.BytesIO(fb.read())
 
 # ############# #
 #   Use cases   #
@@ -59,7 +72,12 @@ BOOK = cnxepub.Binder(
                     nodes=[
                         cnxepub.Document(
                             id=u'2cf4d7d3@draft',
-                            data=u'<p class="para">If you finish the book, there will be cake.</p>',
+                            data=u'<p class="para">If you finish the book, there will be cake.</p><img src="../resources/{}">'.format(RESOURCE_ONE_FILENAME),
+                            resources=[
+                                cnxepub.Resource(RESOURCE_ONE_FILENAME,
+                                                 _read_file(RESOURCE_ONE_FILEPATH, 'rb'),
+                                                 'image/png',
+                                                 filename=RESOURCE_ONE_FILENAME)],
                             metadata={
                                 u'title': u'Document One of Infinity',
                                 u'created': u'2013/03/19 15:01:16 -0500',
@@ -434,6 +452,28 @@ WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
 
+    resource_hash = hashlib.new(cnxepub.RESOURCE_HASH_TYPE,
+                                _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                           .hexdigest()
+    # FIXME Remove and change assertion after cnx-archive switches to
+    # ``cnxepub.RESOURCE_HASH_TYPE`` as hash. Use ``resource_hash`` in the
+    # check instead of ``file_md5``.
+    file_md5 = hashlib.new('md5',
+                           _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                      .hexdigest()
+    cursor.execute("""\
+SELECT f.file, mf.mimetype,
+       m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
+FROM files as f natural join module_files as mf, latest_modules as m
+WHERE
+  mf.module_ident = m.module_ident
+  AND
+  f.md5 = %s""", (file_md5,))
+    file, mime_type, ident_hash = cursor.fetchone()
+    test_case.assertEqual(mime_type, 'image/png')
+    test_case.assertEqual(ident_hash, document_ident_hash)
+    test_case.assertEqual(file[:], _read_file(RESOURCE_ONE_FILEPATH).read())
+
 
 def check_REVISED_BOOK_in_archive(test_case, cursor):
     """This checker assumes that the only content in the database
@@ -491,6 +531,28 @@ FROM latest_modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
+
+    resource_hash = hashlib.new(cnxepub.RESOURCE_HASH_TYPE,
+                                _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                           .hexdigest()
+    # FIXME Remove and change assertion after cnx-archive switches to
+    # ``cnxepub.RESOURCE_HASH_TYPE`` as hash. Use ``resource_hash`` in the
+    # check instead of ``file_md5``.
+    file_md5 = hashlib.new('md5',
+                           _read_file(RESOURCE_ONE_FILEPATH).read()) \
+                      .hexdigest()
+    cursor.execute("""\
+SELECT f.file, mf.mimetype,
+       m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
+FROM files as f natural join module_files as mf, latest_modules as m
+WHERE
+  mf.module_ident = m.module_ident
+  AND
+  f.md5 = %s""", (file_md5,))
+    file, mime_type, ident_hash = cursor.fetchone()
+    test_case.assertEqual(mime_type, 'image/png')
+    test_case.assertEqual(ident_hash, document_ident_hash)
+    test_case.assertEqual(file[:], _read_file(RESOURCE_ONE_FILEPATH).read())
 
 
 # ################### #

@@ -177,14 +177,17 @@ def _get_type_name(model):
 
 def add_pending_resource(cursor, resource):
     args = {
-            'data': psycopg2.Binary(resource.data.read()),
-            'media_type': resource.media_type,
-            }
+        'media_type': resource.media_type,
+        'hash': resource.hash,
+        }
+    with resource.open() as data:
+        args['data'] = psycopg2.Binary(data.read()),
+
     cursor.execute("""\
 INSERT INTO pending_resources
-  (data, media_type)
-VALUES (%(data)s, %(media_type)s);
-SELECT md5(%(data)s);
+  (data, hash, media_type)
+VALUES (%(data)s, %(hash)s, %(media_type)s)
+RETURNING hash;
 """, args)
     resource.id = cursor.fetchone()[0]
 
@@ -345,8 +348,8 @@ def add_pending_model_content(cursor, publication_id, model):
             add_pending_resource(cursor, resource)
 
         for reference in model.references:
-            if reference._bound_model:
-                reference.bind(reference._bound_model, '/resources/{}')
+            if reference.is_bound:
+                reference.bind(reference.bound_model, '/resources/{}')
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
@@ -649,7 +652,7 @@ FROM pending_resources
 WHERE hash = %s""", (hash,))
                 data, media_type = cursor.fetchone()
                 document.resources.append(cnxepub.Resource(
-                    hash, io.BytesIO(data), media_type, filename=hash))
+                    hash, io.BytesIO(data[:]), media_type, filename=hash))
 
         ident_hash = publish_model(cursor, document, publisher, message)
         all_models.append(document)
