@@ -61,7 +61,12 @@ def initdb(connection_string):
                 schema_filepath = os.path.join(SQL_DIR, filename)
                 with open(schema_filepath, 'r') as fb:
                     schema = fb.read()
-                    cursor.execute(schema)
+                    try:
+                        cursor.execute(schema)
+                    except psycopg2.Error as exc:
+                        print("File '{}' had issues executing." \
+                              .format(schema_filepath), file=sys.stderr)
+                        raise
 
 
 def upsert_pending_license_acceptors(cursor, document_id):
