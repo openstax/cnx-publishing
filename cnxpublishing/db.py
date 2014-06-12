@@ -132,7 +132,7 @@ FROM license_acceptances
 WHERE
   uuid = %s
   AND
-  (accepted is NULL OR accepted = FALSE)""", (uuid_,))
+  (accepted is UNKNOWN OR accepted is FALSE)""", (uuid_,))
     defectors = set(cursor.fetchall())
 
     if not defectors:
@@ -171,11 +171,25 @@ INSERT INTO role_acceptances
   ("uuid", "user_id", "role_type", "accepted")
         VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
 
+    # Has everyone already accepted?
+    cursor.execute("""\
+SELECT user_id
+FROM role_acceptances
+WHERE
+  uuid = %s
+  AND
+  (accepted is UNKNOWN OR accepted is FALSE)""", (uuid_,))
+    defectors = set(cursor.fetchall())
+
+    if not defectors:
+        # Update the pending document license acceptance state.
+        cursor.execute("""\
+update pending_documents set roles_accepted = 't'
+where id = %s""", (document_id,))
+
 
 def _get_type_name(model):
     """Returns a type name of 'Document' or 'Binder' based model's type."""
-    # XXX Shouldn't need to complicate this...
-    #     ... IDocument.providedBy(model)
     if isinstance(model, cnxepub.Binder):
         return 'Binder'
     else:

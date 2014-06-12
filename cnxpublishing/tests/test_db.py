@@ -311,7 +311,7 @@ WHERE
         self.assertEqual(is_license_accepted, True)
         self.assertEqual(are_roles_accepted, True)
 
-    def test_add_pending_document_w_exist_license_accept(self):
+    def test_add_pending_document_w_existing_license_accepted(self):
         """Add a pending document to the database.
         In this case we have an existing license acceptance for the author
         of the document.
@@ -321,11 +321,11 @@ WHERE
         document_uuid = str(uuid.uuid4())
         uri = 'http://cnx.org/contents/{}@1'.format(document_uuid)
         user_id = 'smoo'
+        role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
+
         document_metadata = {
-            'authors': [
-                {'id': 'smoo',
-                 'name': 'smOO chIE',
-                 'type': 'cnx-id'}],
+            'authors': [role_struct],
+            'publishers': [role_struct],
             'cnx-archive-uri': uri,
             'license_url': VALID_LICENSE_URL,
             }
@@ -363,6 +363,61 @@ WHERE
         type_, is_license_accepted, are_roles_accepted = record
         self.assertEqual(type_, 'Document')
         self.assertEqual(is_license_accepted, True)
+        self.assertEqual(are_roles_accepted, False)
+
+    def test_add_pending_document_w_existing_role_accepted(self):
+        """Add a pending document to the database.
+        In this case we have an existing license acceptance for the author
+        of the document.
+        This tests the trigger that will update the license acceptance
+        state on the pending document.
+        """
+        document_uuid = str(uuid.uuid4())
+        uri = 'http://cnx.org/contents/{}@1'.format(document_uuid)
+        user_id = 'smoo'
+        role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
+
+        document_metadata = {
+            'authors': [role_struct],
+            'publishers': [role_struct],
+            'cnx-archive-uri': uri,
+            'license_url': VALID_LICENSE_URL,
+            }
+
+        # Create a publication and an acceptance record.
+        publication_id = self.make_publication()
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                args = (document_uuid, user_id, 'Author',
+                        document_uuid, user_id, 'Publisher',)
+                cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES (%s, %s, %s, 't'), (%s, %s, %s, 't')""", args)
+
+        # Create and add a document for the publication.
+        document = self.make_document(metadata=document_metadata)
+        from ..db import add_pending_model
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                document_ident_hash = add_pending_model(
+                    cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT "type", "license_accepted", "roles_accepted"
+FROM pending_documents
+WHERE
+  publication_id = %s
+  AND concat_ws('@', uuid, concat_ws('.', major_version, minor_version)) = %s
+""", (publication_id, document_ident_hash,))
+                record = cursor.fetchone()
+        type_, is_license_accepted, are_roles_accepted = record
+        self.assertEqual(type_, 'Document')
+        self.assertEqual(is_license_accepted, False)
         self.assertEqual(are_roles_accepted, True)
 
     def test_add_pending_document_w_invalid_license(self):
@@ -373,6 +428,7 @@ WHERE
 
         # Create and add a document for the publication.
         metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
                     'license_url': invalid_license_url,
                     }
         document = self.make_document(metadata=metadata)
@@ -420,6 +476,7 @@ WHERE id = %s""", (publication_id,))
         # Create and add a document for the publication.
         author_value = {u'id': u'able', u'type': u'diaspora-id'}
         metadata = {'authors': [author_value],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
                     'license_url': VALID_LICENSE_URL,
                     }
         document = self.make_document(metadata=metadata)
