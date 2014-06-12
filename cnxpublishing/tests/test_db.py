@@ -8,6 +8,7 @@
 import os
 import sys
 import io
+import json
 import uuid
 import unittest
 from copy import deepcopy
@@ -18,6 +19,7 @@ except ImportError:
 
 import psycopg2
 import cnxepub
+from cnxarchive.utils import split_ident_hash
 from pyramid import testing
 
 from . import use_cases
@@ -94,6 +96,88 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
         from ..db import add_pending_model, add_pending_model_content
         ident_hash = add_pending_model(cursor, publication_id, model)
         add_pending_model_content(cursor, publication_id, model)
+
+
+class PublicationLicenseAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify license acceptance functionality"""
+
+    def setUp(self):
+        super(PublicationLicenseAcceptanceTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_pending_licensors
+        return upsert_pending_licensors(*args, **kwargs)
+
+    @db_connect
+    def test_licensor_insertion(self, cursor):
+        """Are we able to insert all roles found on in the content?"""
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the results.
+        cursor.execute("""\
+SELECT user_id, accepted
+FROM license_acceptances
+WHERE uuid = %s
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('charrose', None), ('frahablar', None),
+                    ('impicky', None), ('marknewlyn', None),
+                    ('ream', None), ('rings', None)]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_licensor_additions(self, cursor):
+        """Add licensors to the acceptance list"""
+        # Make it look like BOOK is already in the database.
+        # Add these roles to the license acceptance
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Create existing licensor records.
+        values = [
+            (uuid_, 'charrose', True), ##(uuid_, 'frahablar', None),
+            (uuid_, 'impicky', True), (uuid_, 'marknewlyn', True),
+            (uuid_, 'ream', True), ##(uuid_, 'rings', None),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO license_acceptances (uuid, user_id, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT user_id
+FROM license_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('frahablar',), ('rings',)]
+        self.assertEqual(entries, expected)
 
 
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
