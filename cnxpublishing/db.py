@@ -300,26 +300,15 @@ LIMIT 1
             version = (1, 1,)
 
     type_ = _get_type_name(model)
-    # Is the publishing party a trusted source?
-    request = get_current_request()
-    context = request.root
-    is_license_accepted = bool(
-        has_permission('publish.trusted-license-assigner',
-                       context, request))
-    are_roles_accepted = bool(
-        has_permission('publish.trusted-role-assigner',
-                       context, request))
-
     model.id = str(id)
     model.metadata['version'] = '.'.join([str(v) for v in version if v])
     args = [publication_id, id, version[0], version[1], type_,
-            is_license_accepted, are_roles_accepted,
             json.dumps(model.metadata)]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
     "license_accepted", "roles_accepted", "metadata")
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, 'f', 'f', %s)
 RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
 """, args)
     pending_id, uuid_, version = cursor.fetchone()

@@ -308,8 +308,8 @@ WHERE
                 record = cursor.fetchone()
         type_, is_license_accepted, are_roles_accepted = record
         self.assertEqual(type_, 'Document')
-        self.assertEqual(is_license_accepted, True)
-        self.assertEqual(are_roles_accepted, True)
+        self.assertEqual(is_license_accepted, False)
+        self.assertEqual(are_roles_accepted, False)
 
     def test_add_pending_document_w_existing_license_accepted(self):
         """Add a pending document to the database.
