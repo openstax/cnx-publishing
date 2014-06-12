@@ -88,10 +88,10 @@ SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
   pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) AS ident_hash,
-  acceptance AS is_accepted
+  accepted AS is_accepted
 FROM
   pending_documents AS pd
-  NATURAL JOIN publications_license_acceptance AS pla
+  NATURAL JOIN license_acceptances AS la
 WHERE pd.publication_id = %s AND user_id = %s
 ) as combined_rows;""",
                            (publication_id, user_id))
@@ -163,13 +163,11 @@ SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
   pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) AS ident_hash,
-  acceptance AS is_accepted
+  accepted AS is_accepted
 FROM
   pending_documents AS pd
-  NATURAL JOIN publications_role_acceptance AS pra
+  JOIN role_acceptances AS ra ON (pd.uuid = ra.uuid)
 WHERE
-  pd.id = pra.pending_document_id
-  AND
   pd.publication_id = %s
   AND
   user_id = %s

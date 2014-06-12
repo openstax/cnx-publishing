@@ -44,26 +44,26 @@ CREATE TABLE pending_resources (
 );
 
 
-CREATE TABLE publications_license_acceptance (
-  "uuid" UUID,  -- Document uuid, no constraint
-  "user_id" TEXT,  -- User identifier, no constraint
+CREATE TABLE license_acceptances (
+  "uuid" UUID NOT NULL,  -- Document uuid, no constraint
+  "user_id" TEXT NOT NULL,  -- User identifier, no constraint
   -- Acceptance can be three states null, true or false.
   -- The initial null value indicates action is required.
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
-  "acceptance" BOOLEAN DEFAULT NULL,
+  "accepted" BOOLEAN DEFAULT NULL,
   PRIMARY KEY ("uuid", "user_id")
 );
 
 
-CREATE TABLE publications_role_acceptance (
-  "pending_document_id" INTEGER,
-  "user_id" TEXT,  -- User identifier, no constraint
+CREATE TABLE role_acceptances (
+  "uuid" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,  -- User identifier, no constraint
+  "role_type" role_types NOT NULL,
   -- Acceptance can be three states null, true or false.
   -- The initial null value indicates action is required.
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
-  "acceptance" BOOLEAN DEFAULT NULL,
-  FOREIGN KEY ("pending_document_id") REFERENCES pending_documents ("id"),
-  PRIMARY KEY ("pending_document_id", "user_id")
+  "accepted" BOOLEAN DEFAULT NULL,
+  PRIMARY KEY ("uuid", "user_id", "role_type")
 );

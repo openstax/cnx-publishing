@@ -19,3 +19,13 @@ CREATE TYPE document_types AS ENUM (
   'Document',
   'Binder'
 );
+
+
+CREATE TYPE role_types AS ENUM (
+  'Author',
+  'Copyright Holder',
+  'Editor',
+  'Illustrator',
+  'Publisher',
+  'Translator'
+);

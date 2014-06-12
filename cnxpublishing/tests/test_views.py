@@ -373,9 +373,9 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT user_id, acceptance
-FROM publications_license_acceptance
-GROUP BY user_id, acceptance
+SELECT user_id, accepted
+FROM license_acceptances
+GROUP BY user_id, accepted
 """)
                 acceptance_records = cursor.fetchall()
                 for user_id, has_accepted in acceptance_records:
@@ -404,9 +404,9 @@ GROUP BY user_id, acceptance
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT user_id, acceptance
-FROM publications_role_acceptance
-GROUP BY user_id, acceptance
+SELECT user_id, accepted
+FROM role_acceptances
+GROUP BY user_id, accepted
 """)
                 acceptance_records = cursor.fetchall()
                 for user_id, has_accepted in acceptance_records:
@@ -492,9 +492,9 @@ GROUP BY user_id, acceptance
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT user_id, acceptance
-FROM publications_license_acceptance
-GROUP BY user_id, acceptance
+SELECT user_id, accepted
+FROM license_acceptances
+GROUP BY user_id, accepted
 """)
                 acceptance_records = cursor.fetchall()
                 for user_id, has_accepted in acceptance_records:
@@ -523,9 +523,9 @@ GROUP BY user_id, acceptance
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT user_id, acceptance
-FROM publications_role_acceptance
-GROUP BY user_id, acceptance
+SELECT user_id, accepted
+FROM role_acceptances
+GROUP BY user_id, accepted
 """)
                 acceptance_records = cursor.fetchall()
                 for user_id, has_accepted in acceptance_records:

@@ -159,8 +159,8 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO publications_license_acceptance
-  ("uuid", "user_id", "acceptance")
+INSERT INTO license_acceptances
+  ("uuid", "user_id", "accepted")
 VALUES (%s, %s, 't')""", (document_uuid, user_id,))
 
         # Create and add a document for the publication.
