@@ -150,24 +150,15 @@ FROM pending_documents
 WHERE id = %s""", (document_id,))
     uuid_, metadata = cursor.fetchone()
 
-    acceptors = set([(uid, type_,) for uid, type_ in _dissect_roles(metadata)])
+    acceptors = set([(uid, _role_type_to_db_type(type_),)
+                     for uid, type_ in _dissect_roles(metadata)])
 
     # Acquire a list of existing acceptors.
-    # This queries against the *archive* database.
     cursor.execute("""\
-SELECT r.roleparam, personids
-FROM
-  latest_modules AS lm
-  NATURAL JOIN moduleoptionalroles AS mor,
-  roles AS r
-WHERE
-  mor.roleid = r.roleid
-  AND
-  uuid = %s""", (uuid_,))
-    existing_roles = set([])
-    for role, people in cursor.fetchall():
-        for person_id in people:
-            existing_roles.add((person_id, role,))
+SELECT user_id, role_type
+FROM role_acceptances
+WHERE uuid = %s""", (uuid_,))
+    existing_roles = set([(r, t,) for r, t in cursor.fetchall()])
 
     # Who's not in the existing list?
     existing_acceptors = existing_roles
@@ -175,7 +166,6 @@ WHERE
 
     # Insert the new role acceptors.
     for acceptor, type_ in new_acceptors:
-        type_ = _role_type_to_db_type(type_)
         cursor.execute("""\
 INSERT INTO role_acceptances
   ("uuid", "user_id", "role_type", "accepted")

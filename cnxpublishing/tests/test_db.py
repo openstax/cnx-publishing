@@ -180,6 +180,98 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, expected)
 
 
+class PublicationRoleAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify license acceptance functionality"""
+
+    def setUp(self):
+        super(PublicationRoleAcceptanceTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_pending_roles
+        return upsert_pending_roles(*args, **kwargs)
+
+    @db_connect
+    def test_role_insertion(self, cursor):
+        """Are we able to insert all roles found on in the content?"""
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the results.
+        cursor.execute("""\
+SELECT user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s
+ORDER BY user_id ASC, role_type ASC""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [
+            ('charrose', 'Author', None), ('frahablar', 'Illustrator', None),
+            ('frahablar', 'Translator', None),
+            ('impicky', 'Editor', None), ('marknewlyn', 'Author', None),
+            ('ream', 'Copyright Holder', None),
+            ('ream', 'Publisher', None), ('rings', 'Publisher', None),
+            ]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_role_additions(self, cursor):
+        """Add roles to the acceptance list"""
+        # Make it look like BOOK is already in the database.
+        # Add these roles to the role acceptance
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Create existing role records.
+        values = [
+            (uuid_, 'charrose', 'Author', True),
+            (uuid_, 'frahablar', 'Translator', True),
+            ##(uuid_, 'frahablar', 'Illustrator', None),
+            (uuid_, 'impicky', 'Editor', True),
+            (uuid_, 'marknewlyn', 'Author', True),
+            (uuid_, 'ream', 'Copyright Holder', True),
+            (uuid_, 'ream', 'Publisher', True),
+            ##(uuid_, 'rings', 'Publisher', None),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT user_id, role_type
+FROM role_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('frahablar', 'Illustrator',),
+                    ('rings', 'Publisher',)]
+        self.assertEqual(entries, expected)
+
+
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions"""
 
