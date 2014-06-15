@@ -293,7 +293,9 @@ LIMIT 1
         else:  # ...assume it's a binder.
             version = (next_major_version, 1,)
     else:
-        id = uuid.uuid4()
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        id = cursor.fetchone()[0]
         if isinstance(model, cnxepub.Document):
             version = (1, None,)
         else:  # ...assume it's a binder.

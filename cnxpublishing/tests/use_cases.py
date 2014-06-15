@@ -530,6 +530,14 @@ def _set_uri(model):
     model.set_uri('cnx-archive', uri)
 
 
+def _insert_control_id(uuid_, cursor):
+    """Inserts a UUID value into the ``document_controls`` table."""
+    cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s::UUID) RETURNING uuid""",
+                   (uuid_,))
+    return cursor.fetchone()[0]
+
+
 def setup_BOOK_in_archive(test_case, cursor):
     """Set up BOOK"""
     binder = deepcopy(BOOK)
@@ -545,8 +553,10 @@ def setup_BOOK_in_archive(test_case, cursor):
     publication_message = 'published via test setup'
 
     from ..publish import publish_model
+    _insert_control_id(document.id, cursor)
     publish_model(cursor, document, publisher, publication_message)
     _set_uri(document)
+    _insert_control_id(binder.id, cursor)
     publish_model(cursor, binder, publisher, publication_message)
     _set_uri(binder)
     return binder
@@ -564,6 +574,7 @@ def setup_PAGE_ONE_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -581,6 +592,7 @@ def setup_PAGE_TWO_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -598,6 +610,7 @@ def setup_PAGE_THREE_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -615,6 +628,7 @@ def setup_PAGE_FOUR_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -641,6 +655,7 @@ def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -665,6 +680,7 @@ def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model
@@ -687,6 +703,7 @@ def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
     _set_uri(model)
     return model

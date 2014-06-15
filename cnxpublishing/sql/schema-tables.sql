@@ -31,7 +31,8 @@ CREATE TABLE pending_documents (
   -- Pending information
   "license_accepted" BOOLEAN DEFAULT FALSE,
   "roles_accepted" BOOLEAN DEFAULT FALSE,
-  FOREIGN KEY ("publication_id") REFERENCES publications ("id")
+  FOREIGN KEY ("publication_id") REFERENCES publications ("id"),
+  FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );
 
 
@@ -52,7 +53,8 @@ CREATE TABLE license_acceptances (
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
   "accepted" BOOLEAN DEFAULT NULL,
-  PRIMARY KEY ("uuid", "user_id")
+  PRIMARY KEY ("uuid", "user_id"),
+  FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );
 
 
@@ -65,5 +67,6 @@ CREATE TABLE role_acceptances (
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
   "accepted" BOOLEAN DEFAULT NULL,
-  PRIMARY KEY ("uuid", "user_id", "role_type")
+  PRIMARY KEY ("uuid", "user_id", "role_type"),
+  FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );

@@ -115,10 +115,12 @@ class PublicationLicenseAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
         # Set up the content to be referenced.
         metadata = json.dumps(use_cases.BOOK.metadata)
         cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
 INSERT INTO pending_documents
   (publication_id, uuid, major_version, minor_version,
    type, metadata)
-VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
 RETURNING id, uuid""", (self.publication_id, metadata,))
         pending_id, uuid_ = cursor.fetchone()
 
@@ -145,10 +147,12 @@ ORDER BY user_id""", (uuid_,))
         # Set up the content to be referenced.
         metadata = json.dumps(use_cases.BOOK.metadata)
         cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
 INSERT INTO pending_documents
   (publication_id, uuid, major_version, minor_version,
    type, metadata)
-VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+VALUES (%s, (SELECT uuid from control_insert), 1, 1, 'Binder', %s)
 RETURNING id, uuid""", (self.publication_id, metadata,))
         pending_id, uuid_ = cursor.fetchone()
 
@@ -197,10 +201,12 @@ class PublicationRoleAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
         # Set up the content to be referenced.
         metadata = json.dumps(use_cases.BOOK.metadata)
         cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
 INSERT INTO pending_documents
   (publication_id, uuid, major_version, minor_version,
    type, metadata)
-VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
 RETURNING id, uuid""", (self.publication_id, metadata,))
         pending_id, uuid_ = cursor.fetchone()
 
@@ -231,10 +237,12 @@ ORDER BY user_id ASC, role_type ASC""", (uuid_,))
         # Set up the content to be referenced.
         metadata = json.dumps(use_cases.BOOK.metadata)
         cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
 INSERT INTO pending_documents
   (publication_id, uuid, major_version, minor_version,
    type, metadata)
-VALUES (%s, uuid_generate_v4(), 1, 1, 'Binder', %s)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
 RETURNING id, uuid""", (self.publication_id, metadata,))
         pending_id, uuid_ = cursor.fetchone()
 
@@ -335,6 +343,8 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+                cursor.execute("""\
 INSERT INTO license_acceptances
   ("uuid", "user_id", "accepted")
 VALUES (%s, %s, 't')""", (document_uuid, user_id,))
@@ -388,6 +398,8 @@ WHERE
         publication_id = self.make_publication()
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
+                cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
                 args = (document_uuid, user_id, 'Author',
                         document_uuid, user_id, 'Publisher',)
                 cursor.execute("""\
