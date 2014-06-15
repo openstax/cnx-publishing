@@ -241,7 +241,7 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     # - the tests are secondly divided into new, existing and mixed
     #   document/binder content publications.
 
-    def test_new_untrusted_to_publication(self):
+    def test_new_to_publication(self):
         """\
         Publish *new* documents from an *untrusted* application.
         This includes application and user interactions with publishing.
@@ -357,7 +357,7 @@ GROUP BY user_id, accepted
         # 4. (manual)
         self._check_published_to_archive(use_cases.BOOK)
 
-    def test_untrusted_revision(self):
+    def test_revision(self):
         """\
         Publish *new* documents from an *untrusted* application.
         This includes application and user interactions with publishing.
@@ -476,7 +476,7 @@ GROUP BY user_id, accepted
         # 4. (manual)
         self._check_published_to_archive(use_cases.REVISED_BOOK)
 
-    def test_new_trusted_to_publication_w_exceptions(self):
+    def test_new_to_publication_w_exceptions(self):
         """\
         Publish *new* *invalid* documents from an *trusted* application.
         This proves that the publication creates identifiers for
