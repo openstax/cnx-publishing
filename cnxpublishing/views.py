@@ -7,8 +7,9 @@
 # ###
 import cnxepub
 import psycopg2
-from pyramid.view import view_config
 from pyramid import httpexceptions
+from pyramid.settings import asbool
+from pyramid.view import view_config
 
 from . import config
 from .db import (
@@ -27,6 +28,7 @@ def publish(request):
     if 'epub' not in request.POST:
         raise httpexceptions.HTTPBadRequest("Missing EPUB in POST body.")
 
+    is_pre_publication = asbool(request.POST.get('pre-publication'))
     epub_upload = request.POST['epub']
     try:
         epub = cnxepub.EPUB.from_file(epub_upload.file)
@@ -39,9 +41,8 @@ def publish(request):
     # of the content in the EPUB.
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            publication_id, publications = add_publication(cursor,
-                                                           epub,
-                                                           epub_upload.file)
+            publication_id, publications = add_publication(
+                cursor, epub, epub_upload.file, is_pre_publication)
 
     # Poke at the publication & lookup its state.
     state, messages = poke_publication_state(publication_id)

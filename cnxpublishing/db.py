@@ -405,17 +405,18 @@ UPDATE publications SET ("state", "state_messages") = (%s, %s)
 WHERE id = %s""", ('Failed/Error', state_messages, publication_id,))
 
 
-def add_publication(cursor, epub, epub_file):
+def add_publication(cursor, epub, epub_file, is_pre_publication=False):
     """Adds a publication entry and makes each item
     a pending document.
     """
     publisher = epub[0].metadata['publisher']
     publish_message = epub[0].metadata['publication_message']
     epub_binary = psycopg2.Binary(epub_file.read())
-    args = (publisher, publish_message, epub_binary,)
+    args = (publisher, publish_message, epub_binary, is_pre_publication,)
     cursor.execute("""\
-INSERT INTO publications ("publisher", "publication_message", "epub")
-VALUES (%s, %s, %s)
+INSERT INTO publications
+  ("publisher", "publication_message", "epub", "is_pre_publication")
+VALUES (%s, %s, %s, %s)
 RETURNING id
 """, args)
     publication_id = cursor.fetchone()[0]
@@ -507,10 +508,10 @@ def poke_publication_state(publication_id, current_state=None):
         with db_conn.cursor() as cursor:
             if current_state is None:
                 cursor.execute("""\
-SELECT "state", "state_messages"
+SELECT "state", "state_messages", "is_pre_publication"
 FROM publications
 WHERE id = %s""", (publication_id,))
-                current_state, messages = cursor.fetchone()
+                current_state, messages, is_pre_publication = cursor.fetchone()
     if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
         # Bailout early, because the publication is either in progress
         # or has been completed.
@@ -562,7 +563,16 @@ WHERE p.id = %s
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             if is_publish_ready:
-                publication_state = publish_pending(cursor, publication_id)
+                if not is_pre_publication:
+                    publication_state = publish_pending(cursor, publication_id)
+                else:
+                    change_state = "Done/Success"
+                    cursor.execute("""\
+UPDATE publications
+SET state = %s
+WHERE id = %s
+RETURNING state, state_messages""", (change_state, publication_id,))
+                    publication_state, messages = cursor.fetchone()
             else:
                 change_state = "Waiting for acceptance"
                 cursor.execute("""\

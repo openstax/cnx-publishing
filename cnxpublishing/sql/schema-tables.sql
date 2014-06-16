@@ -11,6 +11,8 @@ CREATE TABLE publications (
   "publisher" TEXT NOT NULL,
   "publication_message" TEXT NOT NULL,
   "epub" BYTEA NOT NULL,
+  -- Pre-publication, do not commit to *archive*.
+  "is_pre_publication" BOOLEAN DEFAULT FALSE,
   -- State information, included an optional message.
   "state" publication_states DEFAULT 'Processing',
   "state_messages" JSON
