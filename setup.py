@@ -8,8 +8,10 @@ IS_PY3 = sys.version_info > (3,)
 install_requires = (
     'cnx-archive',
     'cnx-epub',
+    'openstax-accounts',
     'psycopg2',
     'pyramid',
+    'pyramid_multiauth',
     )
 tests_require = [
     'webtest',
