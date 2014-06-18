@@ -267,6 +267,33 @@ def validate_model(model):
     _validate_roles(model)
 
 
+def is_publication_permissible(cursor, publication_id, uuid_):
+    """Check the given publisher of this publication given
+    by ``publication_id`` is allowed to publish the content given
+    by ``uuid``.
+    """
+    # Check the publishing user has permission to publish
+    cursor.execute("""\
+SELECT 't'::boolean
+FROM
+  pending_documents AS pd
+  NATURAL JOIN document_acl AS acl
+  JOIN publications AS p ON (pd.publication_id = p.id)
+WHERE
+  p.id = %s
+  AND
+  pd.uuid = %s
+  AND
+  p.publisher = acl.user_id
+  AND
+  acl.permission = 'publish'""", (publication_id, uuid_,))
+    try:
+        is_allowed = cursor.fetchone()[0]
+    except TypeError:
+        is_allowed = False
+    return is_allowed
+
+
 def add_pending_model(cursor, publication_id, model):
     """Adds a model (binder or document) that is awaiting publication
     to the database.
@@ -294,7 +321,15 @@ LIMIT 1
             version = (next_major_version, 1,)
     else:
         cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+WITH
+control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid),
+acl_insert AS (
+  INSERT INTO document_acl (uuid, user_id, permission)
+  VALUES ((SELECT uuid FROM control_insert),
+          (SELECT publisher FROM publications WHERE id = %s),
+          'publish'::permission_type))
+SELECT uuid FROM control_insert""", (publication_id,))
         id = cursor.fetchone()[0]
         if isinstance(model, cnxepub.Document):
             version = (1, None,)
@@ -320,6 +355,16 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     request = get_current_request()
     path = request.route_path('get-content', ident_hash=pending_ident_hash)
     model.set_uri('cnx-archive', path)
+
+    # Check if the publication is allowed for the publishing user.
+    if not is_publication_permissible(cursor, publication_id, id):
+        # Set the failure but continue the operation of inserting
+        # the pending document.
+        exc = exceptions.NotAllowed(id)
+        exc.publication_id = publication_id
+        exc.pending_document_id = pending_id
+        exc.pending_ident_hash = pending_ident_hash
+        set_publication_failure(cursor, exc)
 
     try:
         validate_model(model)

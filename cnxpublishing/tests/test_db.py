@@ -432,6 +432,68 @@ WHERE
         self.assertEqual(is_license_accepted, False)
         self.assertEqual(are_roles_accepted, True)
 
+    @db_connect
+    def test_add_pending_document_wo_permission(self, cursor):
+        """Add a pending document from publisher without permission."""
+        publication_id = self.make_publication()
+        document_id = 'a040717c-8d70-4953-9ed0-10d5095d5448'
+
+        # Set up the controls and acl entries.
+        cursor.execute("""\
+WITH
+control_insert AS (
+  INSERT INTO document_controls (uuid)
+  VALUES (%s::uuid) RETURNING uuid)
+INSERT INTO document_acl (uuid, user_id, permission)
+VALUES ((SELECT uuid from control_insert), 'ream', 'publish'::permission_type)
+""",
+                               (document_id,))
+
+        # Create and add a document for the publication.
+        metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
+                    'cnx-archive-uri': 'http://cnx.org/contents/{}' \
+                                       .format(document_id),
+                    }
+        document = self.make_document(metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model
+        document_ident_hash = add_pending_model(
+            cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+        expected_ident_hash = cursor.fetchone()[0]
+        # We're pulling the first value in the state_messages array,
+        # there are other exceptions related to validation in there,
+        # but we can depend on the value's location because the permission
+        # check will always happen before the validations.
+        cursor.execute("""\
+SELECT state, (state_messages->>0)::json
+FROM publications
+WHERE id = %s""", (publication_id,))
+        state, state_messages = cursor.fetchone()
+
+        self.assertEqual(state, 'Failed/Error')
+        expected_message = u"Not allowed to publish '{}'.".format(document_id)
+        expected_state_messages = {
+            u'code': 8,
+            u'publication_id': 1,
+            u'epub_filename': None,
+            u'pending_document_id': 1,
+            u'pending_ident_hash': unicode(expected_ident_hash),
+            u'type': u'NotAllowed',
+            u'message': expected_message,
+            u'uuid': document_id,
+            }
+        self.assertEqual(state_messages, expected_state_messages)
+
     def test_add_pending_document_w_invalid_license(self):
         """Add a pending document to the database."""
         invalid_license_url = 'http://creativecommons.org/licenses/by-sa/1.0'

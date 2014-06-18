@@ -59,6 +59,27 @@ class PublicationException(Exception):
         return data
 
 
+class NotAllowed(PublicationException):
+    """Raised when a user attempts to publish something they don't
+    have permision to publish.
+    """
+    code = 8
+    _message_template = "Not allowed to publish '{uuid}'."
+
+    def __init__(self, uuid):
+        """``uuid`` is the content identifier
+        for which this exception applies.
+        """
+        super(NotAllowed, self).__init__()
+        self._uuid = uuid
+
+    @property
+    def __dict__(self):
+        data = super(NotAllowed, self).__dict__
+        data['uuid'] = self._uuid
+        return data
+
+
 class MissingRequiredMetadata(PublicationException):
     """Raised when an incoming publication lacks a required metadata value."""
     code = 9
