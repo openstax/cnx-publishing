@@ -538,6 +538,17 @@ INSERT INTO document_controls (uuid) VALUES (%s::UUID) RETURNING uuid""",
     return cursor.fetchone()[0]
 
 
+def _insert_acl_for_model(model, cursor):
+    """Insert the access control list for the given model."""
+    uuid_ = model.id
+    permission = 'publish'
+    for person_struct in model.metadata['publishers']:
+        user_id = person_struct['id']
+        cursor.execute("""\
+INSERT INTO document_acl (uuid, user_id, permission)
+VALUES (%s, %s, %s)""", (uuid_, user_id, permission,))
+
+
 def setup_BOOK_in_archive(test_case, cursor):
     """Set up BOOK"""
     binder = deepcopy(BOOK)
@@ -556,9 +567,11 @@ def setup_BOOK_in_archive(test_case, cursor):
     _insert_control_id(document.id, cursor)
     publish_model(cursor, document, publisher, publication_message)
     _set_uri(document)
+    _insert_acl_for_model(document, cursor)
     _insert_control_id(binder.id, cursor)
     publish_model(cursor, binder, publisher, publication_message)
     _set_uri(binder)
+    _insert_acl_for_model(binder,cursor)
     return binder
 
 
@@ -576,6 +589,7 @@ def setup_PAGE_ONE_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -594,6 +608,7 @@ def setup_PAGE_TWO_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -612,6 +627,7 @@ def setup_PAGE_THREE_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -630,6 +646,7 @@ def setup_PAGE_FOUR_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -657,6 +674,7 @@ def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -682,6 +700,7 @@ def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
 
@@ -705,5 +724,6 @@ def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
         publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
     _set_uri(model)
     return model
