@@ -27,9 +27,9 @@ def declare_routes(config):
     add_route('get-resource', '/resources/{hash}')
     add_route('publications', '/publications')
     add_route('get-publication', '/publications/{id}')
-    add_route('license-acceptance',
+    add_route('publication-license-acceptance',
               '/publications/{id}/license-acceptances/{uid}')
-    add_route('role-acceptance',
+    add_route('publication-role-acceptance',
               '/publications/{id}/role-acceptances/{uid}')
 
 

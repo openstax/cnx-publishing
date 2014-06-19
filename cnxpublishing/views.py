@@ -21,6 +21,10 @@ from .db import (
     )
 
 
+# ############## #
+#   Publishing   #
+# ############## #
+
 @view_config(route_name='publications', request_method='POST', renderer='json',
              permission='publish')
 def publish(request):
@@ -70,7 +74,8 @@ def get_publication(request):
     return response_data
 
 
-@view_config(route_name='license-acceptance', request_method='GET',
+@view_config(route_name='publication-license-acceptance',
+             request_method='GET',
              accept='application/json', renderer='json')
 def get_accept_license(request):
     """This produces an HTML form for accepting the license."""
@@ -104,8 +109,8 @@ WHERE pd.publication_id = %s AND user_id = %s
             }
 
 
-@view_config(route_name='license-acceptance', request_method='POST',
-             accept='application/json')
+@view_config(route_name='publication-license-acceptance',
+             request_method='POST', accept='application/json')
 def post_accept_license(request):
     """Accept license acceptance requests."""
     publication_id = request.matchdict['id']
@@ -145,7 +150,7 @@ def post_accept_license(request):
     return httpexceptions.HTTPFound(location=location)
 
 
-@view_config(route_name='role-acceptance', request_method='GET',
+@view_config(route_name='publication-role-acceptance', request_method='GET',
              accept='application/json', renderer='json')
 def get_accept_role(request):
     """This produces an HTML form for accepting the license."""
@@ -182,7 +187,7 @@ WHERE
             }
 
 
-@view_config(route_name='role-acceptance', request_method='POST',
+@view_config(route_name='publication-role-acceptance', request_method='POST',
              accept='application/json')
 def post_accept_role(request):
     """Accept license acceptance requests."""
