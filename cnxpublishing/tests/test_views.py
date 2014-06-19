@@ -33,7 +33,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_DIR = os.path.join(here, 'data')
 
 
-class PublishViewTestCase(unittest.TestCase):
+class PublishViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp()
@@ -96,8 +96,9 @@ class EPUBMixInTestCase(object):
         return dst
 
 
-class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
-    """Request/response client interaction"""
+class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
+    """Request/response client interactions"""
+
 
     settings = None
     db_conn_str = None
@@ -147,6 +148,10 @@ class FunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
+
+
+class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
+    """Publishing API request/response client interactions"""
 
     def _setup_to_archive(self, use_case):
         """Used to setup a content set in the archive.
