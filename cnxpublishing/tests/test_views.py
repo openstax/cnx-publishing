@@ -25,7 +25,7 @@ from pyramid import httpexceptions
 from . import use_cases
 from .testing import (
     integration_test_settings,
-    db_connection_factory,
+    db_connect, db_connection_factory,
     )
 
 
@@ -148,6 +148,128 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
+
+
+class UserActionsAPIFunctionalTestCase(BaseFunctionalViewTestCase):
+    """User actions API request/response client interactions"""
+
+    @db_connect
+    def test_licensors_request(self, cursor):
+        """Submit a set of users to initial license acceptance.
+
+        1. Submit the license request.
+
+        2. Verify the request entry.
+
+        3. Submit a deletion request.
+
+        4. Verify the request entry.
+
+        """
+        # Set up a document_controls entry to make it appear as if we
+        # are working against a true piece of content.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+        cursor.connection.commit()
+
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_header = [('x-api-key', api_key,)]
+        headers = [('content-type', 'application/json',)]
+        headers.extend(api_key_header)
+
+        uids = ['marknewlyn', 'charrose']
+
+        # 1.
+        path = "/contents/{}/licensors".format(uuid_)
+        data = uids
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 2.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'marknewlyn', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
+        # 3.
+        data = ['marknewlyn']
+        resp = self.app.delete_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 200)
+
+        # 4.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
+    @db_connect
+    def test_roles_request(self, cursor):
+        """Submit a set of roles to be accepted.
+
+        1. Submit the roles request.
+
+        2. Verify the request entry.
+
+        3. Submit a deletion request.
+
+        4. Verify the request entry.
+
+        """
+        # Set up a document_controls entry to make it appear as if we
+        # are working against a true piece of content.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+        cursor.connection.commit()
+
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_header = [('x-api-key', api_key,)]
+        headers = [('content-type', 'application/json',)]
+        headers.extend(api_key_header)
+
+        # 1.
+        path = "/contents/{}/roles".format(uuid_)
+        data = [
+            {'uid': 'charrose', 'role': 'Author'},
+            {'uid': 'marknewlyn', 'role': 'Author'},
+            {'uid': 'rings', 'role': 'Publisher'},
+            ]
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 2.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose',
+             'role': 'Author', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'marknewlyn',
+             'role': 'Author', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'rings',
+             'role': 'Publisher', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
+        # 3.
+        data = [
+            {'uid': 'marknewlyn', 'role': 'Author'},
+            {'uid': 'marknewlyn', 'role': 'Publisher'},
+            ]
+        resp = self.app.delete_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 200)
+
+        # 4.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose',
+             'role': 'Author', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'rings',
+             'role': 'Publisher', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
 
 
 class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):

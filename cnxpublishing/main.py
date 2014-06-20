@@ -25,6 +25,12 @@ def declare_routes(config):
     add_route = config.add_route
     add_route('get-content', '/contents/{ident_hash}')
     add_route('get-resource', '/resources/{hash}')
+
+    # User actions API
+    add_route('license-request', '/contents/{uuid}/licensors')
+    add_route('roles-request', '/contents/{uuid}/roles')
+
+    # Publishing API
     add_route('publications', '/publications')
     add_route('get-publication', '/publications/{id}')
     add_route('publication-license-acceptance',

@@ -18,6 +18,10 @@ from .db import (
     check_publication_state,
     accept_publication_license,
     accept_publication_role,
+    upsert_license_requests,
+    remove_license_requests,
+    upsert_role_requests,
+    remove_role_requests,
     )
 
 
@@ -226,3 +230,147 @@ def post_accept_role(request):
     # Poke publication to change state.
     state = poke_publication_state(publication_id)
     return httpexceptions.HTTPFound(location=location)
+
+
+# ################ #
+#   User Actions   #
+# ################ #
+
+@view_config(route_name='license-request',
+             request_method='GET',
+             accept='application/json', renderer='json')
+def get_license_request(request):
+    """Returns a list of those accepting the license."""
+    uuid_ = request.matchdict['uuid']
+    user_id = request.matchdict.get('uid')
+    settings = request.registry.settings
+
+    args = [uuid_]
+    if user_id is not None:
+        fmt_conditional = "AND user_id = %s"
+        args.append(user_id)
+    else:
+        fmt_conditional = ""
+
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+SELECT row_to_json(combined_rows) FROM (
+SELECT uuid, user_id AS uid, accepted AS has_accepted
+FROM license_acceptances AS la
+WHERE uuid = %s {}
+ORDER BY user_id ASC
+) as combined_rows""".format(fmt_conditional), args)
+            acceptances = [r[0] for r in cursor.fetchall()]
+
+    if not acceptances:
+        raise httpexceptions.HTTPNotFound()
+
+    resp_value = acceptances
+    if user_id is not None:
+        resp_value = acceptances[0]
+    return resp_value
+
+
+@view_config(route_name='license-request',
+             request_method='POST', accept='application/json')
+def post_license_request(request):
+    """Submission to create a license acceptance request."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted_uids = request.json
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            upsert_license_requests(cursor, uuid_, posted_uids)
+
+    resp = request.response
+    resp.status_int = 202
+    return resp
+
+
+@view_config(route_name='license-request',
+             request_method='DELETE', accept='application/json')
+def delete_license_request(request):
+    """Submission to remove a license acceptance request."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted_uids = request.json
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            remove_license_requests(cursor, uuid_, posted_uids)
+
+    resp = request.response
+    resp.status_int = 200
+    return resp
+
+
+@view_config(route_name='roles-request',
+             request_method='GET',
+             accept='application/json', renderer='json')
+def get_roles_request(request):
+    """Returns a list of accepting roles."""
+    uuid_ = request.matchdict['uuid']
+    user_id = request.matchdict.get('uid')
+    settings = request.registry.settings
+
+    args = [uuid_]
+    if user_id is not None:
+        fmt_conditional = "AND user_id = %s"
+        args.append(user_id)
+    else:
+        fmt_conditional = ""
+
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+SELECT row_to_json(combined_rows) FROM (
+SELECT uuid, user_id AS uid, role_type AS role, accepted AS has_accepted
+FROM role_acceptances AS la
+WHERE uuid = %s {}
+ORDER BY user_id ASC, role_type ASC
+) as combined_rows""".format(fmt_conditional), args)
+            acceptances = [r[0] for r in cursor.fetchall()]
+
+    if not acceptances:
+        raise httpexceptions.HTTPNotFound()
+
+    resp_value = acceptances
+    if user_id is not None:
+        resp_value = acceptances[0]
+    return resp_value
+
+
+@view_config(route_name='roles-request',
+             request_method='POST', accept='application/json')
+def post_roles_request(request):
+    """Submission to create a role acceptance request."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted_roles = request.json
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            upsert_role_requests(cursor, uuid_, posted_roles)
+
+    resp = request.response
+    resp.status_int = 202
+    return resp
+
+
+@view_config(route_name='roles-request',
+             request_method='DELETE', accept='application/json')
+def delete_roles_request(request):
+    """Submission to remove a role acceptance request."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted_roles = request.json
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            remove_role_requests(cursor, uuid_, posted_roles)
+
+    resp = request.response
+    resp.status_int = 200
+    return resp

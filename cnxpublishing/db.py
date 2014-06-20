@@ -790,3 +790,96 @@ WHERE
   AND
   pd.uuid = ra.uuid""",
                    (is_accepted, publication_id, user_id, document_ids,))
+
+
+def upsert_license_requests(cursor, uuid_, uids):
+    """Given a ``uuid`` and list of ``uids`` (user identifiers)
+    create a license acceptance entry.
+    """
+    if not isinstance(uids, (list, set, tuple,)):
+        raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = set(uids)
+
+    # Acquire a list of existing acceptors.
+    cursor.execute("""\
+SELECT "user_id"
+FROM license_acceptances
+WHERE uuid = %s""", (uuid_,))
+    existing_acceptors = set([x[0] for x in cursor.fetchall()])
+
+    # Who's not in the existing list?
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new licensor acceptors.
+    args = []
+    values_fmt = []
+    for uid in new_acceptors:
+        args.extend([uuid_, uid])
+        values_fmt.append("(%s, %s)")
+    values_fmt = ', '.join(values_fmt)
+    cursor.execute("""\
+INSERT INTO license_acceptances (uuid, user_id)
+VALUES {}""".format(values_fmt), args)
+
+
+def remove_license_requests(cursor, uuid_, uids):
+    """Given a ``uuid`` and list of ``uids`` (user identifiers)
+    remove the identified users' license acceptance entries.
+    """
+    if not isinstance(uids, (list, set, tuple,)):
+        raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = list(set(uids))
+
+    # Remove the the entries.
+    cursor.execute("""\
+DELETE FROM license_acceptances
+WHERE uuid = %s AND user_id = ANY(%s::text[])""", (uuid_, acceptors,))
+
+
+def upsert_role_requests(cursor, uuid_, roles):
+    """Given a ``uuid`` and list of dicts containing the ``uid`` and
+    ``role`` for creating a role acceptance entry.
+    """
+    if not isinstance(roles, (list, set, tuple,)):
+        raise TypeError("``roles`` is an invalid type: {}" \
+                        .format(type(roles)))
+
+    acceptors = set([(x['uid'], x['role'],) for x in roles])
+
+    # Acquire a list of existing acceptors.
+    cursor.execute("""\
+SELECT user_id, role_type
+FROM role_acceptances
+WHERE uuid = %s""", (uuid_,))
+    existing_roles = set([(r, t,) for r, t in cursor.fetchall()])
+
+    # Who's not in the existing list?
+    existing_acceptors = existing_roles
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new role acceptors.
+    for acceptor, type_ in new_acceptors:
+        cursor.execute("""\
+INSERT INTO role_acceptances
+  ("uuid", "user_id", "role_type", "accepted")
+        VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
+
+
+def remove_role_requests(cursor, uuid_, roles):
+    """Given a ``uuid`` and list of dicts containing the ``uid``
+    (user identifiers) and ``role`` for removal of the identified
+    users' role acceptance entries.
+    """
+    if not isinstance(roles, (list, set, tuple,)):
+        raise TypeError("``roles`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = set([(x['uid'], x['role'],) for x in roles])
+
+    # Remove the the entries.
+    for uid, role_type in acceptors:
+        cursor.execute("""\
+DELETE FROM role_acceptances
+WHERE uuid = %s AND user_id = %s AND role_type = %s""",
+                       (uuid_, uid, role_type,))
