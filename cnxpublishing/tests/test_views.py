@@ -271,6 +271,62 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
+    @db_connect
+    def test_acl_request(self, cursor):
+        """Submit a set of access control entries (ACE) to the ACL
+
+        1. Submit the acl request.
+
+        2. Verify the request entry.
+
+        3. Submit a deletion request.
+
+        4. Verify the request entry.
+
+        """
+        # Set up a document_controls entry to make it appear as if we
+        # are working against a true piece of content.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+        cursor.connection.commit()
+
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_header = [('x-api-key', api_key,)]
+        headers = [('content-type', 'application/json',)]
+        headers.extend(api_key_header)
+
+        # 1.
+        path = "/contents/{}/permissions".format(uuid_)
+        data = [
+            {'uid': 'ream', 'permission': 'publish'},
+            {'uid': 'rings', 'permission': 'publish'},
+            ]
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 2.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
+            {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
+        # 3.
+        data = [
+            {'uid': 'rings', 'permission': 'publish'},
+            ]
+        resp = self.app.delete_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 200)
+
+        # 4.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
+            ]
+        resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
 
 class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
     """Publishing API request/response client interactions"""

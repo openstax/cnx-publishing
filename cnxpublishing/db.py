@@ -864,7 +864,7 @@ WHERE uuid = %s""", (uuid_,))
         cursor.execute("""\
 INSERT INTO role_acceptances
   ("uuid", "user_id", "role_type", "accepted")
-        VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
+VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
 
 
 def remove_role_requests(cursor, uuid_, roles):
@@ -883,3 +883,49 @@ def remove_role_requests(cursor, uuid_, roles):
 DELETE FROM role_acceptances
 WHERE uuid = %s AND user_id = %s AND role_type = %s""",
                        (uuid_, uid, role_type,))
+
+
+def upsert_acl(cursor, uuid_, permissions):
+    """Given a ``uuid`` and a set of permissions given as a
+    tuple of ``uid`` and ``permission``, upsert them into the database.
+    """
+    if not isinstance(permissions, (list, set, tuple,)):
+        raise TypeError("``permissions`` is an invalid type: {}" \
+                        .format(type(permissions)))
+
+    permissions = set(permissions)
+
+    # Acquire the existin ACL.
+    cursor.execute("""\
+SELECT user_id, permission
+FROM document_acl
+WHERE uuid = %s""", (uuid_,))
+    existing = set([(r, t,) for r, t in cursor.fetchall()])
+
+    # Who's not in the existing list?
+    new_entries = permissions.difference(existing)
+
+    # Insert the new permissions.
+    for uid, permission in new_entries:
+        cursor.execute("""\
+INSERT INTO document_acl
+  ("uuid", "user_id", "permission")
+VALUES (%s, %s, %s)""", (uuid_, uid, permission))
+
+
+def remove_acl(cursor, uuid_, permissions):
+    """Given a ``uuid`` and a set of permissions given as a tuple
+    of ``uid`` and ``permission``, remove these entries from the database.
+    """
+    if not isinstance(permissions, (list, set, tuple,)):
+        raise TypeError("``permissions`` is an invalid type: {}" \
+                        .format(type(permissions)))
+
+    permissions = set(permissions)
+
+    # Remove the the entries.
+    for uid, permission in permissions:
+        cursor.execute("""\
+DELETE FROM document_acl
+WHERE uuid = %s AND user_id = %s AND permission = %s""",
+                       (uuid_, uid, permission,))

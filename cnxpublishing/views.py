@@ -18,10 +18,9 @@ from .db import (
     check_publication_state,
     accept_publication_license,
     accept_publication_role,
-    upsert_license_requests,
-    remove_license_requests,
-    upsert_role_requests,
-    remove_role_requests,
+    upsert_acl, remove_acl,
+    upsert_license_requests, remove_license_requests,
+    upsert_role_requests, remove_role_requests,
     )
 
 
@@ -370,6 +369,67 @@ def delete_roles_request(request):
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             remove_role_requests(cursor, uuid_, posted_roles)
+
+    resp = request.response
+    resp.status_int = 200
+    return resp
+
+
+@view_config(route_name='acl-request',
+             request_method='GET',
+             accept='application/json', renderer='json')
+def get_acl(request):
+    """Returns the ACL for the given content identified by ``uuid``."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+SELECT row_to_json(combined_rows) FROM (
+SELECT uuid, user_id AS uid, permission
+FROM document_acl AS acl
+WHERE uuid = %s
+ORDER BY user_id ASC, permission ASC
+) as combined_rows""", (uuid_,))
+            acl = [r[0] for r in cursor.fetchall()]
+
+    if not acl:
+        raise httpexceptions.HTTPNotFound()
+
+    return acl
+
+
+@view_config(route_name='acl-request',
+             request_method='POST', accept='application/json')
+def post_acl_request(request):
+    """Submission to create an ACL."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted = request.json
+    permissions = [(x['uid'], x['permission'],) for x in posted]
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+                upsert_acl(cursor, uuid_, permissions)
+
+    resp = request.response
+    resp.status_int = 202
+    return resp
+
+
+@view_config(route_name='acl-request',
+             request_method='DELETE', accept='application/json')
+def delete_acl_request(request):
+    """Submission to remove an ACL."""
+    uuid_ = request.matchdict['uuid']
+    settings = request.registry.settings
+
+    posted = request.json
+    permissions = [(x['uid'], x['permission'],) for x in posted]
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            remove_acl(cursor, uuid_, permissions)
 
     resp = request.response
     resp.status_int = 200
