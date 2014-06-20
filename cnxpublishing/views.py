@@ -146,7 +146,7 @@ def post_accept_license(request):
             accept_publication_license(cursor, publication_id, uid,
                                        denied, False)
 
-    location = request.route_url('license-acceptance',
+    location = request.route_url('publication-license-acceptance',
                                  id=publication_id, uid=uid)
     # Poke publication to change state.
     state = poke_publication_state(publication_id)
@@ -224,7 +224,7 @@ def post_accept_role(request):
             accept_publication_role(cursor, publication_id, uid,
                                        denied, False)
 
-    location = request.route_url('license-acceptance',
+    location = request.route_url('publication-license-acceptance',
                                  id=publication_id, uid=uid)
     # Poke publication to change state.
     state = poke_publication_state(publication_id)
