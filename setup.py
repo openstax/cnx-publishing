@@ -10,7 +10,7 @@ install_requires = (
     'cnx-epub',
     'openstax-accounts',
     'psycopg2',
-    'pyramid',
+    'pyramid>=1.5',
     'pyramid_multiauth',
     )
 tests_require = [
