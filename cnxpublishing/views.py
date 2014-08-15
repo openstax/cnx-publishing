@@ -81,7 +81,9 @@ def get_publication(request):
              request_method='GET',
              accept='application/json', renderer='json')
 def get_accept_license(request):
-    """This produces an HTML form for accepting the license."""
+    """This produces JSON data for a user (at ``uid``) to view the license(s)
+    they have accepted or will need to accept for a publication (at ``id``).
+    """
     publication_id = request.matchdict['id']
     user_id = request.matchdict['uid']
     settings = request.registry.settings
@@ -115,7 +117,9 @@ WHERE pd.publication_id = %s AND user_id = %s
 @view_config(route_name='publication-license-acceptance',
              request_method='POST', accept='application/json')
 def post_accept_license(request):
-    """Accept license acceptance requests."""
+    """Allows the user (at ``uid``) to accept the license(s) for
+    a publication (at ``id``).
+    """
     publication_id = request.matchdict['id']
     uid = request.matchdict['uid']
     settings = request.registry.settings
@@ -156,7 +160,9 @@ def post_accept_license(request):
 @view_config(route_name='publication-role-acceptance', request_method='GET',
              accept='application/json', renderer='json')
 def get_accept_role(request):
-    """This produces an HTML form for accepting the license."""
+    """This produces JSON data for a user (at ``uid``) to view the role(s)
+    they have accepted or will need to accept for a publication (at ``id``).
+    """
     publication_id = request.matchdict['id']
     user_id = request.matchdict['uid']
     settings = request.registry.settings
@@ -193,7 +199,9 @@ WHERE
 @view_config(route_name='publication-role-acceptance', request_method='POST',
              accept='application/json')
 def post_accept_role(request):
-    """Accept license acceptance requests."""
+    """Allows the user (at ``uid``) to accept the role(s) for
+    a publication (at ``id``).
+    """
     publication_id = request.matchdict['id']
     uid = request.matchdict['uid']
     settings = request.registry.settings

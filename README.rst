@@ -46,6 +46,23 @@ HTTP API
 
 :/resources/{hash}: Location of existing and pending resources.
 
+:/contents/{uuid}/licensors: Retrieve a list of users that have a license
+                             request for this content. This includes those
+                             That have also previously accepted.
+                             Applications can post to this url in order
+                             to create license requests.
+
+:/contents/{uuid}/roles: Retrieve a list of users that have a role request
+                         for this content. This includes those that have
+                         previously accepted.
+                         Applications can post to this url in order
+                         to create role requests.
+
+:/contents/{uuid}/permissions: Retrieve a list of users that have a permission
+                               to publish this content.
+                               Applications can post to this url in order
+                               to create additional permission entries.
+
 :/publications: Accepts EPUB files for publication into a *Connexions Archive*.
                 Returns a mapping of identifiers, keyed by the identifiers given
                 in the EPUB with values that identify where the content will be
