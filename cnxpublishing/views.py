@@ -167,8 +167,8 @@ def get_accept_role(request):
     user_id = request.matchdict['uid']
     settings = request.registry.settings
 
-    # FIXME Is this an active publication?
     # TODO Verify the accepting user is the one making the request.
+    # FIXME Is this an active publication?
 
     # For each pending document, accept/deny the role.
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
@@ -393,7 +393,13 @@ def get_acl(request):
 
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute("""\
+SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
+            try:
+                exists = cursor.fetchone()[0]
+            except TypeError:
+                raise httpexceptions.HTTPNotFound()
+            cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
 SELECT uuid, user_id AS uid, permission
 FROM document_acl AS acl
@@ -401,9 +407,6 @@ WHERE uuid = %s
 ORDER BY user_id ASC, permission ASC
 ) as combined_rows""", (uuid_,))
             acl = [r[0] for r in cursor.fetchall()]
-
-    if not acl:
-        raise httpexceptions.HTTPNotFound()
 
     return acl
 
@@ -419,7 +422,17 @@ def post_acl_request(request):
     permissions = [(x['uid'], x['permission'],) for x in posted]
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-                upsert_acl(cursor, uuid_, permissions)
+            cursor.execute("""\
+SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
+            try:
+                exists = cursor.fetchone()[0]
+            except TypeError:
+                if request.has_permission('publish.create-identifier'):
+                    cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
+                else:
+                    raise httpexceptions.HTTPNotFound()
+            upsert_acl(cursor, uuid_, permissions)
 
     resp = request.response
     resp.status_int = 202

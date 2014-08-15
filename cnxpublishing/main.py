@@ -88,8 +88,8 @@ class RootFactory(object):
         (security.Allow, security.Everyone, 'view'),
         (security.Allow, security.Authenticated, 'publish'),
         (security.Allow, 'group:trusted-publishers',
-         ('publish.trusted-license-assigner',
-          'publish.trusted-role-assigner',)),
+         ('publish.create-identifier',
+          'publish.remove-identifier',)),
         security.DENY_ALL,
         )
 
