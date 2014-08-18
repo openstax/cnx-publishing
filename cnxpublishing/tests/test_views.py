@@ -10,6 +10,7 @@ import tempfile
 import json
 import shutil
 import unittest
+import uuid
 import zipfile
 from collections import OrderedDict
 from copy import deepcopy
@@ -18,6 +19,7 @@ import psycopg2
 import cnxepub
 from webob import Request
 from webtest import TestApp
+from webtest import AppError
 from webtest.forms import Upload
 from pyramid import testing
 from pyramid import httpexceptions
@@ -325,6 +327,145 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
             ]
         resp = self.app.get(path, headers=api_key_header)
+        self.assertEqual(resp.json, expected)
+
+    def gen_api_key_headers(self, user):
+        """Generate authentication headers for the given user."""
+        api_key = self.api_keys_by_uid[user]
+        api_key_header = [('x-api-key', api_key,)]
+        return api_key_header
+
+    def test_create_identifier_on_licensors_request(self):
+        """Submit a set of users to initial license acceptance.
+        This tests whether a trusted publisher has the permission
+        to create an identifer where one previously didn't exist.
+
+        1. Submit the license request (as *untrusted* app user).
+
+        2. Submit the license request (as *trusted* app user).
+
+        3. Verify the request entry.
+
+        """
+        uuid_ = uuid.uuid4()
+        base_headers = [('content-type', 'application/json',)]
+
+        uids = ['marknewlyn', 'charrose']
+
+        path = "/contents/{}/licensors".format(uuid_)
+        data = uids
+
+        # 1.
+        headers = self.gen_api_key_headers('no-trust')
+        headers.extend(base_headers)
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+
+        # 2.
+        headers = self.gen_api_key_headers('some-trust')
+        headers.extend(base_headers)
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 3.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'marknewlyn', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=headers)
+        self.assertEqual(resp.json, expected)
+
+    def test_create_identifier_on_roles_request(self):
+        """Submit a set of roles to be accepted.
+        This tests whether a trusted publisher has the permission
+        to create an identifer where one previously didn't exist.
+
+        1. Submit the roles request.
+
+        2. Submit the license request (as *trusted* app user).
+
+        3. Verify the request entry.
+
+        """
+        uuid_ = uuid.uuid4()
+        base_headers = [('content-type', 'application/json',)]
+
+        path = "/contents/{}/roles".format(uuid_)
+        data = [
+            {'uid': 'charrose', 'role': 'Author'},
+            {'uid': 'marknewlyn', 'role': 'Author'},
+            {'uid': 'rings', 'role': 'Publisher'},
+            ]
+
+        # 1.
+        headers = self.gen_api_key_headers('no-trust')
+        headers.extend(base_headers)
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+
+        # 2.
+        headers = self.gen_api_key_headers('some-trust')
+        headers.extend(base_headers)
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 3.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'charrose',
+             'role': 'Author', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'marknewlyn',
+             'role': 'Author', 'has_accepted': None},
+            {'uuid': str(uuid_), 'uid': 'rings',
+             'role': 'Publisher', 'has_accepted': None},
+            ]
+        resp = self.app.get(path, headers=headers)
+        self.assertEqual(resp.json, expected)
+
+    def test_create_identifier_on_acl_request(self):
+        """Submit a set of access control entries (ACE) to the ACL
+        This tests whether a trusted publisher has the permission
+        to create an identifer where one previously didn't exist.
+
+        1. Submit the acl request.
+
+        2. Submit the license request (as *trusted* app user).
+
+        3. Verify the request entry.
+
+        """
+        uuid_ = uuid.uuid4()
+        base_headers = [('content-type', 'application/json',)]
+
+        path = "/contents/{}/permissions".format(uuid_)
+        data = [
+            {'uid': 'ream', 'permission': 'publish'},
+            {'uid': 'rings', 'permission': 'publish'},
+            ]
+
+        # 1.
+        headers = self.gen_api_key_headers('no-trust')
+        headers.extend(base_headers)
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+
+        # 2.
+        headers = self.gen_api_key_headers('some-trust')
+        headers.extend(base_headers)
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # 3.
+        expected = [
+            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
+            {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
+            ]
+        resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
 

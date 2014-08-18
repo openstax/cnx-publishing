@@ -289,6 +289,16 @@ def post_license_request(request):
     posted_uids = request.json
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
+            try:
+                exists = cursor.fetchone()[0]
+            except TypeError:
+                if request.has_permission('publish.create-identifier'):
+                    cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
+                else:
+                    raise httpexceptions.HTTPNotFound()
             upsert_license_requests(cursor, uuid_, posted_uids)
 
     resp = request.response
@@ -359,6 +369,16 @@ def post_roles_request(request):
     posted_roles = request.json
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
+            try:
+                exists = cursor.fetchone()[0]
+            except TypeError:
+                if request.has_permission('publish.create-identifier'):
+                    cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
+                else:
+                    raise httpexceptions.HTTPNotFound()
             upsert_role_requests(cursor, uuid_, posted_roles)
 
     resp = request.response
@@ -423,7 +443,7 @@ def post_acl_request(request):
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
+SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
             try:
                 exists = cursor.fetchone()[0]
             except TypeError:
