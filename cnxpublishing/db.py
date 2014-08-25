@@ -803,9 +803,7 @@ def upsert_license_requests(cursor, uuid_, uids):
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
-SELECT "user_id"
-FROM license_acceptances
-WHERE uuid = %s""", (uuid_,))
+SELECT user_id FROM license_acceptances WHERE uuid = %s""", (uuid_,))
     existing_acceptors = set([x[0] for x in cursor.fetchall()])
 
     # Who's not in the existing list?

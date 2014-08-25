@@ -261,7 +261,15 @@ def get_license_request(request):
 
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute("""\
+SELECT l.url
+FROM licenses AS l RIGHT JOIN document_controls AS dc ON (dc.licenseid = l.licenseid)
+            WHERE dc.uuid = %s""", (uuid_,))
+            try:
+                license_url = cursor.fetchone()[0]
+            except TypeError:  # None value
+                license_url = None
+            cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
 SELECT uuid, user_id AS uid, accepted AS has_accepted
 FROM license_acceptances AS la
@@ -273,9 +281,12 @@ ORDER BY user_id ASC
     if not acceptances:
         raise httpexceptions.HTTPNotFound()
 
-    resp_value = acceptances
     if user_id is not None:
-        resp_value = acceptances[0]
+        acceptances = acceptances[0]
+    resp_value = {
+        'license_url': license_url,
+        'licensors': acceptances,
+        }
     return resp_value
 
 
@@ -286,20 +297,37 @@ def post_license_request(request):
     uuid_ = request.matchdict['uuid']
     settings = request.registry.settings
 
-    posted_uids = request.json
+    posted_data = request.json
+    license_url = posted_data.get('license_url')
+    licensors = posted_data.get('licensors')
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
+SELECT TRUE, l.url
+FROM document_controls AS dc LEFT JOIN licenses AS l ON (dc.licenseid = l.licenseid)
+WHERE uuid = %s::UUID""", (uuid_,))
             try:
-                exists = cursor.fetchone()[0]
+                exists, existing_license_url = cursor.fetchone()
             except TypeError:
                 if request.has_permission('publish.create-identifier'):
                     cursor.execute("""\
 INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
+                    exists, existing_license_url = True, None
                 else:
                     raise httpexceptions.HTTPNotFound()
-            upsert_license_requests(cursor, uuid_, posted_uids)
+            if existing_license_url is None and license_url is None:
+                raise httpexceptions.HTTPBadRequest("license_url is required")
+            elif license_url != existing_license_url or existing_license_url is None:
+                cursor.execute("""\
+UPDATE document_controls AS dc
+SET licenseid = l.licenseid FROM licenses AS l WHERE url = %s and is_valid_for_publication = 't'
+RETURNING dc.licenseid""",
+                   (license_url,))
+                try:
+                    valid_licenseid = cursor.fetchone()[0]
+                except TypeError:  # None returned
+                    raise httpexceptions.HTTPBadRequest("invalid license_url")
+            upsert_license_requests(cursor, uuid_, licensors)
 
     resp = request.response
     resp.status_int = 202
@@ -313,7 +341,7 @@ def delete_license_request(request):
     uuid_ = request.matchdict['uuid']
     settings = request.registry.settings
 
-    posted_uids = request.json
+    posted_uids = request.json['licensors']
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             remove_license_requests(cursor, uuid_, posted_uids)

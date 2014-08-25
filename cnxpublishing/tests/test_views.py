@@ -181,32 +181,114 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         headers.extend(api_key_header)
 
         uids = ['marknewlyn', 'charrose']
+        license_url = u"http://creativecommons.org/licenses/by/4.0/"
 
         # 1.
         path = "/contents/{}/licensors".format(uuid_)
-        data = uids
+        data = {'license_url': license_url, 'licensors': uids}
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
         # 2.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
-            {'uuid': str(uuid_), 'uid': 'marknewlyn', 'has_accepted': None},
-            ]
+        expected = {
+            u'license_url': license_url,
+            u'licensors': [
+                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': None},
+                {u'uuid': unicode(uuid_), u'uid': 'marknewlyn', u'has_accepted': None},
+                ],
+            }
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
         # 3.
-        data = ['marknewlyn']
+        data = {'licensors': ['marknewlyn']}
         resp = self.app.delete_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 200)
 
         # 4.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
-            ]
+        expected = {
+            u'license_url': license_url,
+            u'licensors': [
+                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': None},
+                ],
+            }
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
+
+    @db_connect
+    def test_licensors_request_wo_license(self, cursor):
+        """Submit a set of users to initial license acceptance.
+
+        1. Submit the license request, without a license.
+
+        """
+        # Set up a document_controls entry to make it appear as if we
+        # are working against a true piece of content.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+        cursor.connection.commit()
+
+        api_key = self.api_keys_by_uid['no-trust']
+        headers = [('x-api-key', api_key,)]
+
+        uids = ['marknewlyn', 'charrose']
+
+        # 1.
+        path = "/contents/{}/licensors".format(uuid_)
+        data = {'licensors': uids}
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
+
+    @db_connect
+    def test_license_request_w_license_change(self, cursor):
+        """Submit a license acceptance request to change the license.
+
+        1. Submit the license request, with an invalid license.
+
+        2. Submit the license request, with an invalid publication license.
+
+        3. Submit the license request, with a valid license.
+
+        """
+        # Set up a document_controls entry to make it appear as if we
+        # are working against a true piece of content.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid, licenseid) VALUES (DEFAULT, 11) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+        cursor.connection.commit()
+
+        api_key = self.api_keys_by_uid['no-trust']
+        headers = [('x-api-key', api_key,)]
+
+        uids = ['marknewlyn', 'charrose']
+
+        # 1.
+        license_url = 'http://example.org/licenses/mine/2.0/'
+        path = "/contents/{}/licensors".format(uuid_)
+        data = {'license_url': license_url, 'licensors': uids}
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
+
+        # 2.
+        license_url = 'http://creativecommons.org/licenses/by/2.0/'
+        path = "/contents/{}/licensors".format(uuid_)
+        data = {'license_url': license_url, 'licensors': uids}
+        with self.assertRaises(AppError) as caught_exception:
+            resp = self.app.post_json(path, data, headers=headers)
+        exception = caught_exception.exception
+        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
+
+        # 3.
+        license_url = 'http://creativecommons.org/licenses/by/4.0/'
+        path = "/contents/{}/licensors".format(uuid_)
+        data = {'license_url': license_url, 'licensors': uids}
+        resp = self.app.post_json(path, data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
 
     @db_connect
     def test_roles_request(self, cursor):
@@ -348,16 +430,18 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
 
         """
         uuid_ = uuid.uuid4()
-        base_headers = [('content-type', 'application/json',)]
 
+        license_url = u"http://creativecommons.org/licenses/by/4.0/"
         uids = ['marknewlyn', 'charrose']
 
         path = "/contents/{}/licensors".format(uuid_)
-        data = uids
+        data = {
+            'license_url': license_url,
+            'licensors': uids,
+            }
 
         # 1.
         headers = self.gen_api_key_headers('no-trust')
-        headers.extend(base_headers)
         with self.assertRaises(AppError) as caught_exception:
             resp = self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
@@ -365,15 +449,19 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
 
         # 2.
         headers = self.gen_api_key_headers('some-trust')
-        headers.extend(base_headers)
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
         # 3.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose', 'has_accepted': None},
-            {'uuid': str(uuid_), 'uid': 'marknewlyn', 'has_accepted': None},
-            ]
+        expected = {
+            u'license_url': license_url,
+            u'licensors': [
+                {u'uuid': unicode(uuid_), u'uid': u'charrose',
+                 u'has_accepted': None},
+                {u'uuid': unicode(uuid_), u'uid': u'marknewlyn',
+                 u'has_accepted': None},
+                ],
+            }
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
