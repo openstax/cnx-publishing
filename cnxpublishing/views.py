@@ -291,6 +291,7 @@ ORDER BY user_id ASC
 
 
 @view_config(route_name='license-request',
+             permission='publish.assign-acceptance',
              request_method='POST', accept='application/json')
 def post_license_request(request):
     """Submission to create a license acceptance request."""
@@ -335,6 +336,7 @@ RETURNING dc.licenseid""",
 
 
 @view_config(route_name='license-request',
+             permission='publish.remove-acceptance',
              request_method='DELETE', accept='application/json')
 def delete_license_request(request):
     """Submission to remove a license acceptance request."""

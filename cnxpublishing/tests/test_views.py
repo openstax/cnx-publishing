@@ -175,7 +175,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['no-trust']
+        api_key = self.api_keys_by_uid['some-trust']
         headers = [('x-api-key', api_key,)]
 
         uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
@@ -227,7 +227,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['no-trust']
+        api_key = self.api_keys_by_uid['some-trust']
         headers = [('x-api-key', api_key,)]
 
         uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
@@ -258,7 +258,7 @@ INSERT INTO document_controls (uuid, licenseid) VALUES (DEFAULT, 11) RETURNING u
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['no-trust']
+        api_key = self.api_keys_by_uid['some-trust']
         headers = [('x-api-key', api_key,)]
 
         uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
@@ -308,7 +308,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['no-trust']
+        api_key = self.api_keys_by_uid['some-trust']
         api_key_header = [('x-api-key', api_key,)]
         headers = [('content-type', 'application/json',)]
         headers.extend(api_key_header)
@@ -373,7 +373,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['no-trust']
+        api_key = self.api_keys_by_uid['some-trust']
         api_key_header = [('x-api-key', api_key,)]
         headers = [('content-type', 'application/json',)]
         headers.extend(api_key_header)
@@ -443,7 +443,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         with self.assertRaises(AppError) as caught_exception:
             resp = self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
 
         # 2.
         headers = self.gen_api_key_headers('some-trust')

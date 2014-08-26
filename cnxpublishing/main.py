@@ -88,8 +88,11 @@ class RootFactory(object):
         (security.Allow, security.Everyone, 'view'),
         (security.Allow, security.Authenticated, 'publish'),
         (security.Allow, 'group:trusted-publishers',
-         ('publish.create-identifier',
-          'publish.remove-identifier',)),
+         ('publish.assign-acceptance',  # Used when assigning user actions requests.
+          'publish.remove-acceptance',
+          'publish.create-identifier',  # Used when content does not yet exist.
+          'publish.remove-identifier',
+          )),
         security.DENY_ALL,
         )
 
