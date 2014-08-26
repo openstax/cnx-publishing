@@ -176,11 +176,9 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         cursor.connection.commit()
 
         api_key = self.api_keys_by_uid['no-trust']
-        api_key_header = [('x-api-key', api_key,)]
-        headers = [('content-type', 'application/json',)]
-        headers.extend(api_key_header)
+        headers = [('x-api-key', api_key,)]
 
-        uids = ['marknewlyn', 'charrose']
+        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
         license_url = u"http://creativecommons.org/licenses/by/4.0/"
 
         # 1.
@@ -197,11 +195,11 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
                 {u'uuid': unicode(uuid_), u'uid': 'marknewlyn', u'has_accepted': None},
                 ],
             }
-        resp = self.app.get(path, headers=api_key_header)
+        resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
         # 3.
-        data = {'licensors': ['marknewlyn']}
+        data = {'licensors': [{'uid': 'marknewlyn'}]}
         resp = self.app.delete_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 200)
 
@@ -212,7 +210,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
                 {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': None},
                 ],
             }
-        resp = self.app.get(path, headers=api_key_header)
+        resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
     @db_connect
@@ -232,7 +230,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         api_key = self.api_keys_by_uid['no-trust']
         headers = [('x-api-key', api_key,)]
 
-        uids = ['marknewlyn', 'charrose']
+        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
 
         # 1.
         path = "/contents/{}/licensors".format(uuid_)
@@ -263,7 +261,7 @@ INSERT INTO document_controls (uuid, licenseid) VALUES (DEFAULT, 11) RETURNING u
         api_key = self.api_keys_by_uid['no-trust']
         headers = [('x-api-key', api_key,)]
 
-        uids = ['marknewlyn', 'charrose']
+        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
 
         # 1.
         license_url = 'http://example.org/licenses/mine/2.0/'
@@ -432,7 +430,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = uuid.uuid4()
 
         license_url = u"http://creativecommons.org/licenses/by/4.0/"
-        uids = ['marknewlyn', 'charrose']
+        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
 
         path = "/contents/{}/licensors".format(uuid_)
         data = {

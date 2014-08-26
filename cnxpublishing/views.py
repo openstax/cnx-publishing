@@ -299,7 +299,7 @@ def post_license_request(request):
 
     posted_data = request.json
     license_url = posted_data.get('license_url')
-    licensors = posted_data.get('licensors')
+    licensors = [x['uid'] for x in posted_data.get('licensors', [])]
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
@@ -341,7 +341,7 @@ def delete_license_request(request):
     uuid_ = request.matchdict['uuid']
     settings = request.registry.settings
 
-    posted_uids = request.json['licensors']
+    posted_uids = [x['uid'] for x in request.json.get('licensors', [])]
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             remove_license_requests(cursor, uuid_, posted_uids)
