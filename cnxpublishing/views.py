@@ -328,7 +328,8 @@ RETURNING dc.licenseid""",
                     valid_licenseid = cursor.fetchone()[0]
                 except TypeError:  # None returned
                     raise httpexceptions.HTTPBadRequest("invalid license_url")
-            upsert_license_requests(cursor, uuid_, licensors)
+            upsert_license_requests(cursor, uuid_, licensors,
+                                    has_accepted=True)
 
     resp = request.response
     resp.status_int = 202
@@ -409,7 +410,8 @@ SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
 INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
                 else:
                     raise httpexceptions.HTTPNotFound()
-            upsert_role_requests(cursor, uuid_, posted_roles)
+            upsert_role_requests(cursor, uuid_, posted_roles,
+                                 has_accepted=True)
 
     resp = request.response
     resp.status_int = 202

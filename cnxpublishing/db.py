@@ -792,9 +792,10 @@ WHERE
                    (is_accepted, publication_id, user_id, document_ids,))
 
 
-def upsert_license_requests(cursor, uuid_, uids):
+def upsert_license_requests(cursor, uuid_, uids, has_accepted=None):
     """Given a ``uuid`` and list of ``uids`` (user identifiers)
-    create a license acceptance entry.
+    create a license acceptance entry. If ``has_accepted`` is supplied,
+    it will be used to assign an acceptance value to all listed ``uids``.
     """
     if not isinstance(uids, (list, set, tuple,)):
         raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
@@ -803,22 +804,30 @@ def upsert_license_requests(cursor, uuid_, uids):
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
-SELECT user_id FROM license_acceptances WHERE uuid = %s""", (uuid_,))
-    existing_acceptors = set([x[0] for x in cursor.fetchall()])
+SELECT user_id, accepted FROM license_acceptances WHERE uuid = %s""",
+                   (uuid_,))
+    existing_acceptors = cursor.fetchall()
 
     # Who's not in the existing list?
-    new_acceptors = acceptors.difference(existing_acceptors)
+    new_acceptors = acceptors.difference([x[0] for x in existing_acceptors])
 
     # Insert the new licensor acceptors.
     args = []
     values_fmt = []
     for uid in new_acceptors:
-        args.extend([uuid_, uid])
-        values_fmt.append("(%s, %s)")
+        args.extend([uuid_, uid, has_accepted])
+        values_fmt.append("(%s, %s, %s)")
     values_fmt = ', '.join(values_fmt)
     cursor.execute("""\
-INSERT INTO license_acceptances (uuid, user_id)
+INSERT INTO license_acceptances (uuid, user_id, accepted)
 VALUES {}""".format(values_fmt), args)
+
+    # Update any existing license acceptors
+    for existing_uid, existing_has_accepted in existing_acceptors:
+        if existing_uid in acceptors and existing_has_accepted != has_accepted:
+            cursor.execute("""\
+UPDATE license_acceptances SET accepted = %s
+WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, uid,))
 
 
 def remove_license_requests(cursor, uuid_, uids):
@@ -836,7 +845,7 @@ DELETE FROM license_acceptances
 WHERE uuid = %s AND user_id = ANY(%s::text[])""", (uuid_, acceptors,))
 
 
-def upsert_role_requests(cursor, uuid_, roles):
+def upsert_role_requests(cursor, uuid_, roles, has_accepted=None):
     """Given a ``uuid`` and list of dicts containing the ``uid`` and
     ``role`` for creating a role acceptance entry.
     """
@@ -848,13 +857,13 @@ def upsert_role_requests(cursor, uuid_, roles):
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
-SELECT user_id, role_type
+SELECT user_id, role_type, accepted
 FROM role_acceptances
 WHERE uuid = %s""", (uuid_,))
-    existing_roles = set([(r, t,) for r, t in cursor.fetchall()])
+    existing_roles = cursor.fetchall()
 
     # Who's not in the existing list?
-    existing_acceptors = existing_roles
+    existing_acceptors = set([(r, t,) for r, t, _ in existing_roles])
     new_acceptors = acceptors.difference(existing_acceptors)
 
     # Insert the new role acceptors.
@@ -862,7 +871,15 @@ WHERE uuid = %s""", (uuid_,))
         cursor.execute("""\
 INSERT INTO role_acceptances
   ("uuid", "user_id", "role_type", "accepted")
-VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
+        VALUES (%s, %s, %s, %s)""", (uuid_, acceptor, type_, has_accepted,))
+
+    # Update any existing license acceptors
+    for uid, type_, existing_has_accepted in existing_acceptors:
+        if (uid, type_) in acceptors and existing_has_accepted != has_accepted:
+            cursor.execute("""\
+UPDATE role_acceptances SET accepted = %s
+WHERE uuid = %s AND user_id = %s AND role_type = %s""",
+                           (has_accepted, uuid_, uid, type_,))
 
 
 def remove_role_requests(cursor, uuid_, roles):

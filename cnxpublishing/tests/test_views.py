@@ -191,8 +191,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         expected = {
             u'license_url': license_url,
             u'licensors': [
-                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': None},
-                {u'uuid': unicode(uuid_), u'uid': 'marknewlyn', u'has_accepted': None},
+                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
+                {u'uuid': unicode(uuid_), u'uid': 'marknewlyn', u'has_accepted': True},
                 ],
             }
         resp = self.app.get(path, headers=headers)
@@ -207,7 +207,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         expected = {
             u'license_url': license_url,
             u'licensors': [
-                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': None},
+                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
                 ],
             }
         resp = self.app.get(path, headers=headers)
@@ -326,11 +326,11 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         # 2.
         expected = [
             {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': None},
+             'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'marknewlyn',
-             'role': 'Author', 'has_accepted': None},
+             'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': None},
+             'role': 'Publisher', 'has_accepted': True},
             ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
@@ -346,9 +346,9 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         # 4.
         expected = [
             {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': None},
+             'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': None},
+             'role': 'Publisher', 'has_accepted': True},
             ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
@@ -455,9 +455,9 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             u'license_url': license_url,
             u'licensors': [
                 {u'uuid': unicode(uuid_), u'uid': u'charrose',
-                 u'has_accepted': None},
+                 u'has_accepted': True},
                 {u'uuid': unicode(uuid_), u'uid': u'marknewlyn',
-                 u'has_accepted': None},
+                 u'has_accepted': True},
                 ],
             }
         resp = self.app.get(path, headers=headers)
@@ -502,11 +502,11 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         # 3.
         expected = [
             {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': None},
+             'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'marknewlyn',
-             'role': 'Author', 'has_accepted': None},
+             'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': None},
+             'role': 'Publisher', 'has_accepted': True},
             ]
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
