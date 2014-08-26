@@ -391,6 +391,7 @@ ORDER BY user_id ASC, role_type ASC
 
 
 @view_config(route_name='roles-request',
+             permission='publish.assign-acceptance',
              request_method='POST', accept='application/json')
 def post_roles_request(request):
     """Submission to create a role acceptance request."""
@@ -419,6 +420,7 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 
 
 @view_config(route_name='roles-request',
+             permission='publish.remove-acceptance',
              request_method='DELETE', accept='application/json')
 def delete_roles_request(request):
     """Submission to remove a role acceptance request."""
@@ -464,6 +466,7 @@ ORDER BY user_id ASC, permission ASC
 
 
 @view_config(route_name='acl-request',
+             permission='publish.assign-acl',
              request_method='POST', accept='application/json')
 def post_acl_request(request):
     """Submission to create an ACL."""
@@ -492,6 +495,7 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 
 
 @view_config(route_name='acl-request',
+             permission='publish.remove-acl',
              request_method='DELETE', accept='application/json')
 def delete_acl_request(request):
     """Submission to remove an ACL."""

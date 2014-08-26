@@ -492,7 +492,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         with self.assertRaises(AppError) as caught_exception:
             resp = self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
 
         # 2.
         headers = self.gen_api_key_headers('some-trust')
@@ -539,7 +539,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         with self.assertRaises(AppError) as caught_exception:
             resp = self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("404 Not Found") >= 0)
+        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
 
         # 2.
         headers = self.gen_api_key_headers('some-trust')

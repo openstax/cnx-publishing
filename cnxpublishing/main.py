@@ -90,6 +90,8 @@ class RootFactory(object):
         (security.Allow, 'group:trusted-publishers',
          ('publish.assign-acceptance',  # Used when assigning user actions requests.
           'publish.remove-acceptance',
+          'publish.assign-acl',  # Used when assigning access control on documents.
+          'publish.remove-acl',
           'publish.create-identifier',  # Used when content does not yet exist.
           'publish.remove-identifier',
           )),
