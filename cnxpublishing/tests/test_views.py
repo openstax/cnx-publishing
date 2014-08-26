@@ -24,6 +24,7 @@ from webtest.forms import Upload
 from pyramid import testing
 from pyramid import httpexceptions
 
+from cnxarchive.utils import join_ident_hash
 from . import use_cases
 from .testing import (
     integration_test_settings,
@@ -648,6 +649,14 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
             .format(publication_id, uid)
         resp = self.app.post_json(path, data, headers=headers)
 
+    def app_post_acl(self, uuid_, data, headers=[]):
+        """Submission of ACL information for content at ``uuid``.
+        The ``data`` value is expected to be a python type that this method
+        will marshal to JSON.
+        """
+        path = '/contents/{}/permissions'.format(uuid_)
+        resp = self.app.post_json(path, data, headers=headers)
+
     # ######### #
     #   Tests   #
     # ######### #
@@ -1140,6 +1149,175 @@ GROUP BY user_id, accepted
         # plsql function. If REVISED_BOOK was not in published,
         # checking for the previous revision should be correct.
         self._check_published_to_archive(use_cases.BOOK)
+
+    def test_identifier_creation_to_publication(self):
+        """\
+        Publish documents for that have been identifier created.
+        This includes application and user interactions with publishing.
+
+        This is the workflow that would typically be used by cnx-authoring.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit content identifiers as ACL assignement requests.
+           And submit roles for license and role assignment requests.
+
+        2. For each *attributed role*...
+
+           - As the publisher, accept the license.
+           - As the copyright-holder, accept the license.
+           - As [other attributed roles], accept the license.
+
+        3. For each *attributed role*...
+
+           - As [an attributed role], accept my attribution
+             on these documents/binders in this publication.
+
+        4. Submit an EPUB containing a book of documents.
+
+        5. Verify documents are in the archive. [HACKED]
+
+        """
+        publisher = u'ream'
+        # We use the REVISED_BOOK here, because it contains fixed identifiers.
+        epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        from cnxarchive.utils import split_ident_hash
+        ids = [
+            split_ident_hash(use_cases.REVISED_BOOK.id)[0],
+            split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
+            ]
+        for id in ids:
+            resp = self.app_post_acl(
+                id, [{'uid': publisher, 'permission': 'publish'}],
+                headers=api_key_headers)
+
+        # 2. & 3. --
+        attr_role_key_to_db_role = {
+            'publishers': 'Publisher', 'copyright_holders': 'Copyright Holder',
+            'editors': 'Editor', 'illustrators': 'Illustrator',
+            'translators': 'Translator', 'authors': 'Author',
+            }
+        for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):
+            id = split_ident_hash(model.id)[0]
+            attributed_roles = []
+            roles = []
+            for role_key in cnxepub.ATTRIBUTED_ROLE_KEYS:
+                for role in model.metadata.get(role_key, []):
+                    role_name = attr_role_key_to_db_role[role_key]
+                    attributed_roles.append({'uid': role['id'],
+                                             'role': role_name})
+                    if role['id'] not in [r['uid'] for r in roles]:
+                        roles.append({'uid': role['id']})
+            # Post the accepted attributed roles.
+            path = "/contents/{}/roles".format(id)
+            self.app.post_json(path, attributed_roles,
+                               headers=api_key_headers)
+            # Post the accepted licensors.
+            path = "/contents/{}/licensors".format(id)
+            data = {'license_url': 'http://creativecommons.org/licenses/by/4.0/',
+                    'licensors': roles,
+                    }
+            self.app.post_json(path, data, headers=api_key_headers)
+
+        # -- (manual) Check the records for license acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, accepted
+FROM license_acceptances
+GROUP BY user_id, accepted
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "the licenses.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # -- (manual) Check the records for role acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, accepted
+FROM role_acceptances
+GROUP BY user_id, accepted
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "role attribution.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # 4. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # *. --
+        # This is publication completion,
+        # because all licenses and roles have been accepted.
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
+
+        # 5. (manual)
+        # Checks ``latest_modules`` by virtue of the ``tree_to_json``
+        # plsql function.
+        binder = use_cases.REVISED_BOOK
+        document = use_cases.REVISED_BOOK[0][0]
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Check the module records...
+                cursor.execute("""\
+SELECT uuid, moduleid, major_version, minor_version, version
+FROM modules ORDER BY major_version ASC""")
+                records = {}
+                key_sep = '--'
+                for row in cursor.fetchall():
+                    key = key_sep.join([str(x) for x in row[:2]])
+                    value = list(row[2:])
+                    if key not in records:
+                        records[key] = []
+                    records[key].append(value)
+                binder_uuid = split_ident_hash(binder.id)[0]
+                document_uuid = split_ident_hash(document.id)[0]
+                expected_records = {
+                    # [uuid, moduleid]: [[major_version, minor_version, version], ...]
+                    key_sep.join([binder_uuid, 'col10000']): [
+                        [1, 1, '1.1'],  # REVISED_BOOK
+                        ],
+                    key_sep.join([document_uuid, 'm10000']): [
+                        [1, None, '1.1'],
+                        ],
+                    }
+                self.assertEqual(expected_records, records)
+
+                # Check the tree...
+                # This also proves that the REVISED_BOOK is in latest_modules
+                # by virtual of using the tree_to_json function.
+                binder_ident_hash = join_ident_hash(
+                    split_ident_hash(binder.id)[0], (1, 1,))
+                document_ident_hash = join_ident_hash(
+                    split_ident_hash(document.id)[0], (1, None,))
+                expected_tree = {
+                    u"id": unicode(binder_ident_hash),
+                    u"title": u"Book of Infinity",
+                    u"contents": [
+                        {u"id": u"subcol",
+                         u"title": use_cases.REVISED_BOOK[0].metadata['title'],
+                         u"contents": [
+                             {u"id": unicode(document_ident_hash),
+                              u"title": use_cases.REVISED_BOOK[0].get_title_for_node(document)}]}]}
+                cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version))
+FROM latest_modules
+WHERE portal_type = 'Collection'""")
+                tree = json.loads(cursor.fetchone()[0])
+                self.assertEqual(expected_tree, tree)
 
     def test_new_to_publication_w_exceptions(self):
         """\
