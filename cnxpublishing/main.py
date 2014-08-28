@@ -7,6 +7,7 @@
 # ###
 import tempfile
 
+from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid.config import Configurator
 from pyramid import security
 from pyramid.authorization import ACLAuthorizationPolicy
@@ -62,12 +63,8 @@ def main(global_config, **settings):
 
     api_key_entities = _parse_api_key_lines(settings)
     api_key_authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
-    # FIXME T'is impossible to 'include' openstax-accounts as it is.
-    from openstax_accounts.stub import StubAuthenticationPolicy
-    openstax_authn_policy = StubAuthenticationPolicy(users=settings.get('openstax_accounts.stub.users'))
-    config.add_route('stub-login-form', '/stub-login-form')
-    config.scan(package='openstax_accounts.stub')
-    # /FIXME
+    config.include('openstax_accounts.main')
+    openstax_authn_policy = config.registry.getUtility(IOpenstaxAccountsAuthenticationPolicy)
     policies = [api_key_authn_policy, openstax_authn_policy]
     authn_policy = MultiAuthenticationPolicy(policies)
     config.set_authentication_policy(authn_policy)
