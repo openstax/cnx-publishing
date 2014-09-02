@@ -29,13 +29,13 @@ before_install:
   - cd plpydbapi && sudo /usr/bin/python setup.py install && cd ..
 
   # Installation for cnx-publishing
-  # * Install cnx-archive
-  - git clone https://github.com/Connexions/cnx-archive.git
-  - cd cnx-archive && sudo /usr/bin/python setup.py install && cd ..
   # * Install cnx-epub
   - git clone https://github.com/Connexions/cnx-epub.git
   - cd cnx-epub && sudo /usr/bin/python setup.py install && cd ..
 
+  # * Install cnx-archive
+  - git clone https://github.com/Connexions/cnx-archive.git
+  - cd cnx-archive && sudo /usr/bin/python setup.py install && cd ..
   # Install the coverage utility and coveralls reporting utility
   - sudo apt-get install python-pip
   # Scripts get installed to /usr/local/bin
