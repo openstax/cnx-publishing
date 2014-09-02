@@ -8,6 +8,7 @@
 import os
 import sys
 import io
+import json
 import uuid
 import unittest
 from copy import deepcopy
@@ -18,6 +19,7 @@ except ImportError:
 
 import psycopg2
 import cnxepub
+from cnxarchive.utils import split_ident_hash
 from pyramid import testing
 
 from . import use_cases
@@ -96,6 +98,188 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
         add_pending_model_content(cursor, publication_id, model)
 
 
+class PublicationLicenseAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify license acceptance functionality"""
+
+    def setUp(self):
+        super(PublicationLicenseAcceptanceTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_pending_licensors
+        return upsert_pending_licensors(*args, **kwargs)
+
+    @db_connect
+    def test_licensor_insertion(self, cursor):
+        """Are we able to insert all roles found on in the content?"""
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the results.
+        cursor.execute("""\
+SELECT user_id, accepted
+FROM license_acceptances
+WHERE uuid = %s
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('charrose', None), ('frahablar', None),
+                    ('impicky', None), ('marknewlyn', None),
+                    ('ream', None), ('rings', None)]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_licensor_additions(self, cursor):
+        """Add licensors to the acceptance list"""
+        # Make it look like BOOK is already in the database.
+        # Add these roles to the license acceptance
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, (SELECT uuid from control_insert), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Create existing licensor records.
+        values = [
+            (uuid_, 'charrose', True), ##(uuid_, 'frahablar', None),
+            (uuid_, 'impicky', True), (uuid_, 'marknewlyn', True),
+            (uuid_, 'ream', True), ##(uuid_, 'rings', None),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO license_acceptances (uuid, user_id, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT user_id
+FROM license_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('frahablar',), ('rings',)]
+        self.assertEqual(entries, expected)
+
+
+class PublicationRoleAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify license acceptance functionality"""
+
+    def setUp(self):
+        super(PublicationRoleAcceptanceTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_pending_roles
+        return upsert_pending_roles(*args, **kwargs)
+
+    @db_connect
+    def test_role_insertion(self, cursor):
+        """Are we able to insert all roles found on in the content?"""
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the results.
+        cursor.execute("""\
+SELECT user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s
+ORDER BY user_id ASC, role_type ASC""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [
+            ('charrose', 'Author', None), ('frahablar', 'Illustrator', None),
+            ('frahablar', 'Translator', None),
+            ('impicky', 'Editor', None), ('marknewlyn', 'Author', None),
+            ('ream', 'Copyright Holder', None),
+            ('ream', 'Publisher', None), ('rings', 'Publisher', None),
+            ]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_role_additions(self, cursor):
+        """Add roles to the acceptance list"""
+        # Make it look like BOOK is already in the database.
+        # Add these roles to the role acceptance
+        # Set up the content to be referenced.
+        metadata = json.dumps(use_cases.BOOK.metadata)
+        cursor.execute("""\
+WITH control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid)
+INSERT INTO pending_documents
+  (publication_id, uuid, major_version, minor_version,
+   type, metadata)
+VALUES (%s, (SELECT uuid FROM control_insert), 1, 1, 'Binder', %s)
+RETURNING id, uuid""", (self.publication_id, metadata,))
+        pending_id, uuid_ = cursor.fetchone()
+
+        # Create existing role records.
+        values = [
+            (uuid_, 'charrose', 'Author', True),
+            (uuid_, 'frahablar', 'Translator', True),
+            ##(uuid_, 'frahablar', 'Illustrator', None),
+            (uuid_, 'impicky', 'Editor', True),
+            (uuid_, 'marknewlyn', 'Author', True),
+            (uuid_, 'ream', 'Copyright Holder', True),
+            (uuid_, 'ream', 'Publisher', True),
+            ##(uuid_, 'rings', 'Publisher', None),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target.
+        self.call_target(cursor, pending_id)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT user_id, role_type
+FROM role_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [('frahablar', 'Illustrator',),
+                    ('rings', 'Publisher',)]
+        self.assertEqual(entries, expected)
+
+
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions"""
 
@@ -132,10 +316,10 @@ WHERE
                 record = cursor.fetchone()
         type_, is_license_accepted, are_roles_accepted = record
         self.assertEqual(type_, 'Document')
-        self.assertEqual(is_license_accepted, True)
-        self.assertEqual(are_roles_accepted, True)
+        self.assertEqual(is_license_accepted, False)
+        self.assertEqual(are_roles_accepted, False)
 
-    def test_add_pending_document_w_exist_license_accept(self):
+    def test_add_pending_document_w_existing_license_accepted(self):
         """Add a pending document to the database.
         In this case we have an existing license acceptance for the author
         of the document.
@@ -145,11 +329,11 @@ WHERE
         document_uuid = str(uuid.uuid4())
         uri = 'http://cnx.org/contents/{}@1'.format(document_uuid)
         user_id = 'smoo'
+        role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
+
         document_metadata = {
-            'authors': [
-                {'id': 'smoo',
-                 'name': 'smOO chIE',
-                 'type': 'cnx-id'}],
+            'authors': [role_struct],
+            'publishers': [role_struct],
             'cnx-archive-uri': uri,
             'license_url': VALID_LICENSE_URL,
             }
@@ -159,8 +343,10 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO publications_license_acceptance
-  ("uuid", "user_id", "acceptance")
+INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+                cursor.execute("""\
+INSERT INTO license_acceptances
+  ("uuid", "user_id", "accepted")
 VALUES (%s, %s, 't')""", (document_uuid, user_id,))
 
         # Create and add a document for the publication.
@@ -187,7 +373,126 @@ WHERE
         type_, is_license_accepted, are_roles_accepted = record
         self.assertEqual(type_, 'Document')
         self.assertEqual(is_license_accepted, True)
+        self.assertEqual(are_roles_accepted, False)
+
+    def test_add_pending_document_w_existing_role_accepted(self):
+        """Add a pending document to the database.
+        In this case we have an existing license acceptance for the author
+        of the document.
+        This tests the trigger that will update the license acceptance
+        state on the pending document.
+        """
+        document_uuid = str(uuid.uuid4())
+        uri = 'http://cnx.org/contents/{}@1'.format(document_uuid)
+        user_id = 'smoo'
+        role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
+
+        document_metadata = {
+            'authors': [role_struct],
+            'publishers': [role_struct],
+            'cnx-archive-uri': uri,
+            'license_url': VALID_LICENSE_URL,
+            }
+
+        # Create a publication and an acceptance record.
+        publication_id = self.make_publication()
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+                args = (document_uuid, user_id, 'Author',
+                        document_uuid, user_id, 'Publisher',)
+                cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES (%s, %s, %s, 't'), (%s, %s, %s, 't')""", args)
+
+        # Create and add a document for the publication.
+        document = self.make_document(metadata=document_metadata)
+        from ..db import add_pending_model
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                document_ident_hash = add_pending_model(
+                    cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT "type", "license_accepted", "roles_accepted"
+FROM pending_documents
+WHERE
+  publication_id = %s
+  AND concat_ws('@', uuid, concat_ws('.', major_version, minor_version)) = %s
+""", (publication_id, document_ident_hash,))
+                record = cursor.fetchone()
+        type_, is_license_accepted, are_roles_accepted = record
+        self.assertEqual(type_, 'Document')
+        self.assertEqual(is_license_accepted, False)
         self.assertEqual(are_roles_accepted, True)
+
+    @db_connect
+    def test_add_pending_document_wo_permission(self, cursor):
+        """Add a pending document from publisher without permission."""
+        publication_id = self.make_publication()
+        document_id = 'a040717c-8d70-4953-9ed0-10d5095d5448'
+
+        # Set up the controls and acl entries.
+        cursor.execute("""\
+WITH
+control_insert AS (
+  INSERT INTO document_controls (uuid)
+  VALUES (%s::uuid) RETURNING uuid)
+INSERT INTO document_acl (uuid, user_id, permission)
+VALUES ((SELECT uuid from control_insert), 'ream', 'publish'::permission_type)
+""",
+                               (document_id,))
+
+        # Create and add a document for the publication.
+        metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
+                    'cnx-archive-uri': 'http://cnx.org/contents/{}' \
+                                       .format(document_id),
+                    }
+        document = self.make_document(metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model
+        document_ident_hash = add_pending_model(
+            cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+        expected_ident_hash = cursor.fetchone()[0]
+        # We're pulling the first value in the state_messages array,
+        # there are other exceptions related to validation in there,
+        # but we can depend on the value's location because the permission
+        # check will always happen before the validations.
+        cursor.execute("""\
+SELECT state, (state_messages->>0)::json
+FROM publications
+WHERE id = %s""", (publication_id,))
+        state, state_messages = cursor.fetchone()
+
+        self.assertEqual(state, 'Failed/Error')
+        expected_message = u"Not allowed to publish '{}'.".format(document_id)
+        expected_state_messages = {
+            u'code': 8,
+            u'publication_id': 1,
+            u'epub_filename': None,
+            u'pending_document_id': 1,
+            u'pending_ident_hash': unicode(expected_ident_hash),
+            u'type': u'NotAllowed',
+            u'message': expected_message,
+            u'uuid': document_id,
+            }
+        self.assertEqual(state_messages, expected_state_messages)
 
     def test_add_pending_document_w_invalid_license(self):
         """Add a pending document to the database."""
@@ -197,6 +502,7 @@ WHERE
 
         # Create and add a document for the publication.
         metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
                     'license_url': invalid_license_url,
                     }
         document = self.make_document(metadata=metadata)
@@ -244,6 +550,7 @@ WHERE id = %s""", (publication_id,))
         # Create and add a document for the publication.
         author_value = {u'id': u'able', u'type': u'diaspora-id'}
         metadata = {'authors': [author_value],
+                    'publishers': [{'id': 'able', 'type': 'cnx-id'}],
                     'license_url': VALID_LICENSE_URL,
                     }
         document = self.make_document(metadata=metadata)

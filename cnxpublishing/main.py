@@ -7,9 +7,12 @@
 # ###
 import tempfile
 
+from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid.config import Configurator
 from pyramid import security
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.session import SignedCookieSessionFactory
+from pyramid_multiauth import MultiAuthenticationPolicy
 
 from .authnz import APIKeyAuthenticationPolicy
 
@@ -23,11 +26,18 @@ def declare_routes(config):
     add_route = config.add_route
     add_route('get-content', '/contents/{ident_hash}')
     add_route('get-resource', '/resources/{hash}')
+
+    # User actions API
+    add_route('license-request', '/contents/{uuid}/licensors')
+    add_route('roles-request', '/contents/{uuid}/roles')
+    add_route('acl-request', '/contents/{uuid}/permissions')
+
+    # Publishing API
     add_route('publications', '/publications')
     add_route('get-publication', '/publications/{id}')
-    add_route('license-acceptance',
+    add_route('publication-license-acceptance',
               '/publications/{id}/license-acceptances/{uid}')
-    add_route('role-acceptance',
+    add_route('publication-role-acceptance',
               '/publications/{id}/role-acceptances/{uid}')
 
 
@@ -44,14 +54,21 @@ def _parse_api_key_lines(settings):
 
 def main(global_config, **settings):
     """Application factory"""
-    api_key_entities = _parse_api_key_lines(settings)
-    authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
-    authz_policy = ACLAuthorizationPolicy()
-
     config = Configurator(settings=settings, root_factory=RootFactory)
     declare_routes(config)
 
+    session_factory = SignedCookieSessionFactory(
+        settings.get('session_key', 'itsaseekreet'))
+    config.set_session_factory(session_factory)
+
+    api_key_entities = _parse_api_key_lines(settings)
+    api_key_authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
+    config.include('openstax_accounts.main')
+    openstax_authn_policy = config.registry.getUtility(IOpenstaxAccountsAuthenticationPolicy)
+    policies = [api_key_authn_policy, openstax_authn_policy]
+    authn_policy = MultiAuthenticationPolicy(policies)
     config.set_authentication_policy(authn_policy)
+    authz_policy = ACLAuthorizationPolicy()
     config.set_authorization_policy(authz_policy)
 
     config.scan(ignore='cnxpublishing.tests')
@@ -68,8 +85,13 @@ class RootFactory(object):
         (security.Allow, security.Everyone, 'view'),
         (security.Allow, security.Authenticated, 'publish'),
         (security.Allow, 'group:trusted-publishers',
-         ('publish.trusted-license-assigner',
-          'publish.trusted-role-assigner',)),
+         ('publish.assign-acceptance',  # Used when assigning user actions requests.
+          'publish.remove-acceptance',
+          'publish.assign-acl',  # Used when assigning access control on documents.
+          'publish.remove-acl',
+          'publish.create-identifier',  # Used when content does not yet exist.
+          'publish.remove-identifier',
+          )),
         security.DENY_ALL,
         )
 

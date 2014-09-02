@@ -16,6 +16,7 @@ import cnxepub
 import psycopg2
 from psycopg2.extras import register_uuid
 from cnxarchive.utils import join_ident_hash, split_ident_hash
+from cnxepub import ATTRIBUTED_ROLE_KEYS
 from pyramid.security import has_permission
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
@@ -47,10 +48,6 @@ SCHEMA_FILES = (
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
 # itself. Temporarily call it directly.
 register_uuid()
-ATTRIBUTED_ROLE_KEYS = (
-    'authors', 'copyright_holders', 'editors', 'illustrators',
-    'publishers', 'translators',
-    )
 
 
 def initdb(connection_string):
@@ -61,33 +58,60 @@ def initdb(connection_string):
                 schema_filepath = os.path.join(SQL_DIR, filename)
                 with open(schema_filepath, 'r') as fb:
                     schema = fb.read()
-                    cursor.execute(schema)
+                    try:
+                        cursor.execute(schema)
+                    except psycopg2.Error as exc:
+                        print("File '{}' had issues executing." \
+                              .format(schema_filepath), file=sys.stderr)
+                        raise
 
 
-def upsert_pending_license_acceptors(cursor, document_id):
+# FIXME Cache the database query in this function. Cache for forever.
+def _role_type_to_db_type(type_):
+    """Translates a role type (a value found in
+    ``cnxepub.ATTRIBUTED_ROLE_KEYS``) to a database compatible
+    value for ``role_types``.
+    """
+    registry = get_current_registry()
+    conn_str = registry.settings[CONNECTION_STRING]
+    with psycopg2.connect(conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+WITH unnested_role_types AS (
+  SELECT unnest(enum_range(NULL::role_types)) as role_type
+  ORDER BY role_type ASC)
+SELECT array_agg(role_type)::text[] FROM unnested_role_types""")
+            db_types = cursor.fetchone()[0]
+    return dict(zip(cnxepub.ATTRIBUTED_ROLE_KEYS, db_types))[type_]
+
+
+def _dissect_roles(metadata):
+    """Given a model's ``metadata``, iterate over the roles.
+    Return values are the role identifier and role type as a tuple.
+    """
+    for role_key in cnxepub.ATTRIBUTED_ROLE_KEYS:
+        for user in metadata.get(role_key, []):
+            if user['type'] != 'cnx-id':
+                raise ValueError("Archive only accepts Connexions users.")
+            uid = parse_user_uri(user['id'])
+            yield uid, role_key
+    raise StopIteration()
+
+
+def upsert_pending_licensors(cursor, document_id):
     """Update or insert records for pending license acceptors."""
     cursor.execute("""\
 SELECT "uuid", "metadata"
 FROM pending_documents
 WHERE id = %s""", (document_id,))
-    uuid, metadata = cursor.fetchone()
-    if metadata is None:
-        # Metadata wasn't set yet. Bailout early.
-        return
-
-    acceptors = set([])
-    for role_key in ATTRIBUTED_ROLE_KEYS:
-        for user in metadata.get(role_key, []):
-            if user['type'] != 'cnx-id':
-                raise ValueError("Archive only accepts Connexions users.")
-            id = parse_user_uri(user['id'])
-            acceptors.add(id)
+    uuid_, metadata = cursor.fetchone()
+    acceptors = set([uid for uid, type_ in _dissect_roles(metadata)])
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
-SELECT "user_id", "acceptance"
-FROM publications_license_acceptance
-WHERE uuid = %s""", (uuid,))
+SELECT "user_id", "accepted"
+FROM license_acceptances
+WHERE uuid = %s""", (uuid_,))
     existing_acceptors_mapping = dict(cursor.fetchall())
 
     # Who's not in the existing list?
@@ -97,18 +121,18 @@ WHERE uuid = %s""", (uuid,))
     # Insert the new licensor acceptors.
     for acceptor in new_acceptors:
         cursor.execute("""\
-INSERT INTO publications_license_acceptance
-  ("uuid", "user_id", "acceptance")
-VALUES (%s, %s, NULL)""", (uuid, acceptor,))
+INSERT INTO license_acceptances
+  ("uuid", "user_id", "accepted")
+VALUES (%s, %s, NULL)""", (uuid_, acceptor,))
 
     # Has everyone already accepted?
     cursor.execute("""\
 SELECT user_id
-FROM publications_license_acceptance
+FROM license_acceptances
 WHERE
   uuid = %s
   AND
-  (acceptance is NULL OR acceptance = FALSE)""", (uuid,))
+  (accepted is UNKNOWN OR accepted is FALSE)""", (uuid_,))
     defectors = set(cursor.fetchall())
 
     if not defectors:
@@ -124,51 +148,48 @@ def upsert_pending_roles(cursor, document_id):
 SELECT "uuid", "metadata"
 FROM pending_documents
 WHERE id = %s""", (document_id,))
-    uuid, metadata = cursor.fetchone()
-    if metadata is None:
-        # Metadata wasn't set yet. Bailout early.
-        return
+    uuid_, metadata = cursor.fetchone()
 
-    acceptors = set([])
-    for role_key in ATTRIBUTED_ROLE_KEYS:
-        for user in metadata.get(role_key, []):
-            if user['type'] != 'cnx-id':
-                raise ValueError("Archive only accepts Connexions users.")
-            id = parse_user_uri(user['id'])
-            acceptors.add(id)
+    acceptors = set([(uid, _role_type_to_db_type(type_),)
+                     for uid, type_ in _dissect_roles(metadata)])
 
     # Acquire a list of existing acceptors.
-    # This queries against the *archive* database.
     cursor.execute("""\
-SELECT r.roleparam, personids
-FROM
-  latest_modules AS lm
-  NATURAL JOIN moduleoptionalroles AS mor,
-  roles AS r
-WHERE
-  mor.roleid = r.roleid
-  AND
-  uuid = %s""", (uuid,))
-    existing_roles = set([])
-    for role, people in cursor.fetchall():
-        existing_roles.update(people)
+SELECT user_id, role_type
+FROM role_acceptances
+WHERE uuid = %s""", (uuid_,))
+    existing_roles = set([(r, t,) for r, t in cursor.fetchall()])
 
     # Who's not in the existing list?
     existing_acceptors = existing_roles
     new_acceptors = acceptors.difference(existing_acceptors)
 
     # Insert the new role acceptors.
-    for acceptor in new_acceptors:
+    for acceptor, type_ in new_acceptors:
         cursor.execute("""\
-INSERT INTO publications_role_acceptance
-  ("pending_document_id", "user_id", "acceptance")
-VALUES (%s, %s, DEFAULT)""", (document_id, acceptor,))
+INSERT INTO role_acceptances
+  ("uuid", "user_id", "role_type", "accepted")
+        VALUES (%s, %s, %s, DEFAULT)""", (uuid_, acceptor, type_))
+
+    # Has everyone already accepted?
+    cursor.execute("""\
+SELECT user_id
+FROM role_acceptances
+WHERE
+  uuid = %s
+  AND
+  (accepted is UNKNOWN OR accepted is FALSE)""", (uuid_,))
+    defectors = set(cursor.fetchall())
+
+    if not defectors:
+        # Update the pending document license acceptance state.
+        cursor.execute("""\
+update pending_documents set roles_accepted = 't'
+where id = %s""", (document_id,))
 
 
 def _get_type_name(model):
     """Returns a type name of 'Document' or 'Binder' based model's type."""
-    # XXX Shouldn't need to complicate this...
-    #     ... IDocument.providedBy(model)
     if isinstance(model, cnxepub.Binder):
         return 'Binder'
     else:
@@ -249,6 +270,33 @@ def validate_model(model):
     _validate_roles(model)
 
 
+def is_publication_permissible(cursor, publication_id, uuid_):
+    """Check the given publisher of this publication given
+    by ``publication_id`` is allowed to publish the content given
+    by ``uuid``.
+    """
+    # Check the publishing user has permission to publish
+    cursor.execute("""\
+SELECT 't'::boolean
+FROM
+  pending_documents AS pd
+  NATURAL JOIN document_acl AS acl
+  JOIN publications AS p ON (pd.publication_id = p.id)
+WHERE
+  p.id = %s
+  AND
+  pd.uuid = %s
+  AND
+  p.publisher = acl.user_id
+  AND
+  acl.permission = 'publish'""", (publication_id, uuid_,))
+    try:
+        is_allowed = cursor.fetchone()[0]
+    except TypeError:
+        is_allowed = False
+    return is_allowed
+
+
 def add_pending_model(cursor, publication_id, model):
     """Adds a model (binder or document) that is awaiting publication
     to the database.
@@ -275,42 +323,51 @@ LIMIT 1
         else:  # ...assume it's a binder.
             version = (next_major_version, 1,)
     else:
-        id = uuid.uuid4()
+        cursor.execute("""\
+WITH
+control_insert AS (
+  INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid),
+acl_insert AS (
+  INSERT INTO document_acl (uuid, user_id, permission)
+  VALUES ((SELECT uuid FROM control_insert),
+          (SELECT publisher FROM publications WHERE id = %s),
+          'publish'::permission_type))
+SELECT uuid FROM control_insert""", (publication_id,))
+        id = cursor.fetchone()[0]
         if isinstance(model, cnxepub.Document):
             version = (1, None,)
         else:  # ...assume it's a binder.
             version = (1, 1,)
 
     type_ = _get_type_name(model)
-    # Is the publishing party a trusted source?
-    request = get_current_request()
-    context = request.root
-    is_license_accepted = bool(
-        has_permission('publish.trusted-license-assigner',
-                       context, request))
-    are_roles_accepted = bool(
-        has_permission('publish.trusted-role-assigner',
-                       context, request))
-
     model.id = str(id)
     model.metadata['version'] = '.'.join([str(v) for v in version if v])
     args = [publication_id, id, version[0], version[1], type_,
-            is_license_accepted, are_roles_accepted,
             json.dumps(model.metadata)]
     cursor.execute("""\
 INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
     "license_accepted", "roles_accepted", "metadata")
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, 'f', 'f', %s)
 RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
 """, args)
-    pending_id, id, version = cursor.fetchone()
-    pending_ident_hash = join_ident_hash(id, version)
+    pending_id, uuid_, version = cursor.fetchone()
+    pending_ident_hash = join_ident_hash(uuid_, version)
 
     # Assign the new ident-hash to the document for later use.
     request = get_current_request()
     path = request.route_path('get-content', ident_hash=pending_ident_hash)
     model.set_uri('cnx-archive', path)
+
+    # Check if the publication is allowed for the publishing user.
+    if not is_publication_permissible(cursor, publication_id, id):
+        # Set the failure but continue the operation of inserting
+        # the pending document.
+        exc = exceptions.NotAllowed(id)
+        exc.publication_id = publication_id
+        exc.pending_document_id = pending_id
+        exc.pending_ident_hash = pending_ident_hash
+        set_publication_failure(cursor, exc)
 
     try:
         validate_model(model)
@@ -332,7 +389,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             # Raise the previous exception, so we know the original cause.
             raise exc_info[0], exc_info[1], exc_info[2]
     else:
-        upsert_pending_license_acceptors(cursor, pending_id)
+        upsert_pending_licensors(cursor, pending_id)
         upsert_pending_roles(cursor, pending_id)
     return pending_ident_hash
 
@@ -396,17 +453,18 @@ UPDATE publications SET ("state", "state_messages") = (%s, %s)
 WHERE id = %s""", ('Failed/Error', state_messages, publication_id,))
 
 
-def add_publication(cursor, epub, epub_file):
+def add_publication(cursor, epub, epub_file, is_pre_publication=False):
     """Adds a publication entry and makes each item
     a pending document.
     """
     publisher = epub[0].metadata['publisher']
     publish_message = epub[0].metadata['publication_message']
     epub_binary = psycopg2.Binary(epub_file.read())
-    args = (publisher, publish_message, epub_binary,)
+    args = (publisher, publish_message, epub_binary, is_pre_publication,)
     cursor.execute("""\
-INSERT INTO publications ("publisher", "publication_message", "epub")
-VALUES (%s, %s, %s)
+INSERT INTO publications
+  ("publisher", "publication_message", "epub", "is_pre_publication")
+VALUES (%s, %s, %s, %s)
 RETURNING id
 """, args)
     publication_id = cursor.fetchone()[0]
@@ -439,14 +497,14 @@ RETURNING id
 def _check_pending_document_license_state(cursor, document_id):
     """Check the aggregate state on the pending document."""
     cursor.execute("""\
-SELECT bool_and(acceptance)
+SELECT bool_and(accepted)
 FROM
   pending_documents AS pd,
-  publications_license_acceptance AS pla
+  license_acceptances AS la
 WHERE
   pd.id = %s
   AND
-  pd.uuid = pla.uuid""",
+  pd.uuid = la.uuid""",
                    (document_id,))
     try:
         is_accepted = cursor.fetchone()[0]
@@ -459,11 +517,14 @@ WHERE
 def _check_pending_document_role_state(cursor, document_id):
     """Check the aggregate state on the pending document."""
     cursor.execute("""\
-SELECT bool_and(acceptance)
+SELECT bool_and(accepted)
 FROM
-  publications_role_acceptance AS pra
+  role_acceptances AS ra,
+  pending_documents as pd
 WHERE
-  pra.pending_document_id = %s""",
+  pd.id = %s
+  AND
+  pd.uuid = ra.uuid""",
                    (document_id,))
     try:
         is_accepted = cursor.fetchone()[0]
@@ -495,10 +556,10 @@ def poke_publication_state(publication_id, current_state=None):
         with db_conn.cursor() as cursor:
             if current_state is None:
                 cursor.execute("""\
-SELECT "state", "state_messages"
+SELECT "state", "state_messages", "is_pre_publication"
 FROM publications
 WHERE id = %s""", (publication_id,))
-                current_state, messages = cursor.fetchone()
+                current_state, messages, is_pre_publication = cursor.fetchone()
     if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
         # Bailout early, because the publication is either in progress
         # or has been completed.
@@ -550,7 +611,16 @@ WHERE p.id = %s
     with psycopg2.connect(conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             if is_publish_ready:
-                publication_state = publish_pending(cursor, publication_id)
+                if not is_pre_publication:
+                    publication_state = publish_pending(cursor, publication_id)
+                else:
+                    change_state = "Done/Success"
+                    cursor.execute("""\
+UPDATE publications
+SET state = %s
+WHERE id = %s
+RETURNING state, state_messages""", (change_state, publication_id,))
+                    publication_state, messages = cursor.fetchone()
             else:
                 change_state = "Waiting for acceptance"
                 cursor.execute("""\
@@ -690,17 +760,17 @@ def accept_publication_license(cursor, publication_id, user_id,
     for the documents (listed by id as ``document_ids``).
     """
     cursor.execute("""\
-UPDATE publications_license_acceptance AS pla
-SET acceptance = %s
+UPDATE license_acceptances AS la
+SET accepted = %s
 FROM pending_documents AS pd
 WHERE
   pd.publication_id = %s
   AND
-  pla.user_id = %s
+  la.user_id = %s
   AND
   pd.uuid = ANY(%s::UUID[])
   AND
-  pd.uuid = pla.uuid""",
+  pd.uuid = la.uuid""",
                    (is_accepted, publication_id, user_id, document_ids,))
 
 
@@ -711,15 +781,169 @@ def accept_publication_role(cursor, publication_id, user_id,
     for the documents (listed by id as ``document_ids``).
     """
     cursor.execute("""\
-UPDATE publications_role_acceptance AS pra
-SET acceptance = %s
+UPDATE role_acceptances AS ra
+SET accepted = %s
 FROM pending_documents AS pd
 WHERE
   pd.publication_id = %s
   AND
-  pra.user_id = %s
+  ra.user_id = %s
   AND
   pd.uuid = ANY(%s::UUID[])
   AND
-  pd.id = pra.pending_document_id""",
+  pd.uuid = ra.uuid""",
                    (is_accepted, publication_id, user_id, document_ids,))
+
+
+def upsert_license_requests(cursor, uuid_, uids, has_accepted=None):
+    """Given a ``uuid`` and list of ``uids`` (user identifiers)
+    create a license acceptance entry. If ``has_accepted`` is supplied,
+    it will be used to assign an acceptance value to all listed ``uids``.
+    """
+    if not isinstance(uids, (list, set, tuple,)):
+        raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = set(uids)
+
+    # Acquire a list of existing acceptors.
+    cursor.execute("""\
+SELECT user_id, accepted FROM license_acceptances WHERE uuid = %s""",
+                   (uuid_,))
+    existing_acceptors = cursor.fetchall()
+
+    # Who's not in the existing list?
+    new_acceptors = acceptors.difference([x[0] for x in existing_acceptors])
+
+    # Insert the new licensor acceptors.
+    args = []
+    values_fmt = []
+    for uid in new_acceptors:
+        args.extend([uuid_, uid, has_accepted])
+        values_fmt.append("(%s, %s, %s)")
+    values_fmt = ', '.join(values_fmt)
+    cursor.execute("""\
+INSERT INTO license_acceptances (uuid, user_id, accepted)
+VALUES {}""".format(values_fmt), args)
+
+    # Update any existing license acceptors
+    for existing_uid, existing_has_accepted in existing_acceptors:
+        if existing_uid in acceptors and existing_has_accepted != has_accepted:
+            cursor.execute("""\
+UPDATE license_acceptances SET accepted = %s
+WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, uid,))
+
+
+def remove_license_requests(cursor, uuid_, uids):
+    """Given a ``uuid`` and list of ``uids`` (user identifiers)
+    remove the identified users' license acceptance entries.
+    """
+    if not isinstance(uids, (list, set, tuple,)):
+        raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = list(set(uids))
+
+    # Remove the the entries.
+    cursor.execute("""\
+DELETE FROM license_acceptances
+WHERE uuid = %s AND user_id = ANY(%s::text[])""", (uuid_, acceptors,))
+
+
+def upsert_role_requests(cursor, uuid_, roles, has_accepted=None):
+    """Given a ``uuid`` and list of dicts containing the ``uid`` and
+    ``role`` for creating a role acceptance entry.
+    """
+    if not isinstance(roles, (list, set, tuple,)):
+        raise TypeError("``roles`` is an invalid type: {}" \
+                        .format(type(roles)))
+
+    acceptors = set([(x['uid'], x['role'],) for x in roles])
+
+    # Acquire a list of existing acceptors.
+    cursor.execute("""\
+SELECT user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s""", (uuid_,))
+    existing_roles = cursor.fetchall()
+
+    # Who's not in the existing list?
+    existing_acceptors = set([(r, t,) for r, t, _ in existing_roles])
+    new_acceptors = acceptors.difference(existing_acceptors)
+
+    # Insert the new role acceptors.
+    for acceptor, type_ in new_acceptors:
+        cursor.execute("""\
+INSERT INTO role_acceptances
+  ("uuid", "user_id", "role_type", "accepted")
+        VALUES (%s, %s, %s, %s)""", (uuid_, acceptor, type_, has_accepted,))
+
+    # Update any existing license acceptors
+    for uid, type_, existing_has_accepted in existing_acceptors:
+        if (uid, type_) in acceptors and existing_has_accepted != has_accepted:
+            cursor.execute("""\
+UPDATE role_acceptances SET accepted = %s
+WHERE uuid = %s AND user_id = %s AND role_type = %s""",
+                           (has_accepted, uuid_, uid, type_,))
+
+
+def remove_role_requests(cursor, uuid_, roles):
+    """Given a ``uuid`` and list of dicts containing the ``uid``
+    (user identifiers) and ``role`` for removal of the identified
+    users' role acceptance entries.
+    """
+    if not isinstance(roles, (list, set, tuple,)):
+        raise TypeError("``roles`` is an invalid type: {}".format(type(uids)))
+
+    acceptors = set([(x['uid'], x['role'],) for x in roles])
+
+    # Remove the the entries.
+    for uid, role_type in acceptors:
+        cursor.execute("""\
+DELETE FROM role_acceptances
+WHERE uuid = %s AND user_id = %s AND role_type = %s""",
+                       (uuid_, uid, role_type,))
+
+
+def upsert_acl(cursor, uuid_, permissions):
+    """Given a ``uuid`` and a set of permissions given as a
+    tuple of ``uid`` and ``permission``, upsert them into the database.
+    """
+    if not isinstance(permissions, (list, set, tuple,)):
+        raise TypeError("``permissions`` is an invalid type: {}" \
+                        .format(type(permissions)))
+
+    permissions = set(permissions)
+
+    # Acquire the existin ACL.
+    cursor.execute("""\
+SELECT user_id, permission
+FROM document_acl
+WHERE uuid = %s""", (uuid_,))
+    existing = set([(r, t,) for r, t in cursor.fetchall()])
+
+    # Who's not in the existing list?
+    new_entries = permissions.difference(existing)
+
+    # Insert the new permissions.
+    for uid, permission in new_entries:
+        cursor.execute("""\
+INSERT INTO document_acl
+  ("uuid", "user_id", "permission")
+VALUES (%s, %s, %s)""", (uuid_, uid, permission))
+
+
+def remove_acl(cursor, uuid_, permissions):
+    """Given a ``uuid`` and a set of permissions given as a tuple
+    of ``uid`` and ``permission``, remove these entries from the database.
+    """
+    if not isinstance(permissions, (list, set, tuple,)):
+        raise TypeError("``permissions`` is an invalid type: {}" \
+                        .format(type(permissions)))
+
+    permissions = set(permissions)
+
+    # Remove the the entries.
+    for uid, permission in permissions:
+        cursor.execute("""\
+DELETE FROM document_acl
+WHERE uuid = %s AND user_id = %s AND permission = %s""",
+                       (uuid_, uid, permission,))
