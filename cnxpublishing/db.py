@@ -65,6 +65,15 @@ def initdb(connection_string):
                               .format(schema_filepath), file=sys.stderr)
                         raise
 
+# FIXME Cache the database query in this function. Cache for forever.
+# TODO Move to cnx-archive.
+def acquire_subject_vocabulary(cursor):
+    """Acquire a list of term and identifier values.
+    Returns a list of tuples containing the term and the subject identifier.
+    """
+    cursor.execute("""SELECT tag, tagid FROM tags WHERE tagid != 0""")
+    return cursor.fetchall()
+
 
 # FIXME Cache the database query in this function. Cache for forever.
 def _role_type_to_db_type(type_):
@@ -240,6 +249,7 @@ def _validate_license(model):
         raise exceptions.InvalidLicense(license_url)
     if not license['is_valid_for_publication']:
         raise exceptions.InvalidLicense(license_url)
+    # TODO Does the given license_url match the license in document_controls?
 
 
 def _validate_roles(model):
@@ -262,11 +272,74 @@ def _validate_roles(model):
                 raise exceptions.InvalidRole(role_key, role)
 
 
-def validate_model(model):
+def _validate_derived_from(cursor, model):
+    """Given a database cursor and model, check the derived-from
+    value accurately points to content in the archive.
+    The value can be nothing or must point to existing content.
+    """
+    derived_from_uri = model.metadata.get('derived_from_uri')
+    if derived_from_uri is None:
+        return  # bail out early
+
+    # Can we parse the value?
+    try:
+        ident_hash = parse_archive_uri(derived_from_uri)
+        uuid_, version = split_ident_hash(ident_hash, split_version=True)
+    except ValueError as exc:
+        raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri,
+                                         original_exception=exc)
+    # Is the ident-hash a valid pointer?
+    args = [uuid_]
+    table = 'latest_modules'
+    version_condition = ''
+    if version != (None, None,):
+        args.extend(version)
+        version_condition = " AND major_version = %s AND minor_version = %s"
+    cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}""" \
+                   .format(table, version_condition), args)
+    try:
+        exists = cursor.fetchone()[0]
+    except TypeError:  # None type
+        raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri)
+
+    # Assign the derived_from value so that we don't have to split it again.
+    model.metadata['derived_from'] = ident_hash
+
+
+def _validate_subjects(cursor, model):
+    """Give a database cursor and model, check the subjects against
+    the subject vocabulary.
+    """
+    subject_vocab = [term[0] for term in acquire_subject_vocabulary(cursor)]
+    subjects = model.metadata.get('subjects', [])
+    invalid_subjects = [s for s in subjects if s not in subject_vocab]
+    if invalid_subjects:
+        raise exceptions.InvalidMetadata('subjects', invalid_subjects)
+
+
+def validate_model(cursor, model):
     """Validates the model using a series of checks on bits of the data."""
     # Check the license is one valid for publication.
     _validate_license(model)
     _validate_roles(model)
+
+    # Other required metadata includes: title, summary
+    required_metadata = ('title', 'summary',)
+    for metadata_key in required_metadata:
+        if model.metadata.get(metadata_key) in [None, '', []]:
+            raise exceptions.MissingRequiredMetadata(metadata_key)
+
+    # Ensure that derived-from values are either None
+    # or point at a live record in the archive.
+    _validate_derived_from(cursor, model)
+
+    # FIXME Valid language code?
+
+    # Are the given 'subjects'
+    _validate_subjects(cursor, model)
+
+    # Optional metadata that does not need validation:
+    #   created, revised, keywords, google_analytics, buylink
 
 
 def is_publication_permissible(cursor, publication_id, uuid_):
@@ -369,7 +442,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
         set_publication_failure(cursor, exc)
 
     try:
-        validate_model(model)
+        validate_model(cursor, model)
     except exceptions.PublicationException as exc:
         exc_info = sys.exc_info()
         exc.publication_id = publication_id

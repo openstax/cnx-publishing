@@ -545,9 +545,9 @@ WHERE
 
     def test_add_pending_document_w_existing_license_accepted(self):
         """Add a pending document to the database.
-        In this case we have an existing license acceptance for the author
+        In this case we have an existing license acceptance for the author(s)
         of the document.
-        This tests the trigger that will update the license acceptance
+        This tests the logic that will update the license acceptance
         state on the pending document.
         """
         document_uuid = str(uuid.uuid4())
@@ -556,6 +556,8 @@ WHERE
         role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
 
         document_metadata = {
+            'title': "Test Document",
+            'summary': "Test Document Abstract",
             'authors': [role_struct],
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
@@ -567,7 +569,9 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+INSERT INTO document_controls (uuid, licenseid)
+SELECT %s, licenseid FROM licenses WHERE url = %s""",
+                               (document_uuid, VALID_LICENSE_URL,))
                 cursor.execute("""\
 INSERT INTO license_acceptances
   ("uuid", "user_id", "accepted")
@@ -601,9 +605,9 @@ WHERE
 
     def test_add_pending_document_w_existing_role_accepted(self):
         """Add a pending document to the database.
-        In this case we have an existing license acceptance for the author
+        In this case we have an existing role acceptance for the author(s)
         of the document.
-        This tests the trigger that will update the license acceptance
+        This tests the logic that will update the role acceptance
         state on the pending document.
         """
         document_uuid = str(uuid.uuid4())
@@ -612,6 +616,8 @@ WHERE
         role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
 
         document_metadata = {
+            'title': "Test Document",
+            'summary': "Test Document Abstract",
             'authors': [role_struct],
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
@@ -623,7 +629,9 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+INSERT INTO document_controls (uuid, licenseid)
+SELECT %s, licenseid FROM licenses WHERE url = %s""",
+                               (document_uuid, VALID_LICENSE_URL,))
                 args = (document_uuid, user_id, 'Author',
                         document_uuid, user_id, 'Publisher',)
                 cursor.execute("""\
@@ -854,6 +862,14 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""
     # Nameing convension for these tests is:
     #   test_{exception-code}_{point-of-interest}
+
+    _base_metadata = {
+        }
+
+    def setUp(self):
+        super(ValidationsTestCase, self).setUp()
+        self.metadata = self._base_metadata.copy()
+        self.addCleanup(delattr, self, 'metadata')
 
     def test_9_license_url(self):
         """Check for raised exception when license is missing."""

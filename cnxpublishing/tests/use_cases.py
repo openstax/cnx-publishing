@@ -40,7 +40,10 @@ BOOK = cnxepub.Binder(
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
-        u'subjects': [u'Science and Mathematics'],
+        u'subjects': [
+            u'Mathematics and Statistics',
+            u'Science and Technology',
+            ],
         u'authors': [
             {u'id': u'marknewlyn', u'name': u'Mark Horner',
              u'type': u'cnx-id'},
@@ -83,7 +86,9 @@ BOOK = cnxepub.Binder(
                                 u'created': u'2013/03/19 15:01:16 -0500',
                                 u'revised': u'2013/03/19 15:01:16 -0500',
                                 u'keywords': [u'South Africa'],
-                                u'subjects': [u'Science and Mathematics'],
+                                u'subjects': [
+                                    u'Mathematics and Statistics',
+                                    ],
                                 u'summary': u'<span>descriptive text</span>',
                                 u'language': u'en',
                                 u'license_text': u'CC-By 4.0',
