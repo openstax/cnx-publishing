@@ -945,6 +945,69 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
         exc = caught_exc.exception
         self.assertEqual(exc.__dict__['value'], invalid_license_url)
 
+    @db_connect
+    def test_12_invalid_subjects(self, cursor):
+        """Check for raised exception when the given subject is not fit
+        for new publications.
+        """
+        # Create a Document model.
+        invalid_subjects = [
+            u'Science and Statistics',
+            u'Math and Stuph',
+            ]
+        valid_subjects = [
+            u'Humanities',
+            ]
+        subjects = invalid_subjects + valid_subjects
+        metadata = {u'subjects': subjects}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_subjects as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_subjects)
+
+    @db_connect
+    def test_12_invalid_derived_from_uri(self, cursor):
+        """Check for raised exception when the given derived-from is not fit
+        for new publications.
+        """
+        # Create a Document model.
+        invalid_derived_from_uri = u"http://example.org/c/3a9b2cef@2"
+        metadata = {u'derived_from_uri': invalid_derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_derived_from as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_derived_from_uri)
+
+    @db_connect
+    def test_12_derived_from_uri_not_found(self, cursor):
+        """Check for raised exception when the given derived-from is not found
+        in the archive.
+        """
+        # Create a Document model.
+        invalid_derived_from_uri = \
+                u"http://cnx.org/contents/b07fd622-a2f1-4ccb-967c-9b966935961f"
+        metadata = {u'derived_from_uri': invalid_derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_derived_from as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_derived_from_uri)
+        self.assertEqual(exc._original_exception, None)
+
 
 class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions with a *Connexions Archive*

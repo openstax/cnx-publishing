@@ -15,7 +15,10 @@ import uuid
 import cnxepub
 import psycopg2
 from psycopg2.extras import register_uuid
-from cnxarchive.utils import join_ident_hash, split_ident_hash
+from cnxarchive.utils import (
+    IdentHashSyntaxError,
+    join_ident_hash, split_ident_hash,
+    )
 from cnxepub import ATTRIBUTED_ROLE_KEYS
 from pyramid.security import has_permission
 from pyramid.threadlocal import (
@@ -285,7 +288,7 @@ def _validate_derived_from(cursor, model):
     try:
         ident_hash = parse_archive_uri(derived_from_uri)
         uuid_, version = split_ident_hash(ident_hash, split_version=True)
-    except ValueError as exc:
+    except (ValueError, IdentHashSyntaxError) as exc:
         raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri,
                                          original_exception=exc)
     # Is the ident-hash a valid pointer?
