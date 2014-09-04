@@ -208,9 +208,8 @@ def add_pending_resource(cursor, resource):
 INSERT INTO pending_resources
   (data, hash, media_type)
 VALUES (%(data)s, %(hash)s, %(media_type)s)
-RETURNING hash;
 """, args)
-    resource.id = cursor.fetchone()[0]
+    resource.id = resource.hash
 
 
 # FIXME Cache this this function. There is no reason it needs to run

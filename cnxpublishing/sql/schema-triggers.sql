@@ -25,6 +25,9 @@ AS $$
   if existing_resource:
       if existing_resource[0]['fileid'] is not None:
           TD['new']['exists_in_archive'] = True
+      else:
+          # exists in pending_resources, don't insert again
+          return 'SKIP'
   return 'MODIFY'
 $$
 LANGUAGE plpythonu;
