@@ -283,6 +283,26 @@ ORDER BY user_id""", (uuid_,))
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions"""
 
+    def test_add_duplicate_pending_resources(self):
+        """Add duplicate pending resources to the database"""
+        resource = cnxepub.Resource('a.txt', io.BytesIO('hello world\n'),
+                'text/plain')
+
+        from ..db import add_pending_resource
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                add_pending_resource(cursor, resource)
+                add_pending_resource(cursor, resource)
+                cursor.execute("""\
+SELECT COUNT(*) FROM pending_resources WHERE hash = %s""", [
+                    resource.hash])
+                self.assertEqual(cursor.fetchone()[0], 1)
+
+        self.assertEqual(resource.hash,
+                '22596363b3de40b06f981fb85d82312e8c0ed511')
+        self.assertEqual(resource.id,
+                '22596363b3de40b06f981fb85d82312e8c0ed511')
+
     def test_add_new_pending_document(self):
         """Add a pending document to the database."""
         publication_id = self.make_publication()
