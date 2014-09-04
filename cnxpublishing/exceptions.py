@@ -171,3 +171,28 @@ class InvalidMetadata(PublicationException):
         else:
             data['message'] = message
         return data
+
+
+
+class InvalidReference(PublicationException):
+    """Raised when a Document contains an invalid reference to an internal
+    Document or Resource.
+    """
+
+    code = 20
+    _message_template = "Invalid reference at '{xpath}'."
+
+    def __init__(self, reference):
+        """``reference`` is the Reference object that contains
+        the invalid reference.
+        """
+        super(InvalidReference, self).__init__()
+        self._reference = reference
+
+    @property
+    def __dict__(self):
+        data = super(InvalidReference, self).__dict__
+        elm = self._reference.elm
+        data['xpath'] = elm.getroottree().getpath(elm)
+        data['value'] = self._reference.uri
+        return data

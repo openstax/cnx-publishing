@@ -479,9 +479,33 @@ def add_pending_model_content(cursor, publication_id, model):
         for resource in model.resources:
             add_pending_resource(cursor, resource)
 
+        cursor.execute("""\
+            SELECT id, concat_ws('@', uuid, major_version)
+            FROM pending_documents
+            WHERE publication_id = %s AND uuid = %s""",
+                       (publication_id, model.id,))
+        document_info = cursor.fetchone()
+        def attach_info_to_exception(exc):
+            """Small cached function to grab the pending document id
+            and hash to attach to the exception, which is useful when
+            reading the json data on a response.
+            """
+            exc.publication_id = publication_id
+            exc.pending_document_id, exc.pending_ident_hash = document_info
+
         for reference in model.references:
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')
+            elif reference.remote_type == cnxepub.INTERNAL_REFERENCE_TYPE:
+                exc = exceptions.InvalidReference(reference)
+                attach_info_to_exception(exc)
+                set_publication_failure(cursor, exc)
+            # This will check cnx.org and openstaxcnx.org.
+            elif reference.uri_parts.netloc.find('cnx.org') >= 0:
+                exc = exceptions.InvalidReference(reference)
+                attach_info_to_exception(exc)
+                set_publication_failure(cursor, exc)
+            # else, it's a remote reference... Do nothing.
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
