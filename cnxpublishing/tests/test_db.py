@@ -184,8 +184,108 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, expected)
 
 
+class LicenseRequestTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify license request functionality"""
+
+    def setUp(self):
+        super(LicenseRequestTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_license_requests
+        return upsert_license_requests(*args, **kwargs)
+
+    @db_connect
+    def test_add(self, cursor):
+        """Add to the license to the acceptance list"""
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+
+        # Create existing records.
+        values = [
+            (uuid_, 'charrose', None),
+            (uuid_, 'frahablar', None),
+            (uuid_, 'impicky', True),
+            (uuid_, 'marknewlyn', True),
+            (uuid_, 'ream', True),
+            (uuid_, 'rings', True),
+            ]
+        first_set_size = 2
+
+        # Call the target on the first group.
+        roles = [x[1] for x in values[:first_set_size]]
+        self.call_target(cursor, uuid_, roles)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT uuid, user_id, accepted
+FROM license_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = values[:first_set_size]
+        self.assertEqual(entries, expected)
+
+        # Call the target on the second group.
+        roles = [x[1] for x in values[first_set_size:]]
+        self.call_target(cursor, uuid_, roles, has_accepted=True)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT uuid, user_id, accepted
+FROM license_acceptances
+WHERE uuid = %s AND accepted is TRUE
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = values[first_set_size:]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_update(self, cursor):
+        """Update the license to the acceptance list"""
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+
+        # Create existing records.
+        values = [
+            (uuid_, 'charrose', None),
+            (uuid_, 'frahablar', None),
+            (uuid_, 'impicky', True),
+            (uuid_, 'marknewlyn', True),
+            (uuid_, 'ream', True),
+            (uuid_, 'rings', True),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO license_acceptances (uuid, user_id, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target on a selection of uids.
+        roles = [x[1] for x in values[:2] + values[-1:]]
+        self.call_target(cursor, uuid_, roles, has_accepted=False)
+
+        # Check the update.
+        cursor.execute("""\
+SELECT uuid, user_id, accepted
+FROM license_acceptances
+WHERE uuid = %s AND accepted is FALSE
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [
+            tuple(list(values[0][:2]) + [False]),
+            tuple(list(values[1][:2]) + [False]),
+            tuple(list(values[-1][:2]) + [False]),
+            ]
+        self.assertEqual(entries, expected)
+
+
 class PublicationRoleAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
-    """Verify license acceptance functionality"""
+    """Verify role acceptance functionality"""
 
     def setUp(self):
         super(PublicationRoleAcceptanceTestCase, self).setUp()
@@ -277,6 +377,110 @@ ORDER BY user_id""", (uuid_,))
         entries = cursor.fetchall()
         expected = [('frahablar', 'Illustrator',),
                     ('rings', 'Publisher',)]
+        self.assertEqual(entries, expected)
+
+
+class RoleRequestTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify role acceptance request functionality"""
+
+    def setUp(self):
+        super(RoleRequestTestCase, self).setUp()
+        self.publication_id = self.make_publication()
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_role_requests
+        return upsert_role_requests(*args, **kwargs)
+
+    @db_connect
+    def test_add(self, cursor):
+        """Add roles to the acceptance list"""
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+
+        # Create existing role records.
+        values = [
+            (uuid_, 'charrose', 'Author', None),
+            (uuid_, 'frahablar', 'Illustrator', None),
+            (uuid_, 'frahablar', 'Translator', None),
+            (uuid_, 'impicky', 'Editor', True),
+            (uuid_, 'marknewlyn', 'Author', True),
+            (uuid_, 'ream', 'Copyright Holder', True),
+            (uuid_, 'ream', 'Publisher', True),
+            (uuid_, 'rings', 'Publisher', True),
+            ]
+        first_set_size = 3
+
+        # Call the target on the first group.
+        roles = [{'uid': x[1], 'role': x[2]} for x in values[:first_set_size]]
+        self.call_target(cursor, uuid_, roles)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT uuid, user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s AND accepted is UNKNOWN
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = values[:first_set_size]
+        self.assertEqual(entries, expected)
+
+        # Call the target on the second group.
+        roles = [{'uid': x[1], 'role': x[2]} for x in values[first_set_size:]]
+        self.call_target(cursor, uuid_, roles, has_accepted=True)
+
+        # Check the additions.
+        cursor.execute("""\
+SELECT uuid, user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s AND accepted is TRUE
+ORDER BY user_id, role_type ASC""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = values[first_set_size:]
+        self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_update(self, cursor):
+        """Update roles to the acceptance list"""
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+
+        # Create existing role records.
+        values = [
+            (uuid_, 'charrose', 'Author', None),
+            (uuid_, 'frahablar', 'Translator', None),
+            (uuid_, 'frahablar', 'Illustrator', None),
+            (uuid_, 'impicky', 'Editor', True),
+            (uuid_, 'marknewlyn', 'Author', True),
+            (uuid_, 'ream', 'Copyright Holder', True),
+            (uuid_, 'ream', 'Publisher', True),
+            (uuid_, 'rings', 'Publisher', None),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target on the first group.
+        roles = [{'uid': x[1], 'role': x[2]} for x in values[:2] + values[6:7]]
+        self.call_target(cursor, uuid_, roles, has_accepted=False)
+
+        # Check the updates.
+        cursor.execute("""\
+SELECT uuid, user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s AND accepted is FALSE
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        expected = [
+            tuple(list(values[0][:3]) + [False]),
+            tuple(list(values[1][:3]) + [False]),
+            tuple(list(values[6][:3]) + [False]),
+            ]
         self.assertEqual(entries, expected)
 
 

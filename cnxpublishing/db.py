@@ -814,13 +814,14 @@ SELECT user_id, accepted FROM license_acceptances WHERE uuid = %s""",
     new_acceptors = acceptors.difference([x[0] for x in existing_acceptors])
 
     # Insert the new licensor acceptors.
-    args = []
-    values_fmt = []
-    for uid in new_acceptors:
-        args.extend([uuid_, uid, has_accepted])
-        values_fmt.append("(%s, %s, %s)")
-    values_fmt = ', '.join(values_fmt)
-    cursor.execute("""\
+    if new_acceptors:
+        args = []
+        values_fmt = []
+        for uid in new_acceptors:
+            args.extend([uuid_, uid, has_accepted])
+            values_fmt.append("(%s, %s, %s)")
+        values_fmt = ', '.join(values_fmt)
+        cursor.execute("""\
 INSERT INTO license_acceptances (uuid, user_id, accepted)
 VALUES {}""".format(values_fmt), args)
 
@@ -829,7 +830,7 @@ VALUES {}""".format(values_fmt), args)
         if existing_uid in acceptors and existing_has_accepted != has_accepted:
             cursor.execute("""\
 UPDATE license_acceptances SET accepted = %s
-WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, uid,))
+WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, existing_uid,))
 
 
 def remove_license_requests(cursor, uuid_, uids):
@@ -871,12 +872,11 @@ WHERE uuid = %s""", (uuid_,))
     # Insert the new role acceptors.
     for acceptor, type_ in new_acceptors:
         cursor.execute("""\
-INSERT INTO role_acceptances
-  ("uuid", "user_id", "role_type", "accepted")
-        VALUES (%s, %s, %s, %s)""", (uuid_, acceptor, type_, has_accepted,))
+INSERT INTO role_acceptances ("uuid", "user_id", "role_type", "accepted")
+VALUES (%s, %s, %s, %s)""", (uuid_, acceptor, type_, has_accepted,))
 
     # Update any existing license acceptors
-    for uid, type_, existing_has_accepted in existing_acceptors:
+    for uid, type_, existing_has_accepted in existing_roles:
         if (uid, type_) in acceptors and existing_has_accepted != has_accepted:
             cursor.execute("""\
 UPDATE role_acceptances SET accepted = %s
