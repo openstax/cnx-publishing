@@ -19,7 +19,7 @@ except ImportError:
 
 import psycopg2
 import cnxepub
-from cnxarchive.utils import split_ident_hash
+from cnxarchive.utils import join_ident_hash, split_ident_hash
 from pyramid import testing
 
 from . import use_cases
@@ -898,6 +898,71 @@ WHERE id = %s""", (publication_id,))
             }
         self.assertEqual(len(state_messages), 4)
         self.assertEqual(state_messages[-1], expected_state_message)
+
+    @db_connect
+    def test_add_pending_binder_w_document_pointers(self, cursor):
+        """Add a pending binder with document pointers."""
+        publication_id = self.make_publication()
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+        # This Book contains the pages used in book three.
+        metadata = book_three.metadata.copy()
+        del metadata['cnx-archive-uri']
+        binder = cnxepub.Binder(
+            id='bacc12fe@draft', metadata=metadata,
+            nodes=[
+                # Valid, because it points at the 'latest' version of the document.
+                cnxepub.DocumentPointer(split_ident_hash(book_three[0].ident_hash)[0]),
+                # Invalid, because of the version specified.
+                cnxepub.DocumentPointer(
+                    join_ident_hash(split_ident_hash(book_three[1].ident_hash)[0], '99')),
+                # Invalid, because it points at a binder.
+                cnxepub.DocumentPointer(
+                    book_three.ident_hash),
+                ],
+            )
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                binder_ident_hash = add_pending_model(
+                    cursor, publication_id, binder)
+                add_pending_model_content(cursor, publication_id, binder)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+                expected_ident_hash = cursor.fetchone()[0]
+                cursor.execute("""
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                state, state_messages = cursor.fetchone()
+        self.assertEqual(state, 'Failed/Error')
+
+        expected_message = u"Invalid document pointer: {}" \
+                           .format(book_three.ident_hash)
+        expected_state_message = {
+            u'code': 21,
+            u'publication_id': 1,
+            u'epub_filename': None,
+            u'pending_document_id': 1,
+            u'pending_ident_hash': unicode(expected_ident_hash),
+            u'type': u'InvalidDocumentPointer',
+            u'message': expected_message,
+            u'ident_hash': unicode(book_three.ident_hash),
+            u'exists': True,
+            u'is_document': False,
+            }
+        self.assertEqual(len(state_messages), 2)
+        self.assertEqual(state_messages[0], expected_state_message)
 
     @mock.patch('sys.stderr', new_callable=STDERR_MOCK_CLASS)
     def test_add_pending_document_w_critical_error(self, stderr):

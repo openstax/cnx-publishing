@@ -173,7 +173,6 @@ class InvalidMetadata(PublicationException):
         return data
 
 
-
 class InvalidReference(PublicationException):
     """Raised when a Document contains an invalid reference to an internal
     Document or Resource.
@@ -195,4 +194,29 @@ class InvalidReference(PublicationException):
         elm = self._reference.elm
         data['xpath'] = elm.getroottree().getpath(elm)
         data['value'] = self._reference.uri
+        return data
+
+
+class InvalidDocumentPointer(PublicationException):
+    """Raised when a Document contains an invalid reference to an internal
+    Document or Resource.
+    """
+    code = 21
+    _message_template = "Invalid document pointer: {ident_hash}"
+
+    def __init__(self, document_pointer, exists, is_document):
+        """``document_pointer`` is the DocumentPointer object that contains
+        the invalid reference.
+        """
+        super(InvalidDocumentPointer, self).__init__()
+        self._document_pointer = document_pointer
+        self._exists = bool(exists)
+        self._is_document = bool(is_document)
+
+    @property
+    def __dict__(self):
+        data = super(InvalidDocumentPointer, self).__dict__
+        data['ident_hash'] = self._document_pointer.ident_hash
+        data['exists'] = self._exists
+        data['is_document'] = self._is_document
         return data
