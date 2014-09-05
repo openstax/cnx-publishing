@@ -1085,7 +1085,7 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
 class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions with a *Connexions Archive*
     Most of the minor details for this interaction are handled in the
-    publish module tests. These tests bridge those a slightly,
+    publish module tests. These tests bridge those slightly,
     when trying to test overall logic that needs to know
     the complete publication context.
     """
@@ -1184,3 +1184,55 @@ ORDER BY major_version ASC, minor_version ASC""")
                  }],
             }
         self.assertEqual(tree, expected_tree)
+
+    @db_connect
+    def test_publish_binder_w_document_pointers(self, cursor):
+        """Ensure publication of binders with document pointers."""
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+        # This book contains the pages used in book three.
+        metadata = book_three.metadata.copy()
+        del metadata['cnx-archive-uri']
+        title = metadata['title'] = 'My copy of "{}"'.format(metadata['title'])
+        binder = cnxepub.Binder(
+            id='bacc12fe@draft', metadata=metadata,
+            title_overrides=['P One', 'P Two'],
+            nodes=[
+                cnxepub.DocumentPointer(book_three[0].ident_hash),
+                cnxepub.DocumentPointer(book_three[1].ident_hash),
+                ],
+            )
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(binder):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, binder)
+
+        # * Fire the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was published with tree references to the existing
+        # pages, which we are calling document pointers.
+        cursor.execute("""\
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM modules WHERE name = %s""", (title,))
+        binder_ident_hash = cursor.fetchone()[0]
+
+        expected_tree = {
+            "id": binder_ident_hash,
+            "title": title,
+            "contents": [
+                {"id": book_three[0].ident_hash,
+                 "title": "P One"},
+                {"id": book_three[1].ident_hash,
+                 "title": "P Two"},
+            ]}
+        cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+        tree = json.loads(cursor.fetchone()[0])
+        self.assertEqual(expected_tree, tree)
