@@ -19,7 +19,7 @@ except ImportError:
 
 import psycopg2
 import cnxepub
-from cnxarchive.utils import split_ident_hash
+from cnxarchive.utils import join_ident_hash, split_ident_hash
 from pyramid import testing
 
 from . import use_cases
@@ -545,9 +545,9 @@ WHERE
 
     def test_add_pending_document_w_existing_license_accepted(self):
         """Add a pending document to the database.
-        In this case we have an existing license acceptance for the author
+        In this case we have an existing license acceptance for the author(s)
         of the document.
-        This tests the trigger that will update the license acceptance
+        This tests the logic that will update the license acceptance
         state on the pending document.
         """
         document_uuid = str(uuid.uuid4())
@@ -556,6 +556,8 @@ WHERE
         role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
 
         document_metadata = {
+            'title': "Test Document",
+            'summary': "Test Document Abstract",
             'authors': [role_struct],
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
@@ -567,7 +569,9 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+INSERT INTO document_controls (uuid, licenseid)
+SELECT %s, licenseid FROM licenses WHERE url = %s""",
+                               (document_uuid, VALID_LICENSE_URL,))
                 cursor.execute("""\
 INSERT INTO license_acceptances
   ("uuid", "user_id", "accepted")
@@ -601,9 +605,9 @@ WHERE
 
     def test_add_pending_document_w_existing_role_accepted(self):
         """Add a pending document to the database.
-        In this case we have an existing license acceptance for the author
+        In this case we have an existing role acceptance for the author(s)
         of the document.
-        This tests the trigger that will update the license acceptance
+        This tests the logic that will update the role acceptance
         state on the pending document.
         """
         document_uuid = str(uuid.uuid4())
@@ -612,6 +616,8 @@ WHERE
         role_struct = {'id': 'smoo', 'name': 'smOO chIE', 'type': 'cnx-id'}
 
         document_metadata = {
+            'title': "Test Document",
+            'summary': "Test Document Abstract",
             'authors': [role_struct],
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
@@ -623,7 +629,9 @@ WHERE
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (%s)""", (document_uuid,))
+INSERT INTO document_controls (uuid, licenseid)
+SELECT %s, licenseid FROM licenses WHERE url = %s""",
+                               (document_uuid, VALID_LICENSE_URL,))
                 args = (document_uuid, user_id, 'Author',
                         document_uuid, user_id, 'Publisher',)
                 cursor.execute("""\
@@ -719,7 +727,9 @@ WHERE id = %s""", (publication_id,))
         self.assertEqual(state_messages, expected_state_messages)
 
     def test_add_pending_document_w_invalid_license(self):
-        """Add a pending document to the database."""
+        """Add a pending document to the database.
+        This tests the the metadata validations.
+        """
         invalid_license_url = 'http://creativecommons.org/licenses/by-sa/1.0'
 
         publication_id = self.make_publication()
@@ -818,6 +828,142 @@ WHERE id = %s""", (publication_id,))
              }]
         self.assertEqual(state_messages, expected_state_messages)
 
+    def test_add_pending_document_w_invalid_references(self):
+        """Add a pending document with an invalid content references."""
+        publication_id = self.make_publication()
+
+        # Create and add a document for the publication.
+        metadata = {
+            'title': 'Document Title',
+            'summary': 'Document Summary',
+            'authors': [{u'id': u'able', u'type': u'cnx-id'}],
+            'publishers': [{'id': 'able', 'type': 'cnx-id'}],
+            'license_url': VALID_LICENSE_URL,
+            }
+        content = """
+            <!-- Invalid references -->
+            <img src="../resources/8bef27ba.png"/>
+            <a href="http://openstaxcnx.org/contents/8bef27ba@55">
+              external reference to internal content
+            </a>
+            <a href="http://cnx.org/contents/8bef27ba@55">
+              external reference to internal content
+            </a>
+            <a href="/contents/8bef27ba@55">
+              relative reference to internal content
+            </a>
+            <!-- Valid reference -->
+            <a href="http://example.org/">external link</a>"""
+        document = self.make_document(content=content, metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                document_ident_hash = add_pending_model(
+                    cursor, publication_id, document)
+                add_pending_model_content(cursor, publication_id, document)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+                expected_ident_hash = cursor.fetchone()[0]
+                cursor.execute("""
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                state, state_messages = cursor.fetchone()
+        self.assertEqual(state, 'Failed/Error')
+        xpath = u'/div/img'
+        ref_value = u'../resources/8bef27ba.png'
+        expected_message = u"Invalid reference at '{}'." \
+                           .format(xpath)
+
+        expected_state_message = {
+            u'code': 20,
+            u'publication_id': 1,
+            u'epub_filename': None,
+            u'pending_document_id': 1,
+            u'pending_ident_hash': unicode(expected_ident_hash),
+            u'type': u'InvalidReference',
+            u'message': expected_message,
+            u'xpath': xpath,
+            u'value': ref_value,
+            }
+        self.assertEqual(len(state_messages), 4)
+        self.assertEqual(state_messages[-1], expected_state_message)
+
+    @db_connect
+    def test_add_pending_binder_w_document_pointers(self, cursor):
+        """Add a pending binder with document pointers."""
+        publication_id = self.make_publication()
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+        # This Book contains the pages used in book three.
+        metadata = book_three.metadata.copy()
+        del metadata['cnx-archive-uri']
+        binder = cnxepub.Binder(
+            id='bacc12fe@draft', metadata=metadata,
+            nodes=[
+                # Valid, because it points at the 'latest' version of the document.
+                cnxepub.DocumentPointer(split_ident_hash(book_three[0].ident_hash)[0]),
+                # Invalid, because of the version specified.
+                cnxepub.DocumentPointer(
+                    join_ident_hash(split_ident_hash(book_three[1].ident_hash)[0], '99')),
+                # Invalid, because it points at a binder.
+                cnxepub.DocumentPointer(
+                    book_three.ident_hash),
+                ],
+            )
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                binder_ident_hash = add_pending_model(
+                    cursor, publication_id, binder)
+                add_pending_model_content(cursor, publication_id, binder)
+
+        # Confirm the addition by checking for an entry
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added.
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+                expected_ident_hash = cursor.fetchone()[0]
+                cursor.execute("""
+SELECT "state", "state_messages"
+FROM publications
+WHERE id = %s""", (publication_id,))
+                state, state_messages = cursor.fetchone()
+        self.assertEqual(state, 'Failed/Error')
+
+        expected_message = u"Invalid document pointer: {}" \
+                           .format(book_three.ident_hash)
+        expected_state_message = {
+            u'code': 21,
+            u'publication_id': 1,
+            u'epub_filename': None,
+            u'pending_document_id': 1,
+            u'pending_ident_hash': unicode(expected_ident_hash),
+            u'type': u'InvalidDocumentPointer',
+            u'message': expected_message,
+            u'ident_hash': unicode(book_three.ident_hash),
+            u'exists': True,
+            u'is_document': False,
+            }
+        self.assertEqual(len(state_messages), 2)
+        self.assertEqual(state_messages[0], expected_state_message)
+
     @mock.patch('sys.stderr', new_callable=STDERR_MOCK_CLASS)
     def test_add_pending_document_w_critical_error(self, stderr):
         """Add a pending document to the database with an invalid role."""
@@ -854,6 +1000,14 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""
     # Nameing convension for these tests is:
     #   test_{exception-code}_{point-of-interest}
+
+    _base_metadata = {
+        }
+
+    def setUp(self):
+        super(ValidationsTestCase, self).setUp()
+        self.metadata = self._base_metadata.copy()
+        self.addCleanup(delattr, self, 'metadata')
 
     def test_9_license_url(self):
         """Check for raised exception when license is missing."""
@@ -929,11 +1083,128 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
         exc = caught_exc.exception
         self.assertEqual(exc.__dict__['value'], invalid_license_url)
 
+    @db_connect
+    def test_12_invalid_subjects(self, cursor):
+        """Check for raised exception when the given subject is not fit
+        for new publications.
+        """
+        # Create a Document model.
+        invalid_subjects = [
+            u'Science and Statistics',
+            u'Math and Stuph',
+            ]
+        valid_subjects = [
+            u'Humanities',
+            ]
+        subjects = invalid_subjects + valid_subjects
+        metadata = {u'subjects': subjects}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_subjects as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_subjects)
+
+    @db_connect
+    def test_12_invalid_derived_from_uri(self, cursor):
+        """Check for raised exception when the given derived-from is not fit
+        for new publications.
+        """
+        # Create a Document model.
+        invalid_derived_from_uri = u"http://example.org/c/3a9b2cef@2"
+        metadata = {u'derived_from_uri': invalid_derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_derived_from as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_derived_from_uri)
+
+    @db_connect
+    def test_12_valid_derived_from_uri(self, cursor):
+        """Check that the derived-from can be found.
+        This checks the logic used to validate when the exception
+        should not be raised.
+        """
+        uuid_ = uuid.uuid4()
+        # Create a published document with two versions.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s);
+INSERT INTO abstracts (abstractid, abstract) VALUES (1, 'abstract');
+INSERT INTO modules
+(module_ident, portal_type, moduleid, uuid, name,
+ major_version, minor_version,
+ created, revised, abstractid, licenseid, 
+ doctype, submitter, submitlog, stateid, parent, parentauthors,
+ language, authors, maintainers, licensors,
+ google_analytics, buylink)
+VALUES
+(1, 'Module', 'm10000', %s, 'v1',
+ '1', DEFAULT,
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT),
+(2, 'Module', 'm10000', %s, 'v2',
+ '2', DEFAULT,
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT);
+        """, (uuid_, uuid_, uuid_,))
+
+        # The following two cases test the query condition that specifies
+        # which table to query against: modules or latest_modules.
+
+        # Create a Document model, derived from a latest version.
+        derived_from_uri = u"http://cnx.org/contents/{}".format(uuid_)
+        metadata = {u'derived_from_uri': derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..db import _validate_derived_from as validator
+        validator(cursor, model)  # Should not raise an error.
+
+        # Create a Document model, derived from a non-latest version.
+        derived_from_uri = u"http://cnx.org/contents/{}@1".format(uuid_)
+        metadata = {u'derived_from_uri': derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..db import _validate_derived_from as validator
+        validator(cursor, model)  # Should not raise an error.
+
+    @db_connect
+    def test_12_derived_from_uri_not_found(self, cursor):
+        """Check for raised exception when the given derived-from is not found
+        in the archive.
+        """
+        # Create a Document model.
+        invalid_derived_from_uri = \
+                u"http://cnx.org/contents/b07fd622-a2f1-4ccb-967c-9b966935961f"
+        metadata = {u'derived_from_uri': invalid_derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..exceptions import InvalidMetadata
+        from ..db import _validate_derived_from as validator
+        with self.assertRaises(InvalidMetadata) as caught_exc:
+            validator(cursor, model)
+        exc = caught_exc.exception
+        self.assertEqual(exc.__dict__['value'], invalid_derived_from_uri)
+        self.assertEqual(exc._original_exception, None)
+
 
 class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     """Verify database interactions with a *Connexions Archive*
     Most of the minor details for this interaction are handled in the
-    publish module tests. These tests bridge those a slightly,
+    publish module tests. These tests bridge those slightly,
     when trying to test overall logic that needs to know
     the complete publication context.
     """
@@ -1032,3 +1303,55 @@ ORDER BY major_version ASC, minor_version ASC""")
                  }],
             }
         self.assertEqual(tree, expected_tree)
+
+    @db_connect
+    def test_publish_binder_w_document_pointers(self, cursor):
+        """Ensure publication of binders with document pointers."""
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+        # This book contains the pages used in book three.
+        metadata = book_three.metadata.copy()
+        del metadata['cnx-archive-uri']
+        title = metadata['title'] = 'My copy of "{}"'.format(metadata['title'])
+        binder = cnxepub.Binder(
+            id='bacc12fe@draft', metadata=metadata,
+            title_overrides=['P One', 'P Two'],
+            nodes=[
+                cnxepub.DocumentPointer(book_three[0].ident_hash),
+                cnxepub.DocumentPointer(book_three[1].ident_hash),
+                ],
+            )
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(binder):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, binder)
+
+        # * Fire the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was published with tree references to the existing
+        # pages, which we are calling document pointers.
+        cursor.execute("""\
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+FROM modules WHERE name = %s""", (title,))
+        binder_ident_hash = cursor.fetchone()[0]
+
+        expected_tree = {
+            "id": binder_ident_hash,
+            "title": title,
+            "contents": [
+                {"id": book_three[0].ident_hash,
+                 "title": "P One"},
+                {"id": book_three[1].ident_hash,
+                 "title": "P Two"},
+            ]}
+        cursor.execute("""\
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'""")
+        tree = json.loads(cursor.fetchone()[0])
+        self.assertEqual(expected_tree, tree)

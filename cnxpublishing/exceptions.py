@@ -138,3 +138,85 @@ class InvalidRole(PublicationException):
         data['key'] = self._key
         data['value'] = self._value
         return data
+
+
+class InvalidMetadata(PublicationException):
+    """Raised when an incoming publication has metadata
+    but the value does not conform to the expected syntax, type
+    or vocabulary.
+    """
+    code = 12
+    _message_template = "Invalid value given for '{key}': {value}\n{message}"
+
+    def __init__(self, metadata_key, value, original_exception=None):
+        """``metadata_key`` tells which metadata has the
+        invalid ``value``. If ``original_exception`` is supplied, it will be
+        used to supply additional information.
+        """
+        super(InvalidMetadata, self).__init__()
+        self._key = metadata_key
+        self._value = value
+        self._original_exception = original_exception
+
+    @property
+    def __dict__(self):
+        data = super(InvalidMetadata, self).__dict__
+        data['key'] = self._key
+        data['value'] = self._value
+        data['message'] = ''
+        try:
+            message = self._original_exception.message
+        except AttributeError:
+            pass
+        else:
+            data['message'] = message
+        return data
+
+
+class InvalidReference(PublicationException):
+    """Raised when a Document contains an invalid reference to an internal
+    Document or Resource.
+    """
+
+    code = 20
+    _message_template = "Invalid reference at '{xpath}'."
+
+    def __init__(self, reference):
+        """``reference`` is the Reference object that contains
+        the invalid reference.
+        """
+        super(InvalidReference, self).__init__()
+        self._reference = reference
+
+    @property
+    def __dict__(self):
+        data = super(InvalidReference, self).__dict__
+        elm = self._reference.elm
+        data['xpath'] = elm.getroottree().getpath(elm)
+        data['value'] = self._reference.uri
+        return data
+
+
+class InvalidDocumentPointer(PublicationException):
+    """Raised when a Document contains an invalid reference to an internal
+    Document or Resource.
+    """
+    code = 21
+    _message_template = "Invalid document pointer: {ident_hash}"
+
+    def __init__(self, document_pointer, exists, is_document):
+        """``document_pointer`` is the DocumentPointer object that contains
+        the invalid reference.
+        """
+        super(InvalidDocumentPointer, self).__init__()
+        self._document_pointer = document_pointer
+        self._exists = bool(exists)
+        self._is_document = bool(is_document)
+
+    @property
+    def __dict__(self):
+        data = super(InvalidDocumentPointer, self).__dict__
+        data['ident_hash'] = self._document_pointer.ident_hash
+        data['exists'] = self._exists
+        data['is_document'] = self._is_document
+        return data

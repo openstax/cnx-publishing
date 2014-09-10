@@ -15,7 +15,10 @@ import uuid
 import cnxepub
 import psycopg2
 from psycopg2.extras import register_uuid
-from cnxarchive.utils import join_ident_hash, split_ident_hash
+from cnxarchive.utils import (
+    IdentHashSyntaxError,
+    join_ident_hash, split_ident_hash,
+    )
 from cnxepub import ATTRIBUTED_ROLE_KEYS
 from pyramid.security import has_permission
 from pyramid.threadlocal import (
@@ -64,6 +67,15 @@ def initdb(connection_string):
                         print("File '{}' had issues executing." \
                               .format(schema_filepath), file=sys.stderr)
                         raise
+
+# FIXME Cache the database query in this function. Cache for forever.
+# TODO Move to cnx-archive.
+def acquire_subject_vocabulary(cursor):
+    """Acquire a list of term and identifier values.
+    Returns a list of tuples containing the term and the subject identifier.
+    """
+    cursor.execute("""SELECT tag, tagid FROM tags WHERE tagid != 0""")
+    return cursor.fetchall()
 
 
 # FIXME Cache the database query in this function. Cache for forever.
@@ -240,6 +252,7 @@ def _validate_license(model):
         raise exceptions.InvalidLicense(license_url)
     if not license['is_valid_for_publication']:
         raise exceptions.InvalidLicense(license_url)
+    # TODO Does the given license_url match the license in document_controls?
 
 
 def _validate_roles(model):
@@ -262,11 +275,77 @@ def _validate_roles(model):
                 raise exceptions.InvalidRole(role_key, role)
 
 
-def validate_model(model):
+def _validate_derived_from(cursor, model):
+    """Given a database cursor and model, check the derived-from
+    value accurately points to content in the archive.
+    The value can be nothing or must point to existing content.
+    """
+    derived_from_uri = model.metadata.get('derived_from_uri')
+    if derived_from_uri is None:
+        return  # bail out early
+
+    # Can we parse the value?
+    try:
+        ident_hash = parse_archive_uri(derived_from_uri)
+        uuid_, version = split_ident_hash(ident_hash, split_version=True)
+    except (ValueError, IdentHashSyntaxError) as exc:
+        raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri,
+                                         original_exception=exc)
+    # Is the ident-hash a valid pointer?
+    args = [uuid_]
+    table = 'latest_modules'
+    version_condition = ''
+    if version != (None, None,):
+        args.extend(version)
+        table = 'modules'
+        version_condition = " AND major_version = %s" \
+                            " AND minor_version {} %s" \
+                            .format(version[1] is None and 'is' or '=')
+    cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}""" \
+                   .format(table, version_condition), args)
+    try:
+        exists = cursor.fetchone()[0]
+    except TypeError:  # None type
+        raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri)
+
+    # Assign the derived_from value so that we don't have to split it again.
+    model.metadata['derived_from'] = ident_hash
+
+
+def _validate_subjects(cursor, model):
+    """Give a database cursor and model, check the subjects against
+    the subject vocabulary.
+    """
+    subject_vocab = [term[0] for term in acquire_subject_vocabulary(cursor)]
+    subjects = model.metadata.get('subjects', [])
+    invalid_subjects = [s for s in subjects if s not in subject_vocab]
+    if invalid_subjects:
+        raise exceptions.InvalidMetadata('subjects', invalid_subjects)
+
+
+def validate_model(cursor, model):
     """Validates the model using a series of checks on bits of the data."""
     # Check the license is one valid for publication.
     _validate_license(model)
     _validate_roles(model)
+
+    # Other required metadata includes: title, summary
+    required_metadata = ('title', 'summary',)
+    for metadata_key in required_metadata:
+        if model.metadata.get(metadata_key) in [None, '', []]:
+            raise exceptions.MissingRequiredMetadata(metadata_key)
+
+    # Ensure that derived-from values are either None
+    # or point at a live record in the archive.
+    _validate_derived_from(cursor, model)
+
+    # FIXME Valid language code?
+
+    # Are the given 'subjects'
+    _validate_subjects(cursor, model)
+
+    # Optional metadata that does not need validation:
+    #   created, revised, keywords, google_analytics, buylink
 
 
 def is_publication_permissible(cursor, publication_id, uuid_):
@@ -369,7 +448,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
         set_publication_failure(cursor, exc)
 
     try:
-        validate_model(model)
+        validate_model(cursor, model)
     except exceptions.PublicationException as exc:
         exc_info = sys.exc_info()
         exc.publication_id = publication_id
@@ -399,6 +478,21 @@ def add_pending_model_content(cursor, publication_id, model):
     content reference resolution requires the identifiers as they
     will appear in the end publication.
     """
+    cursor.execute("""\
+        SELECT id, concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+        FROM pending_documents
+        WHERE publication_id = %s AND uuid = %s""",
+                   (publication_id, model.id,))
+    document_info = cursor.fetchone()
+
+    def attach_info_to_exception(exc):
+        """Small cached function to grab the pending document id
+        and hash to attach to the exception, which is useful when
+        reading the json data on a response.
+        """
+        exc.publication_id = publication_id
+        exc.pending_document_id, exc.pending_ident_hash = document_info
+
     if isinstance(model, cnxepub.Document):
         for resource in model.resources:
             add_pending_resource(cursor, resource)
@@ -406,6 +500,16 @@ def add_pending_model_content(cursor, publication_id, model):
         for reference in model.references:
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')
+            elif reference.remote_type == cnxepub.INTERNAL_REFERENCE_TYPE:
+                exc = exceptions.InvalidReference(reference)
+                attach_info_to_exception(exc)
+                set_publication_failure(cursor, exc)
+            # This will check cnx.org and openstaxcnx.org.
+            elif reference.uri_parts.netloc.find('cnx.org') >= 0:
+                exc = exceptions.InvalidReference(reference)
+                attach_info_to_exception(exc)
+                set_publication_failure(cursor, exc)
+            # else, it's a remote reference... Do nothing.
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
@@ -415,6 +519,38 @@ def add_pending_model_content(cursor, publication_id, model):
             WHERE "publication_id" = %s AND "uuid" = %s"""
     else:
         metadata = model.metadata.copy()
+        # All document pointers in the tree are valid?
+        document_pointers = [m for m in cnxepub.flatten_model(model)
+                             if isinstance(m, cnxepub.DocumentPointer)]
+        document_pointer_ident_hashes = [
+            (split_ident_hash(dp.ident_hash)[0],
+             split_ident_hash(dp.ident_hash, split_version=True)[1][0],
+             split_ident_hash(dp.ident_hash, split_version=True)[1][1],)
+            #  split_ident_hash(dp.ident_hash, split_version=True)[1][0],)
+            for dp in document_pointers]
+        document_pointer_ident_hashes = zip(*document_pointer_ident_hashes)
+
+        if document_pointers:
+            uuids, major_vers, minor_vers = document_pointer_ident_hashes
+            cursor.execute("""\
+SELECT dp.uuid, concat_ws('.', dp.maj_ver, dp.min_ver) AS version,
+       dp.uuid = m.uuid AS exists,
+       m.portal_type = 'Module' AS is_document
+FROM (SELECT unnest(%s::uuid[]), unnest(%s::integer[]), unnest(%s::integer[])) AS dp(uuid, maj_ver, min_ver)
+     LEFT JOIN modules AS m ON dp.uuid = m.uuid AND (dp.maj_ver = m.major_version OR dp.maj_ver is null)""",
+                           (list(uuids), list(major_vers), list(minor_vers),))
+            valid_pointer_results = cursor.fetchall()
+            for result_row in valid_pointer_results:
+                uuid, version, exists, is_document = result_row
+                if not (exists and is_document):
+                    dp = [dp for dp in document_pointers
+                          if dp.ident_hash == join_ident_hash(uuid, version)
+                          ][0]
+                    exc = exceptions.InvalidDocumentPointer(
+                            dp, exists=exists, is_document=is_document)
+                    attach_info_to_exception(exc)
+                    set_publication_failure(cursor, exc)
+
         # Insert the tree into the metadata.
         metadata['_tree'] = cnxepub.model_to_tree(model)
         args = (json.dumps(metadata),
