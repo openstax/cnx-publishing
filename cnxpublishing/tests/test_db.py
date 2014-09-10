@@ -1127,6 +1127,60 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
         self.assertEqual(exc.__dict__['value'], invalid_derived_from_uri)
 
     @db_connect
+    def test_12_valid_derived_from_uri(self, cursor):
+        """Check that the derived-from can be found.
+        This checks the logic used to validate when the exception
+        should not be raised.
+        """
+        uuid_ = uuid.uuid4()
+        # Create a published document with two versions.
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (%s);
+INSERT INTO abstracts (abstractid, abstract) VALUES (1, 'abstract');
+INSERT INTO modules
+(module_ident, portal_type, moduleid, uuid, name,
+ major_version, minor_version,
+ created, revised, abstractid, licenseid, 
+ doctype, submitter, submitlog, stateid, parent, parentauthors,
+ language, authors, maintainers, licensors,
+ google_analytics, buylink)
+VALUES
+(1, 'Module', 'm10000', %s, 'v1',
+ '1', DEFAULT,
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT),
+(2, 'Module', 'm10000', %s, 'v2',
+ '2', DEFAULT,
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT);
+        """, (uuid_, uuid_, uuid_,))
+
+        # The following two cases test the query condition that specifies
+        # which table to query against: modules or latest_modules.
+
+        # Create a Document model, derived from a latest version.
+        derived_from_uri = u"http://cnx.org/contents/{}".format(uuid_)
+        metadata = {u'derived_from_uri': derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..db import _validate_derived_from as validator
+        validator(cursor, model)  # Should not raise an error.
+
+        # Create a Document model, derived from a non-latest version.
+        derived_from_uri = u"http://cnx.org/contents/{}@1".format(uuid_)
+        metadata = {u'derived_from_uri': derived_from_uri}
+        model = self.make_document(metadata=metadata)
+
+        # Call the in-question validator.
+        from ..db import _validate_derived_from as validator
+        validator(cursor, model)  # Should not raise an error.
+
+    @db_connect
     def test_12_derived_from_uri_not_found(self, cursor):
         """Check for raised exception when the given derived-from is not found
         in the archive.

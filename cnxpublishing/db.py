@@ -297,7 +297,10 @@ def _validate_derived_from(cursor, model):
     version_condition = ''
     if version != (None, None,):
         args.extend(version)
-        version_condition = " AND major_version = %s AND minor_version = %s"
+        table = 'modules'
+        version_condition = " AND major_version = %s" \
+                            " AND minor_version {} %s" \
+                            .format(version[1] is None and 'is' or '=')
     cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}""" \
                    .format(table, version_condition), args)
     try:
