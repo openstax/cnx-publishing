@@ -856,13 +856,8 @@ SELECT data, media_type
 FROM pending_resources
 WHERE hash = %s""", (hash,))
                 data, media_type = cursor.fetchone()
-                # FIXME md5 code to be removed when database is migrated to
-                # use sha1 hash
-                import hashlib
-                md5 = hashlib.new('md5', data[:]).hexdigest()
                 document.resources.append(cnxepub.Resource(
-                    md5, io.BytesIO(data[:]), media_type, filename=hash))
-                ref.bind(document.resources[-1], '/resources/{}')
+                    hash, io.BytesIO(data[:]), media_type, filename=hash))
 
         ident_hash = publish_model(cursor, document, publisher, message)
         all_models.append(document)
