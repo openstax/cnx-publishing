@@ -1355,3 +1355,59 @@ FROM modules
 WHERE portal_type = 'Collection'""")
         tree = json.loads(cursor.fetchone()[0])
         self.assertEqual(expected_tree, tree)
+
+    @db_connect
+    def test_complex_republish(self, cursor):
+        """Ensure republication of binders that share two or more documents."""
+        # * Set up three collections in the archive. These are used
+        # two of the three will be republished as minor versions.
+        # The other will be part of the main publication context,
+        # who's insertion into archive is outside the scope of this
+        # test case.
+        book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        book_two = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
+        book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        # * Make a new publication of book three.
+        book_three.metadata['version'] = '2.1'
+        book_three[0].metadata['version'] = '2'
+        book_three[1].metadata['version'] = '2'
+        # Set the ident-hash on the models. Probably not necessary...
+        for model in (book_three[0], book_three[1], book_three,):
+            model.set_uri('cnx-archive', '/contents/{}'.format(model.ident_hash))
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(book_three):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, book_three)
+        cursor.connection.commit()
+
+        # * Invoke the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was only published once due to the publication
+        # request and the shared binder was republished as a minor revision.
+        cursor.execute("SELECT count(*) FROM modules WHERE uuid = %s",
+                       (book_three.id,))
+        shared_binder_publication_count = cursor.fetchone()[0]
+        self.assertEqual(shared_binder_publication_count, 2)
+        cursor.connection.commit()
+
+        # Check the shared binders got a minor version bump.
+        cursor.execute("""\
+SELECT uuid::text, array_agg(concat_ws('.', major_version, minor_version))
+FROM modules
+WHERE portal_type = 'Collection'
+GROUP BY uuid
+ORDER BY uuid, 2""")
+        rows = cursor.fetchall()
+        expected_rows = [
+            (book_three.id, [book_three.metadata['version'], '1.1'],),
+            (book_one.id, ['1.2', '1.1'],),
+            (book_two.id, ['1.2', '1.1'],),
+            ]
+        self.assertEqual(rows, expected_rows)
