@@ -5,7 +5,6 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-
-
-# Configuration keys
-CONNECTION_STRING = 'psycopg2.connection_string'
+from cnxarchive.config import (
+    CONNECTION_STRING,
+    )
