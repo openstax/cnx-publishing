@@ -27,6 +27,26 @@ Or::
 
     pip install .
 
+If you haven't done so already, you will need to initialize an archive
+database. This can be done using the following command::
+
+    cnx-archive-initdb <your-config>.ini
+
+Then you'll need to add the publishing schema to an existing
+cnx-archive database::
+
+    cnx-publishing-initdb <your-config>.ini
+
+Here ``<your-config>.ini`` can be the ``development.ini`` in the project root.
+The settings in this config are the same as the development settings used
+by cnx-archive.
+
+To run the project you can use the supplied script or configure it as a WSGI
+application in your webserver.
+::
+
+    pserve <your-config>.ini
+
 Testing
 -------
 
