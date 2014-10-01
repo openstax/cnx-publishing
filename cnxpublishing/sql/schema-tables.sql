@@ -57,6 +57,11 @@ CREATE TABLE license_acceptances (
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
   "accepted" BOOLEAN DEFAULT NULL,
+  -- When publishing sends a notification message to the user
+  -- via the OpenStax Accounts service, the datetime that message
+  -- was sent is recorded here. This value can be null while ``accepted``
+  -- is true due to various other workflow circumstances.
+  "notified" TIMESTAMP WITH TIME ZONE,
   PRIMARY KEY ("uuid", "user_id"),
   FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );
@@ -71,6 +76,11 @@ CREATE TABLE role_acceptances (
   -- A value of true or false indicates the user (at ``user_id``)
   -- has responded to the license acceptance request.
   "accepted" BOOLEAN DEFAULT NULL,
+  -- When publishing sends a notification message to the user
+  -- via the OpenStax Accounts service, the datetime that message
+  -- was sent is recorded here. This value can be null while ``accepted``
+  -- is true due to various other workflow circumstances.
+  "notified" TIMESTAMP WITH TIME ZONE,
   PRIMARY KEY ("uuid", "user_id", "role_type"),
   FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );

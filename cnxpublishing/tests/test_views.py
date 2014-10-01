@@ -711,6 +711,20 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         # *. --
         self.app_check_state(publication_id, 'Waiting for acceptance',
                              headers=api_key_headers)
+        # -.-  Check that users have been notified.
+        #      We can check this using the stub memory writer,
+        #      which has been configured for the application.
+        from openstax_accounts.stub import IStubMessageWriter
+        registry = self._app.registry
+        accounts_stub_writer = registry.getUtility(IStubMessageWriter)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT count(*) FROM license_acceptances "
+                               "WHERE notified IS NOT NULL")
+                self.assertEqual(cursor.fetchone()[0], 13)
+                cursor.execute("SELECT count(*) FROM role_acceptances "
+                               "WHERE notified IS NOT NULL")
+                self.assertEqual(cursor.fetchone()[0], 15)
 
         # 2. --
         # TODO This uses the JSON get/post parts; revision publications

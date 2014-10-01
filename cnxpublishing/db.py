@@ -14,12 +14,14 @@ import uuid
 
 import cnxepub
 import psycopg2
-from psycopg2.extras import register_uuid
+import jinja2
 from cnxarchive.utils import (
     IdentHashSyntaxError,
     join_ident_hash, split_ident_hash,
     )
 from cnxepub import ATTRIBUTED_ROLE_KEYS
+from openstax_accounts.interfaces import IOpenstaxAccounts
+from psycopg2.extras import register_uuid
 from pyramid.security import has_permission
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
@@ -469,6 +471,7 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     else:
         upsert_pending_licensors(cursor, pending_id)
         upsert_pending_roles(cursor, pending_id)
+        notify_users(cursor, pending_id)
     return pending_ident_hash
 
 
@@ -1082,3 +1085,71 @@ def remove_acl(cursor, uuid_, permissions):
 DELETE FROM document_acl
 WHERE uuid = %s AND user_id = %s AND permission = %s""",
                        (uuid_, uid, permission,))
+
+
+NOTIFICATION_TEMPLATE = jinja2.Template("""\
+Hello {{full_name}},
+
+{% if licensor %}
+You have been assigned as a licenee on content.
+You will need to approve the license on content before it can be published. 
+{% endif %}
+
+{% if roles %}
+You have been assigned the {{ ', '.join(roles) }} role(s) on content.
+You will need to approve these roles before the content can be published.
+{% endif %}
+
+Thank you from your friends at OpenStax CNX
+""", trim_blocks=True, lstrip_blocks=True)
+NOFIFICATION_SUBJECT = "Requesting action on OpenStax CNX content"
+
+
+def notify_users(cursor, document_id):
+    """Notify all users about their role and/or license acceptance
+    for a piece of content associated with the given ``document_id``.
+    """
+    registry = get_current_registry()
+    accounts = registry.getUtility(IOpenstaxAccounts)
+    cursor.execute("""\
+SELECT la.user_id
+FROM license_acceptances AS la
+WHERE
+  la.uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
+  AND la.notified IS NULL AND (NOT la.accepted or la.accepted IS UNKNOWN)
+""", (document_id,))    
+    licensors = [x[0] for x in cursor.fetchall()]
+
+    cursor.execute("""\
+SELECT user_id, array_agg(role_type)::text[]
+FROM role_acceptances AS ra
+WHERE
+  ra.uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
+  AND ra.notified IS NULL AND (NOT ra.accepted or ra.accepted IS UNKNOWN)
+GROUP BY user_id
+""", (document_id,))
+    roles = {u: r for u, r in cursor.fetchall()}
+
+    needs_notified = set(licensors + roles.keys())
+
+    for user_id in needs_notified:
+        data = {
+            'user_id': user_id,
+            'full_name': None,  # TODO
+            'licensor': user_id in licensors,
+            'roles': roles.get(user_id, []),
+            }
+        message = NOTIFICATION_TEMPLATE.render(**data)
+        accounts.send_message(user_id, NOFIFICATION_SUBJECT, message)
+
+    cursor.execute("""\
+UPDATE license_acceptances SET notified = CURRENT_TIMESTAMP
+WHERE
+  uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
+  AND user_id = ANY (%s)""", (document_id, licensors,))
+    # FIXME overwrites notified for all roles types a user might have. 
+    cursor.execute("""\
+UPDATE role_acceptances SET notified = CURRENT_TIMESTAMP
+WHERE
+  uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
+  AND user_id = ANY (%s)""", (document_id, roles.keys(),))

@@ -68,6 +68,10 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from ..main import declare_routes
         declare_routes(self.config)
 
+        # Initialize the authentication policy.
+        from openstax_accounts.stub import main
+        main(self.config)
+
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
