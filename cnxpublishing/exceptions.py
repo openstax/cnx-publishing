@@ -220,3 +220,24 @@ class InvalidDocumentPointer(PublicationException):
         data['exists'] = self._exists
         data['is_document'] = self._is_document
         return data
+
+
+class ResourceFileExceededLimitError(PublicationException):
+    """Raised when a user tries to publish a document with resource
+    files bigger than the size limit
+    """
+    code = 22
+    _message_template = ('Resource files cannot be bigger than {size_limit}MB'
+                         ' ({filename})')
+
+    def __init__(self, size_limit, filename):
+        super(ResourceFileExceededLimitError, self).__init__()
+        self._size_limit = size_limit
+        self._filename = filename
+
+    @property
+    def __dict__(self):
+        data = super(ResourceFileExceededLimitError, self).__dict__
+        data['size_limit'] = self._size_limit
+        data['filename'] = self._filename
+        return data

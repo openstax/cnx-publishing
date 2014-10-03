@@ -29,6 +29,7 @@ from pyramid.threadlocal import (
 
 from . import exceptions
 from .config import CONNECTION_STRING
+from .exceptions import ResourceFileExceededLimitError
 from .utils import parse_archive_uri, parse_user_uri
 from .publish import publish_model, republish_binders
 
@@ -211,12 +212,16 @@ def _get_type_name(model):
 
 
 def add_pending_resource(cursor, resource):
+    settings = get_current_registry().settings
     args = {
         'media_type': resource.media_type,
         'hash': resource.hash,
         }
     with resource.open() as data:
-        args['data'] = psycopg2.Binary(data.read()),
+        if data.seek(0, 2) > int(settings['file-upload-limit']) * 1024 * 1024:
+            raise ResourceFileExceededLimitError(settings['file-upload-limit'], resource.filename)
+        data.seek(0)
+        args['data'] = psycopg2.Binary(data.read())
 
     cursor.execute("""\
 INSERT INTO pending_resources
@@ -628,7 +633,11 @@ RETURNING id
     for model in models:
         # Now that all models have been given an identifier
         # we can write the content to the database.
-        add_pending_model_content(cursor, publication_id, model)
+        try:
+            add_pending_model_content(cursor, publication_id, model)
+        except ResourceFileExceededLimitError as e:
+            e.publication_id = publication_id
+            set_publication_failure(cursor, e)
     return publication_id, insert_mapping
 
 
