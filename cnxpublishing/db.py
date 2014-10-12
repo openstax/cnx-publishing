@@ -933,15 +933,15 @@ WHERE
                    (is_accepted, publication_id, user_id, document_ids,))
 
 
-def upsert_license_requests(cursor, uuid_, uids, has_accepted=None):
+def upsert_license_requests(cursor, uuid_, roles):
     """Given a ``uuid`` and list of ``uids`` (user identifiers)
     create a license acceptance entry. If ``has_accepted`` is supplied,
     it will be used to assign an acceptance value to all listed ``uids``.
     """
-    if not isinstance(uids, (list, set, tuple,)):
+    if not isinstance(roles, (list, set, tuple,)):
         raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
 
-    acceptors = set(uids)
+    acceptors = set([x['uid'] for x in roles])
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
@@ -957,6 +957,9 @@ SELECT user_id, accepted FROM license_acceptances WHERE uuid = %s""",
         args = []
         values_fmt = []
         for uid in new_acceptors:
+            has_accepted = [x.get('has_accepted', None)
+                            for x in roles
+                            if uid == x['uid']][0]
             args.extend([uuid_, uid, has_accepted])
             values_fmt.append("(%s, %s, %s)")
         values_fmt = ', '.join(values_fmt)
@@ -965,11 +968,23 @@ INSERT INTO license_acceptances (uuid, user_id, accepted)
 VALUES {}""".format(values_fmt), args)
 
     # Update any existing license acceptors
-    for existing_uid, existing_has_accepted in existing_acceptors:
-        if existing_uid in acceptors and existing_has_accepted != has_accepted:
+    acceptors = set([
+        (x['uid'], x.get('has_accepted', None),)
+        for x in roles
+        # Prevent updating newly inserted records.
+        if (x['uid'], x.get('has_accepted', None),) not in new_acceptors
+        ])
+    existing_acceptors = set([
+        x for x in existing_acceptors
+        # Prevent updating newly inserted records.
+        if x[0] not in new_acceptors
+        ])
+    tobe_updated_acceptors = acceptors.difference(existing_acceptors)
+
+    for uid, has_accepted in tobe_updated_acceptors:
             cursor.execute("""\
 UPDATE license_acceptances SET accepted = %s
-WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, existing_uid,))
+WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, uid,))
 
 
 def remove_license_requests(cursor, uuid_, uids):

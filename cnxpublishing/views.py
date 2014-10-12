@@ -300,7 +300,7 @@ def post_license_request(request):
 
     posted_data = request.json
     license_url = posted_data.get('license_url')
-    licensors = [x['uid'] for x in posted_data.get('licensors', [])]
+    licensors = posted_data.get('licensors', [])
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
@@ -328,8 +328,7 @@ RETURNING dc.licenseid""",
                     valid_licenseid = cursor.fetchone()[0]
                 except TypeError:  # None returned
                     raise httpexceptions.HTTPBadRequest("invalid license_url")
-            upsert_license_requests(cursor, uuid_, licensors,
-                                    has_accepted=True)
+            upsert_license_requests(cursor, uuid_, licensors)
 
     resp = request.response
     resp.status_int = 202

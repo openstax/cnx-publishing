@@ -186,12 +186,15 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         api_key = self.api_keys_by_uid['some-trust']
         headers = [('x-api-key', api_key,)]
 
-        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
+        licensors = [
+            {'uid': 'marknewlyn', 'has_accepted': True},
+            {'uid': 'charrose', 'has_accepted': True},
+            ]
         license_url = u"http://creativecommons.org/licenses/by/4.0/"
 
         # 1.
         path = "/contents/{}/licensors".format(uuid_)
-        data = {'license_url': license_url, 'licensors': uids}
+        data = {'license_url': license_url, 'licensors': licensors}
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
@@ -200,7 +203,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             u'license_url': license_url,
             u'licensors': [
                 {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
-                {u'uuid': unicode(uuid_), u'uid': 'marknewlyn', u'has_accepted': True},
+                {u'uuid': unicode(uuid_), u'uid': u'marknewlyn', u'has_accepted': True},
                 ],
             }
         resp = self.app.get(path, headers=headers)
@@ -238,11 +241,14 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         api_key = self.api_keys_by_uid['some-trust']
         headers = [('x-api-key', api_key,)]
 
-        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
+        licensors = [
+            {'uid': 'marknewlyn', 'has_accepted': True},
+            {'uid': 'charrose', 'has_accepted': True},
+            ]
 
         # 1.
         path = "/contents/{}/licensors".format(uuid_)
-        data = {'licensors': uids}
+        data = {'licensors': licensors}
         with self.assertRaises(AppError) as caught_exception:
             resp = self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
@@ -438,12 +444,15 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = uuid.uuid4()
 
         license_url = u"http://creativecommons.org/licenses/by/4.0/"
-        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
+        licensors = [
+            {'uid': 'marknewlyn', 'has_accepted': True},
+            {'uid': 'charrose', 'has_accepted': True},
+            ]
 
         path = "/contents/{}/licensors".format(uuid_)
         data = {
             'license_url': license_url,
-            'licensors': uids,
+            'licensors': licensors,
             }
 
         # 1.
@@ -1234,7 +1243,7 @@ GROUP BY user_id, accepted
                                              'role': role_name,
                                              'has_accepted': True})
                     if role['id'] not in [r['uid'] for r in roles]:
-                        roles.append({'uid': role['id']})
+                        roles.append({'uid': role['id'], 'has_accepted': True})
             # Post the accepted attributed roles.
             path = "/contents/{}/roles".format(id)
             self.app.post_json(path, attributed_roles,

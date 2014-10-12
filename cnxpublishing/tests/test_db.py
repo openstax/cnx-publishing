@@ -225,7 +225,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         first_set_size = 2
 
         # Call the target on the first group.
-        roles = [x[1] for x in values[:first_set_size]]
+        roles = [{'uid': x[1], 'has_accepted': None}
+                 for x in values[:first_set_size]]
         self.call_target(cursor, uuid_, roles)
 
         # Check the additions.
@@ -239,8 +240,9 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, expected)
 
         # Call the target on the second group.
-        roles = [x[1] for x in values[first_set_size:]]
-        self.call_target(cursor, uuid_, roles, has_accepted=True)
+        roles = [{'uid': x[1], 'has_accepted': True}
+                 for x in values[first_set_size:]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the additions.
         cursor.execute("""\
@@ -277,8 +279,9 @@ INSERT INTO license_acceptances (uuid, user_id, accepted)
 VALUES {}""".format(value_format), serial_values)
 
         # Call the target on a selection of uids.
-        roles = [x[1] for x in values[:2] + values[-1:]]
-        self.call_target(cursor, uuid_, roles, has_accepted=False)
+        roles = [{'uid': x[1], 'has_accepted': False}
+                 for x in values[:2] + values[-1:]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the update.
         cursor.execute("""\
