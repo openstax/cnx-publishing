@@ -411,8 +411,7 @@ SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
 INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
                 else:
                     raise httpexceptions.HTTPNotFound()
-            upsert_role_requests(cursor, uuid_, posted_roles,
-                                 has_accepted=True)
+            upsert_role_requests(cursor, uuid_, posted_roles)
 
     resp = request.response
     resp.status_int = 202

@@ -324,9 +324,9 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         # 1.
         path = "/contents/{}/roles".format(uuid_)
         data = [
-            {'uid': 'charrose', 'role': 'Author'},
-            {'uid': 'marknewlyn', 'role': 'Author'},
-            {'uid': 'rings', 'role': 'Publisher'},
+            {'uid': 'charrose', 'role': 'Author', 'has_accepted': True},
+            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
+            {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
             ]
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
@@ -345,8 +345,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
 
         # 3.
         data = [
-            {'uid': 'marknewlyn', 'role': 'Author'},
-            {'uid': 'marknewlyn', 'role': 'Publisher'},
+            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
+            {'uid': 'marknewlyn', 'role': 'Publisher', 'has_accepted': True},
             ]
         resp = self.app.delete_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 200)
@@ -489,8 +489,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         path = "/contents/{}/roles".format(uuid_)
         data = [
             {'uid': 'charrose', 'role': 'Author'},
-            {'uid': 'marknewlyn', 'role': 'Author'},
-            {'uid': 'rings', 'role': 'Publisher'},
+            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': False},
+            {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
             ]
 
         # 1.
@@ -510,9 +510,9 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         # 3.
         expected = [
             {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': True},
+             'role': 'Author', 'has_accepted': None},
             {'uuid': str(uuid_), 'uid': 'marknewlyn',
-             'role': 'Author', 'has_accepted': True},
+             'role': 'Author', 'has_accepted': False},
             {'uuid': str(uuid_), 'uid': 'rings',
              'role': 'Publisher', 'has_accepted': True},
             ]
@@ -1231,7 +1231,8 @@ GROUP BY user_id, accepted
                 for role in model.metadata.get(role_key, []):
                     role_name = attr_role_key_to_db_role[role_key]
                     attributed_roles.append({'uid': role['id'],
-                                             'role': role_name})
+                                             'role': role_name,
+                                             'has_accepted': True})
                     if role['id'] not in [r['uid'] for r in roles]:
                         roles.append({'uid': role['id']})
             # Post the accepted attributed roles.
