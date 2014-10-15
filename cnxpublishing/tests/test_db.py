@@ -225,7 +225,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         first_set_size = 2
 
         # Call the target on the first group.
-        roles = [x[1] for x in values[:first_set_size]]
+        roles = [{'uid': x[1], 'has_accepted': None}
+                 for x in values[:first_set_size]]
         self.call_target(cursor, uuid_, roles)
 
         # Check the additions.
@@ -239,8 +240,9 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, expected)
 
         # Call the target on the second group.
-        roles = [x[1] for x in values[first_set_size:]]
-        self.call_target(cursor, uuid_, roles, has_accepted=True)
+        roles = [{'uid': x[1], 'has_accepted': True}
+                 for x in values[first_set_size:]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the additions.
         cursor.execute("""\
@@ -277,8 +279,9 @@ INSERT INTO license_acceptances (uuid, user_id, accepted)
 VALUES {}""".format(value_format), serial_values)
 
         # Call the target on a selection of uids.
-        roles = [x[1] for x in values[:2] + values[-1:]]
-        self.call_target(cursor, uuid_, roles, has_accepted=False)
+        roles = [{'uid': x[1], 'has_accepted': False}
+                 for x in values[:2] + values[-1:]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the update.
         cursor.execute("""\
@@ -437,8 +440,9 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, expected)
 
         # Call the target on the second group.
-        roles = [{'uid': x[1], 'role': x[2]} for x in values[first_set_size:]]
-        self.call_target(cursor, uuid_, roles, has_accepted=True)
+        roles = [{'uid': x[1], 'role': x[2], 'has_accepted': True}
+                 for x in values[first_set_size:]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the additions.
         cursor.execute("""\
@@ -477,8 +481,9 @@ INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
 VALUES {}""".format(value_format), serial_values)
 
         # Call the target on the first group.
-        roles = [{'uid': x[1], 'role': x[2]} for x in values[:2] + values[6:7]]
-        self.call_target(cursor, uuid_, roles, has_accepted=False)
+        roles = [{'uid': x[1], 'role': x[2], 'has_accepted': False}
+                 for x in values[:2] + values[6:7]]
+        self.call_target(cursor, uuid_, roles)
 
         # Check the updates.
         cursor.execute("""\
@@ -493,6 +498,58 @@ ORDER BY user_id""", (uuid_,))
             tuple(list(values[6][:3]) + [False]),
             ]
         self.assertEqual(entries, expected)
+
+    @db_connect
+    def test_mixed_update(self, cursor):
+        """Update roles with a mixed set of acceptance values"""
+        cursor.execute("""\
+INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
+        uuid_ = cursor.fetchone()[0]
+
+        # Create existing role records.
+        values = [
+            (uuid_, 'charrose', 'Author', None),
+            (uuid_, 'frahablar', 'Translator', None),
+            ##(uuid_, 'frahablar', 'Illustrator', None),
+            (uuid_, 'impicky', 'Editor', True),
+            (uuid_, 'marknewlyn', 'Author', True),
+            (uuid_, 'ream', 'Copyright Holder', True),
+            (uuid_, 'ream', 'Publisher', True),
+            (uuid_, 'rings', 'Publisher', True),
+            ]
+        serial_values = []
+        for v in values:
+            serial_values.extend(v)
+        value_format = ', '.join(['(%s, %s, %s, %s)'] * len(values))
+        cursor.execute("""\
+INSERT INTO role_acceptances (uuid, user_id, role_type, accepted)
+VALUES {}""".format(value_format), serial_values)
+
+        # Call the target on the first group.
+        roles = [
+            # new role...
+            {'uid': 'frahablar', 'role': 'Illustrator', 'has_accepted': False},
+            # update, testing the optional has_accepted...
+            {'uid': 'rings', 'role': 'Publisher'},
+            # update, testing usage of has_accepted...
+            {'uid': 'frahablar', 'role': 'Translator', 'has_accepted': True},
+            ]
+        self.call_target(cursor, uuid_, roles)
+
+        # Update values to the expected state.
+        values.insert(2, (uuid_, 'frahablar', 'Illustrator', False,))
+        values[-1] = tuple(list(values[-1][:3]) + [None])
+        values[1] = tuple(list(values[1][:3]) + [True])
+
+        # Check the updates.
+        cursor.execute("""\
+SELECT uuid, user_id, role_type, accepted
+FROM role_acceptances
+WHERE uuid = %s
+ORDER BY user_id""", (uuid_,))
+        entries = cursor.fetchall()
+        self.assertEqual(entries, values)
+
 
 
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
