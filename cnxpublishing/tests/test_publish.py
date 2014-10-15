@@ -17,6 +17,8 @@ except ImportError:
 
 import cnxepub
 import psycopg2
+from cnxarchive import config as archive_config
+from cnxarchive.database import initdb as archive_initdb
 from cnxarchive.utils import join_ident_hash
 from webob import Request
 from pyramid import testing
@@ -59,8 +61,13 @@ class PublishIntegrationTestCase(unittest.TestCase):
         cls.db_connect = staticmethod(db_connection_factory())
 
     def setUp(self):
-        from cnxarchive.database import initdb
-        initdb({'db-connection-string': self.db_conn_str})
+        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
+        accounts_db_conn_str = self.settings[accounts_config_key]
+        archive_settings = {
+            archive_config.CONNECTION_STRING: self.db_conn_str,
+            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
+            }
+        archive_initdb(archive_settings)
         from ..db import initdb
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)
@@ -323,8 +330,13 @@ class RepublishTestCase(unittest.TestCase):
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
     def setUp(self):
-        from cnxarchive.database import initdb
-        initdb({'db-connection-string': self.db_conn_str})
+        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
+        accounts_db_conn_str = self.settings[accounts_config_key]
+        archive_settings = {
+            archive_config.CONNECTION_STRING: self.db_conn_str,
+            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
+            }
+        archive_initdb(archive_settings)
         from ..db import initdb
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)

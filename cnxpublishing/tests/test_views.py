@@ -17,6 +17,9 @@ from copy import deepcopy
 
 import psycopg2
 import cnxepub
+from cnxarchive import config as archive_config
+from cnxarchive.database import initdb as archive_initdb
+from cnxarchive.utils import join_ident_hash
 from webob import Request
 from webtest import TestApp
 from webtest import AppError
@@ -24,7 +27,6 @@ from webtest.forms import Upload
 from pyramid import testing
 from pyramid import httpexceptions
 
-from cnxarchive.utils import join_ident_hash
 from . import use_cases
 from .testing import (
     integration_test_settings,
@@ -140,8 +142,13 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
         config = testing.setUp(settings=self.settings)
-        from cnxarchive.database import initdb
-        initdb({'db-connection-string': self.db_conn_str})
+        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
+        accounts_db_conn_str = self.settings[accounts_config_key]
+        archive_settings = {
+            archive_config.CONNECTION_STRING: self.db_conn_str,
+            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
+            }
+        archive_initdb(archive_settings)
         from ..db import initdb
         initdb(self.db_conn_str)
 
