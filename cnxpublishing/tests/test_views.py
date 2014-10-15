@@ -622,13 +622,13 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         self.assertEqual(resp.json['state'], expected_state)
 
     def app_post_publication(self, epub_filepath, is_pre_publication=False,
-                             headers=[]):
+                             headers=[], status=None):
         with open(epub_filepath, 'rb') as epub:
             params = OrderedDict(
                 [('pre-publication', str(is_pre_publication),),
                  ('epub', Upload('book.epub', content=epub.read()),)])
         resp = self.app.post('/publications', params=params,
-                             headers=headers)
+                             headers=headers, status=status)
         return resp
 
     def app_get_license_acceptance(self, publication_id, uid, headers=[]):
@@ -1388,5 +1388,28 @@ WHERE portal_type = 'Collection'""")
                          [(10, u'InvalidLicense'), (11, u'InvalidRole')])
 
         # *. --
+        self.app_check_state(publication_id, 'Failed/Error',
+                             headers=api_key_headers)
+
+    def test_new_to_publication_size_limit_exceeded(self):
+        publisher = u'ream'
+        use_case = deepcopy(use_cases.BOOK)
+        use_case.append(use_cases.PAGE_FIVE)
+        epub_filepath = self.make_epub(use_case, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        resp = self.app_post_publication(epub_filepath, headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Failed/Error')
+        publication_id = resp.json['publication']
+        self.maxDiff = None
+        error_messages = resp.json['messages']
+        self.assertEqual(len(error_messages), 1)
+        self.assertEqual(error_messages[0]['code'], 22)
+        self.assertEqual(
+                error_messages[0]['message'],
+                'Resource files cannot be bigger than 1MB (big-file.txt)')
+
         self.app_check_state(publication_id, 'Failed/Error',
                              headers=api_key_headers)

@@ -291,6 +291,46 @@ PAGE_FOUR = cnxepub.Document(
         }
     )
 
+PAGE_FIVE = cnxepub.Document(
+    id=u'b3627ba5@draft',
+    data=u'<p class="para">Download big file <a href="../resources/big-file.txt">here</a></p>',
+    resources=[
+        cnxepub.Resource('big-file.txt',
+                         # a 2 MB file
+                         io.BytesIO('a ' * 1024 * 1024),
+                         'text/plain',
+                         filename='big-file.txt'),
+        ],
+    metadata={
+        u'title': u'Document Five',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [u'South Africa'],
+        u'subjects': [u'Science and Technology'],
+        u'summary': u'<span>descriptive text</span>',
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [{u'id': u'charrose',
+                      u'name': u'Charmaine St. Rose',
+                      u'type': u'cnx-id'},
+                      ],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [{u'id': u'ream',
+                         u'name': u'Ream',
+                         u'type': u'cnx-id'},
+                        {u'id': u'charrose',
+                         u'name': u'Charmaine St. Rose',
+                         u'type': u'cnx-id'}],
+        u'translators': []
+        }
+    )
+
 COMPLEX_BOOK_ONE = cnxepub.Binder(
     id='94f4d0f5@draft',
     metadata={
