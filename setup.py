@@ -9,7 +9,7 @@ install_requires = (
     'cnx-archive',
     'cnx-epub',
     'jinja2',
-    'openstax-accounts>=0.8',
+    'openstax-accounts>=0.10.0',
     'psycopg2',
     'pyramid>=1.5',
     'pyramid_multiauth',
