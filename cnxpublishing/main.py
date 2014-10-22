@@ -92,6 +92,12 @@ class RootFactory(object):
           'publish.create-identifier',  # Used when content does not yet exist.
           'publish.remove-identifier',
           )),
+        (security.Allow, 'group:publishers',
+         ('publish.assign-acceptance',  # Used when assigning user actions requests.
+          'publish.remove-acceptance',
+          'publish.assign-acl',  # Used when assigning access control on documents.
+          'publish.remove-acl',
+          )),
         security.DENY_ALL,
         )
 
