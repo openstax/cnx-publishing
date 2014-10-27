@@ -121,6 +121,12 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             setattr(self, attr_name, api_keys)
         return {x[1]:x[0] for x in api_keys}
 
+    def gen_api_key_headers(self, user):
+        """Generate authentication headers for the given user."""
+        api_key = self.api_keys_by_uid[user]
+        api_key_header = [('x-api-key', api_key,)]
+        return api_key_header
+
     @classmethod
     def setUpClass(cls):
         cls.settings = integration_test_settings()
@@ -423,12 +429,6 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
-    def gen_api_key_headers(self, user):
-        """Generate authentication headers for the given user."""
-        api_key = self.api_keys_by_uid[user]
-        api_key_header = [('x-api-key', api_key,)]
-        return api_key_header
-
     def test_create_identifier_on_licensors_request(self):
         """Submit a set of users to initial license acceptance.
         This tests whether a trusted publisher has the permission
@@ -570,6 +570,51 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             ]
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
+
+
+    def test_create_identifier_for_all_routes(self):
+        """Tests that creating an identifier result in non-404
+        on other routes. See also,
+        https://github.com/Connexions/cnx-publishing/issues/52
+        """
+        # POST a permission set
+        data = [{'uid': 'ream', 'permission': 'publish'}]
+        uuid_ = uuid.uuid4()
+        path = '/contents/{}/permissions'
+        headers = self.gen_api_key_headers('some-trust')
+        resp = self.app.post_json(path.format(uuid_), data, headers=headers)
+        self.assertEqual(resp.status_int, 202)
+
+        # Also, check that we still get 404 for non-existent controls.
+        other_uuid = uuid.uuid4()
+
+        # Check the response...
+        resp = self.app.get(path.format(uuid_))
+        data[0]['uuid'] = str(uuid_)
+        self.assertEqual(resp.json, data)
+        with self.assertRaises(AppError) as caught_exc:
+            self.app.get(path.format(other_uuid))
+        self.assertIn('404', caught_exc.exception.message)
+
+        # And check the other two routes at least result in 200 OK
+        path = '/contents/{}/licensors'
+        licensors_resp = self.app.get(path.format(uuid_))
+        self.assertEqual(licensors_resp.status_int, 200)
+        with self.assertRaises(AppError) as caught_exc:
+            self.app.get(path.format(other_uuid))
+        self.assertIn('404', caught_exc.exception.message)
+
+        path = '/contents/{}/roles'
+        roles_resp = self.app.get(path.format(uuid_))
+        self.assertEqual(roles_resp.status_int, 200)
+        with self.assertRaises(AppError) as caught_exc:
+            self.app.get(path.format(other_uuid))
+        self.assertIn('404', caught_exc.exception.message)
+
+        # And check the contents...
+        self.assertEqual(licensors_resp.json,
+                         {'license_url': None, 'licensors': []})
+        self.assertEqual(roles_resp.json, [])
 
 
 class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
