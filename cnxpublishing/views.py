@@ -264,11 +264,12 @@ def get_license_request(request):
             cursor.execute("""\
 SELECT l.url
 FROM licenses AS l RIGHT JOIN document_controls AS dc ON (dc.licenseid = l.licenseid)
-            WHERE dc.uuid = %s""", (uuid_,))
+WHERE dc.uuid = %s""", (uuid_,))
             try:
                 license_url = cursor.fetchone()[0]
             except TypeError:  # None value
-                license_url = None
+                # The document_controls record does not exist.
+                raise httpexceptions.HTTPNotFound()
             cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
 SELECT uuid, user_id AS uid, accepted AS has_accepted
@@ -277,9 +278,6 @@ WHERE uuid = %s {}
 ORDER BY user_id ASC
 ) as combined_rows""".format(fmt_conditional), args)
             acceptances = [r[0] for r in cursor.fetchall()]
-
-    if not acceptances:
-        raise httpexceptions.HTTPNotFound()
 
     if user_id is not None:
         acceptances = acceptances[0]
@@ -371,7 +369,7 @@ def get_roles_request(request):
 
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
 SELECT uuid, user_id AS uid, role_type AS role, accepted AS has_accepted
 FROM role_acceptances AS la
@@ -380,8 +378,16 @@ ORDER BY user_id ASC, role_type ASC
 ) as combined_rows""".format(fmt_conditional), args)
             acceptances = [r[0] for r in cursor.fetchall()]
 
-    if not acceptances:
-        raise httpexceptions.HTTPNotFound()
+            if not acceptances:
+                if user_id is not None:
+                    raise httpexceptions.HTTPNotFound()
+                else:
+                    cursor.execute("""\
+SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
+                    try:
+                        cursor.fetchone()[0]
+                    except TypeError:  # NoneType
+                        raise httpexceptions.HTTPNotFound()
 
     resp_value = acceptances
     if user_id is not None:
