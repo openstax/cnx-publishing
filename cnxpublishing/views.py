@@ -264,7 +264,7 @@ def get_license_request(request):
             cursor.execute("""\
 SELECT l.url
 FROM licenses AS l RIGHT JOIN document_controls AS dc ON (dc.licenseid = l.licenseid)
-            WHERE dc.uuid = %s""", (uuid_,))
+WHERE dc.uuid = %s""", (uuid_,))
             try:
                 license_url = cursor.fetchone()[0]
             except TypeError:  # None value
@@ -277,9 +277,6 @@ WHERE uuid = %s {}
 ORDER BY user_id ASC
 ) as combined_rows""".format(fmt_conditional), args)
             acceptances = [r[0] for r in cursor.fetchall()]
-
-    if not acceptances:
-        raise httpexceptions.HTTPNotFound()
 
     if user_id is not None:
         acceptances = acceptances[0]
@@ -379,9 +376,6 @@ WHERE uuid = %s {}
 ORDER BY user_id ASC, role_type ASC
 ) as combined_rows""".format(fmt_conditional), args)
             acceptances = [r[0] for r in cursor.fetchall()]
-
-    if not acceptances:
-        raise httpexceptions.HTTPNotFound()
 
     resp_value = acceptances
     if user_id is not None:
