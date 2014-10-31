@@ -1458,3 +1458,33 @@ WHERE portal_type = 'Collection'""")
 
         self.app_check_state(publication_id, 'Failed/Error',
                              headers=api_key_headers)
+
+    def test_new_to_publication_epub_stored(self):
+        """\
+        Publish a new document from a trusted application, verify the epub
+        is stored in the database
+        """
+        publisher = u'ream'
+        use_case = deepcopy(use_cases.BOOK)
+        epub_filepath = self.make_epub(
+            use_case, publisher, u'publishing this book')
+
+        # upload to publishing
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        publication_id = resp.json['publication']
+
+        # Check that the epub file is stored in the database
+        with open(epub_filepath, 'r') as f:
+            epub_content = f.read()
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute('SELECT epub FROM publications'
+                               '  WHERE id = %s', (publication_id,))
+                epub_in_db = cursor.fetchone()[0][:]
+
+        self.assertEqual(len(epub_content), len(epub_in_db))
+        self.assertEqual(epub_content, epub_in_db)
