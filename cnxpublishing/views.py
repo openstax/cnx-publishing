@@ -36,9 +36,9 @@ def publish(request):
         raise httpexceptions.HTTPBadRequest("Missing EPUB in POST body.")
 
     is_pre_publication = asbool(request.POST.get('pre-publication'))
-    epub_upload = request.POST['epub']
+    epub_upload = request.POST['epub'].file
     try:
-        epub = cnxepub.EPUB.from_file(epub_upload.file)
+        epub = cnxepub.EPUB.from_file(epub_upload)
     except:
         raise httpexceptions.HTTPBadRequest('Format not recognized.')
 
@@ -48,8 +48,9 @@ def publish(request):
     # of the content in the EPUB.
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
+            epub_upload.seek(0)
             publication_id, publications = add_publication(
-                cursor, epub, epub_upload.file, is_pre_publication)
+                cursor, epub, epub_upload, is_pre_publication)
 
     # Poke at the publication & lookup its state.
     state, messages = poke_publication_state(publication_id)
