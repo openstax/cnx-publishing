@@ -111,8 +111,8 @@ class PublishIntegrationTestCase(unittest.TestCase):
             'translators': [{'id': 'RhowandaOkofarBates', 'type': None},
                             {'id': 'JamesOrwel', 'type': None}],
             'copyright_holders': [{'id': 'ream', 'type': None}],
-            'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
-            'keywords': ['dingbat', 'bates', 'dilemma'],
+            'subjects': ['Arts', 'Business', 'Mathematics and Statistics'],
+            'keywords': ['bates', 'dilemma', 'dingbat'],
             }
         publisher = 'ream'
         message = 'no msg'
@@ -151,7 +151,8 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
                          [x['id'] for x in metadata['authors']])
         self.assertEqual(module[7], publisher)
         self.assertEqual(module[8], message)
-        self.assertEqual(module[9], None)  # TODO maintainers list?
+        self.assertEqual(module[9],
+                         [x['id'] for x in metadata['editors']])
         self.assertEqual(module[10],
                          [x['id'] for x in metadata['copyright_holders']])
         self.assertEqual(module[11], None)  # TODO parent authors?
@@ -166,25 +167,53 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         self.assertEqual(module[15].utctimetuple()[:5],
                          revised.timetuple()[:5])
 
-        # Check the roles...
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
+                # Grab the module_ident, for easy lookup of related items.
                 cursor.execute("""\
-WITH module AS (
-  SELECT module_ident
-  FROM modules AS m
-  WHERE m.uuid||'@'||m.major_version = %s)
+SELECT module_ident
+FROM modules AS m
+WHERE m.uuid||'@'||m.major_version = %s
+""", (ident_hash,))
+                module_ident = cursor.fetchone()[0]
+
+                # Lookup the roles...
+                cursor.execute("""\
 SELECT r.roleparam, mor.personids
 FROM moduleoptionalroles AS mor NATURAL JOIN roles AS r
-WHERE mor.module_ident = (SELECT module_ident from module)
-""", (ident_hash,))
+WHERE mor.module_ident = %s
+""", (module_ident,))
                 roles = dict(cursor.fetchall())
+
+                # Lookup the subjects...
+                cursor.execute("""\
+SELECT t.tag
+FROM moduletags AS mt NATURAL JOIN tags AS t
+WHERE mt.module_ident = %s
+ORDER BY t.tag ASC
+""", (module_ident,))
+                subjects = [x[0] for x in cursor.fetchall()]
+
+                # Lookup the keywords...
+                cursor.execute("""\
+SELECT k.word
+FROM modulekeywords AS mk NATURAL JOIN keywords AS k
+WHERE mk.module_ident = %s
+ORDER BY k.word ASC
+""", (module_ident,))
+                keywords = [x[0] for x in cursor.fetchall()]
+
+        # Check the roles...
         self.assertEqual(roles['authors'],
                          [x['id'] for x in metadata['authors']])
         self.assertEqual(roles['licensors'],
                          [x['id'] for x in metadata['copyright_holders']])
         self.assertEqual(roles['translators'],
                          [x['id'] for x in metadata['translators']])
+        # Check the subjects...
+        self.assertEqual(subjects, metadata['subjects'])
+        # Check the keywords...
+        self.assertEqual(keywords, metadata['keywords'])
 
     def test_document_insertion_w_id_n_version_provided(self):
         id, version = '3a70f722-b7b0-4b41-83dd-2790cee98c39', '1'

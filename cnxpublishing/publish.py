@@ -55,7 +55,7 @@ module_insertion AS (
         WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
      (SELECT authors FROM modules
         WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
-     %(authors)s, DEFAULT, %(copyright_holders)s,
+     %(authors)s, %(editors)s, %(copyright_holders)s,
      DEFAULT, DEFAULT,
      DEFAULT, ' ')
   RETURNING
@@ -78,7 +78,30 @@ editor_roles AS (
   INSERT INTO moduleoptionalroles
     (module_ident, roleid, personids)
   VALUES
-    ((SELECT module_ident FROM module_insertion), 5, %(editors)s))
+    ((SELECT module_ident FROM module_insertion), 5, %(editors)s)),
+subjects AS (
+  INSERT INTO moduletags
+    SELECT (SELECT module_ident FROM module_insertion),
+           (SELECT tagid FROM tags WHERE tag = s)
+    FROM unnest(%(subjects)s::text[]) AS s),
+keyword_inserts AS (
+  INSERT INTO keywords
+    (word)
+    (SELECT word FROM unnest(%(keywords)s::text[]) AS word
+     WHERE word NOT IN (SELECT k.word FROM keywords AS k))
+  RETURNING word, keywordid),
+keywords_relationship_from_new AS (
+  INSERT INTO modulekeywords
+    (module_ident, keywordid)
+    (SELECT (SELECT module_ident FROM module_insertion), k.keywordid
+     FROM keyword_inserts AS k)),
+keywords_relationship_from_existing AS (
+  INSERT INTO modulekeywords
+    (module_ident, keywordid)
+    (SELECT (SELECT module_ident FROM module_insertion), k.keywordid
+     FROM unnest(%(keywords)s::text[]) AS i
+          LEFT JOIN keywords AS k ON (i = k.word)
+     WHERE word not in (SELECT word FROM keyword_inserts)))
 SELECT module_ident, ident_hash FROM module_insertion
 """
 
