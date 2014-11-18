@@ -152,7 +152,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         self.assertEqual(module[7], publisher)
         self.assertEqual(module[8], message)
         self.assertEqual(module[9],
-                         [x['id'] for x in metadata['editors']])
+                         [x['id'] for x in metadata['publishers']])
         self.assertEqual(module[10],
                          [x['id'] for x in metadata['copyright_holders']])
         self.assertEqual(module[11], None)  # TODO parent authors?
