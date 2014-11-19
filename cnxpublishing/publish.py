@@ -55,7 +55,7 @@ module_insertion AS (
         WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
      (SELECT authors FROM modules
         WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
-     %(authors)s, %(editors)s, %(copyright_holders)s,
+     %(authors)s, %(publishers)s, %(copyright_holders)s,
      DEFAULT, DEFAULT,
      DEFAULT, ' ')
   RETURNING
