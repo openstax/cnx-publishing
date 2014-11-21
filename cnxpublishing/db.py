@@ -1150,6 +1150,8 @@ def notify_users(cursor, document_id):
     """Notify all users about their role and/or license acceptance
     for a piece of content associated with the given ``document_id``.
     """
+    return
+
     registry = get_current_registry()
     accounts = registry.getUtility(IOpenstaxAccounts)
     cursor.execute("""\
