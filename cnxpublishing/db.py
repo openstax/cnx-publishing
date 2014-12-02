@@ -509,9 +509,10 @@ def add_pending_model_content(cursor, publication_id, model):
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')
             elif reference.remote_type == cnxepub.INTERNAL_REFERENCE_TYPE:
-                exc = exceptions.InvalidReference(reference)
-                attach_info_to_exception(exc)
-                set_publication_failure(cursor, exc)
+                if not reference.uri.startswith('#'):
+                    exc = exceptions.InvalidReference(reference)
+                    attach_info_to_exception(exc)
+                    set_publication_failure(cursor, exc)
             # This will check cnx.org and openstaxcnx.org.
             elif reference.uri_parts.netloc.find('cnx.org') >= 0:
                 exc = exceptions.InvalidReference(reference)

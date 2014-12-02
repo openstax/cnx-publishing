@@ -921,6 +921,7 @@ WHERE id = %s""", (publication_id,))
               relative reference to internal content
             </a>
             <!-- Valid reference -->
+            <a href="#hello">anchor link</a>
             <a href="http://example.org/">external link</a>"""
         document = self.make_document(content=content, metadata=metadata)
 
