@@ -645,7 +645,7 @@ RETURNING id
 def _check_pending_document_license_state(cursor, document_id):
     """Check the aggregate state on the pending document."""
     cursor.execute("""\
-SELECT bool_and(accepted)
+SELECT BOOL_AND(accepted IS TRUE)
 FROM
   pending_documents AS pd,
   license_acceptances AS la
@@ -656,7 +656,7 @@ WHERE
                    (document_id,))
     try:
         is_accepted = cursor.fetchone()[0]
-    except IndexError:
+    except TypeError:
         # There are no licenses associated with this document.
         is_accepted = True
     return is_accepted
@@ -665,7 +665,7 @@ WHERE
 def _check_pending_document_role_state(cursor, document_id):
     """Check the aggregate state on the pending document."""
     cursor.execute("""\
-SELECT bool_and(accepted)
+SELECT BOOL_AND(accepted IS TRUE)
 FROM
   role_acceptances AS ra,
   pending_documents as pd
@@ -676,8 +676,8 @@ WHERE
                    (document_id,))
     try:
         is_accepted = cursor.fetchone()[0]
-    except IndexError:
-        # There are no licenses associated with this document.
+    except TypeError:
+        # There are no roles to accept
         is_accepted = True
     return is_accepted
 

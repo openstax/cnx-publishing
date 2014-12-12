@@ -1489,3 +1489,78 @@ WHERE portal_type = 'Collection'""")
 
         self.assertEqual(len(epub_content), len(epub_in_db))
         self.assertEqual(epub_content, epub_in_db)
+
+    def test_new_to_publication_license_not_accepted(self):
+        """Publish documents only after all users have accepted the license"""
+        publisher = u'ream'
+        # We use the REVISED_BOOK here, because it contains fixed identifiers.
+        epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['some-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # Give publisher permission to publish
+        from cnxarchive.utils import split_ident_hash
+        ids = [
+            split_ident_hash(use_cases.REVISED_BOOK.id)[0],
+            split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
+            ]
+        for id in ids:
+            resp = self.app_post_acl(
+                id, [{'uid': publisher, 'permission': 'publish'}],
+                headers=api_key_headers)
+
+        attr_role_key_to_db_role = {
+            'publishers': 'Publisher', 'copyright_holders': 'Copyright Holder',
+            'editors': 'Editor', 'illustrators': 'Illustrator',
+            'translators': 'Translator', 'authors': 'Author',
+            }
+        for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):
+            id = split_ident_hash(model.id)[0]
+            attributed_roles = []
+            roles = []
+            for role_key in cnxepub.ATTRIBUTED_ROLE_KEYS:
+                for role in model.metadata.get(role_key, []):
+                    role_name = attr_role_key_to_db_role[role_key]
+                    attributed_roles.append({'uid': role['id'],
+                                             'role': role_name,
+                                             'has_accepted': True})
+                    if role['id'] not in [r['uid'] for r in roles]:
+                        roles.append({'uid': role['id'], 'has_accepted': True})
+            # Post the accepted attributed roles.
+            path = "/contents/{}/roles".format(id)
+            self.app.post_json(path, attributed_roles,
+                               headers=api_key_headers)
+            # Post the accepted licensors. (everyone except one)
+            path = "/contents/{}/licensors".format(id)
+            data = {'license_url': 'http://creativecommons.org/licenses/by/4.0/',
+                    'licensors': roles[:-1],
+                    }
+            self.app.post_json(path, data, headers=api_key_headers)
+
+        # Check publication state
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
+        publication_id = resp.json['publication']
+
+        # Post the last accepted licensor.
+        for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):
+            id = split_ident_hash(model.id)[0]
+            path = "/contents/{}/licensors".format(id)
+            data = {'license_url': 'http://creativecommons.org/licenses/by/4.0/',
+                    'licensors': [roles[-1]],
+                    }
+            self.app.post_json(path, data, headers=api_key_headers)
+
+        # Check publication state
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Done/Success')
+        publication_id = resp.json['publication']
+
+        # *. --
+        # This is publication completion,
+        # because all licenses and roles have been accepted.
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
