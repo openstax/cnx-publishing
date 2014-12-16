@@ -9,6 +9,7 @@
 Functions used to commit publication works to the archive.
 """
 import cnxepub
+import psycopg2
 from cnxepub import Document, Binder
 from cnxarchive.utils import join_ident_hash, split_ident_hash
 
@@ -263,7 +264,7 @@ def publish_model(cursor, model, publisher, message):
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
             'mime_type': 'text/html',
-            'data': model.html.encode('utf-8'),
+            'data': psycopg2.Binary(model.html.encode('utf-8')),
             }
         cursor.execute("""\
 WITH file_insertion AS (
