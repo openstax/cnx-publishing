@@ -26,7 +26,7 @@ ATTRIBUTED_ROLE_KEYS = (
 MODULE_INSERTION_TEMPLATE = """\
 WITH abstract_insertion AS (
   INSERT INTO abstracts (abstractid, abstract, html)
-  VALUES (DEFAULT, %(summary)s, %(summary)s)
+  VALUES (DEFAULT, NULL, %(summary)s)
   RETURNING abstractid),
 license_lookup AS (
   SELECT licenseid

@@ -128,7 +128,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
 SELECT
-  m.name, m.language, a.abstract, l.url,
+  m.name, m.language, a.html AS abstract, l.url,
   m.major_version, m.minor_version,
   m.authors, m.submitter, m.submitlog, m.maintainers,
   m.licensors, m.parentauthors, m.google_analytics, m.buylink,

@@ -63,7 +63,7 @@ BOOK = cnxepub.Binder(
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
-        u'summary': "<span>Book summary</span>",
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -89,7 +89,7 @@ BOOK = cnxepub.Binder(
                                 u'subjects': [
                                     u'Mathematics and Statistics',
                                     ],
-                                u'summary': u'<span>descriptive text</span>',
+                                u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
                                 u'language': u'en',
                                 u'license_text': u'CC-By 4.0',
                                 u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -148,7 +148,7 @@ PAGE_ONE = cnxepub.Document(
         u'revised': u'2013/03/19 15:01:16 -0500',
         u'keywords': [u'South Africa'],
         u'subjects': [u'Science and Mathematics'],
-        u'summary': u'<span>descriptive text</span>',
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -191,7 +191,7 @@ PAGE_TWO = cnxepub.Document(
         u'revised': u'2013/03/19 15:01:16 -0500',
         u'keywords': [u'South Africa'],
         u'subjects': [u'Science and Mathematics'],
-        u'summary': u'<span>descriptive text</span>',
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -229,7 +229,7 @@ PAGE_THREE = cnxepub.Document(
         u'revised': u'2013/03/19 15:01:16 -0500',
         u'keywords': [u'South Africa'],
         u'subjects': [u'Science and Mathematics'],
-        u'summary': u'<span>descriptive text</span>',
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -267,7 +267,7 @@ PAGE_FOUR = cnxepub.Document(
         u'revised': u'2013/03/19 15:01:16 -0500',
         u'keywords': [u'South Africa'],
         u'subjects': [u'Science and Mathematics'],
-        u'summary': u'<span>descriptive text</span>',
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -307,7 +307,7 @@ PAGE_FIVE = cnxepub.Document(
         u'revised': u'2013/03/19 15:01:16 -0500',
         u'keywords': [u'South Africa'],
         u'subjects': [u'Science and Technology'],
-        u'summary': u'<span>descriptive text</span>',
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
         u'language': u'en',
         u'license_text': u'CC-By 4.0',
         u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
@@ -361,7 +361,7 @@ COMPLEX_BOOK_ONE = cnxepub.Binder(
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
-        u'summary': "<span>Book summary</span>",
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -406,7 +406,7 @@ COMPLEX_BOOK_TWO = cnxepub.Binder(
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
-        u'summary': "<span>Book summary</span>",
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -442,7 +442,7 @@ COMPLEX_BOOK_THREE = cnxepub.Binder(
         u'publishers': [
             {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
         u'translators': [],
-        u'summary': "<span>Book summary</span>",
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         },
     title_overrides=['D One', 'D Two'],
     nodes=[PAGE_TWO, PAGE_FOUR],
