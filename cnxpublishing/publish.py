@@ -62,14 +62,6 @@ module_insertion AS (
   RETURNING
     module_ident,
     uuid||'@'||concat_ws('.',major_version,minor_version) AS ident_hash),
-author_roles AS (
-  INSERT INTO moduleoptionalroles (module_ident, roleid, personids)
-  VALUES ((SELECT module_ident FROM module_insertion), 1, %(authors)s)),
-licensor_roles AS (
-  INSERT INTO moduleoptionalroles
-    (module_ident, roleid, personids)
-  VALUES
-    ((SELECT module_ident FROM module_insertion), 2, %(copyright_holders)s)),
 translator_roles AS (
   INSERT INTO moduleoptionalroles
     (module_ident, roleid, personids)
