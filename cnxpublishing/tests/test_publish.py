@@ -204,12 +204,11 @@ ORDER BY k.word ASC
                 keywords = [x[0] for x in cursor.fetchall()]
 
         # Check the roles...
-        self.assertEqual(roles['authors'],
-                         [x['id'] for x in metadata['authors']])
-        self.assertEqual(roles['licensors'],
-                         [x['id'] for x in metadata['copyright_holders']])
         self.assertEqual(roles['translators'],
                          [x['id'] for x in metadata['translators']])
+        # authors and licensors should not be keys in moduleoptionalroles table
+        self.assertRaises(KeyError, lambda: roles['authors'])
+        self.assertRaises(KeyError, lambda: roles['licensors'])
         # Check the subjects...
         self.assertEqual(subjects, metadata['subjects'])
         # Check the keywords...
