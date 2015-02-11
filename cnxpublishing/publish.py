@@ -172,8 +172,25 @@ def _insert_metadata(cursor, model, publisher, message):
             '__moduleid__': "DEFAULT",
             })
 
+    ##################################
+    # FIXME : removal of empty       #
+    # editors and translators        #
+    # arrays should be handled       #
+    # when SQL stmt is generated     #
+    ##################################
+    if params['editors'] == []:
+        params['editors'] = None
+
+    if params['translators'] == []:
+        params['translators'] = None
+
     cursor.execute(stmt, params)
-    return cursor.fetchone()
+
+    ident_hash = cursor.fetchone()
+
+    cursor.execute("DELETE FROM moduleoptionalroles WHERE personids IS NULL")
+
+    return ident_hash
 
 
 def _insert_resource_file(cursor, module_ident, resource):

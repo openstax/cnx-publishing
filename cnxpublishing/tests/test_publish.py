@@ -206,13 +206,70 @@ ORDER BY k.word ASC
         # Check the roles...
         self.assertEqual(roles['translators'],
                          [x['id'] for x in metadata['translators']])
-        # authors and licensors should not be keys in moduleoptionalroles table
-        self.assertRaises(KeyError, lambda: roles['authors'])
-        self.assertRaises(KeyError, lambda: roles['licensors'])
         # Check the subjects...
         self.assertEqual(subjects, metadata['subjects'])
         # Check the keywords...
         self.assertEqual(keywords, metadata['keywords'])
+
+    def test_optional_roles_table_entires(self):
+        """
+        Check to see if authors and copyright_holders data,
+        as well as empty lists from translators and editors
+        are not entered into the optional roles table.
+        """
+        metadata = {
+            'title': "Dingbat's Dilemma",
+            'language': 'en-us',
+            'summary': "The options are limitless.",
+            'created': '1420-02-03 23:36:20.583149-05',
+            'revised': '1420-02-03 23:36:20.583149-05',
+            'license_url': 'http://creativecommons.org/licenses/by/3.0/',
+            'publishers': [{'id': 'ream', 'type': None}],
+            'illustrators': [{'id': 'AbagaleBates', 'type': None}],
+            'subjects': ['Arts', 'Business', 'Mathematics and Statistics'],
+            'keywords': ['bates', 'dilemma', 'dingbat'],
+            # these values should not be entered into the roles
+            # table
+            'translators': [],
+            'editors': [],
+            'authors': [{'id': 'rbates', 'type': 'cnx-id',
+                         'name': 'Richard Bates'}, ],
+            'copyright_holders': [{'id': 'ream', 'type': None}],
+            }
+        publisher = 'ream'
+        message = 'no msg'
+        document = self.make_document(metadata=metadata)
+
+        from ..publish import _insert_metadata
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                ident_hash = _insert_metadata(cursor, document,
+                                              publisher, message)[1]
+
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Grab the module_ident, for easy lookup of related items.
+                cursor.execute("""\
+SELECT module_ident
+FROM modules AS m
+WHERE m.uuid||'@'||m.major_version = %s
+""", (ident_hash,))
+                module_ident = cursor.fetchone()[0]
+
+                # Lookup the roles...
+                cursor.execute("""\
+SELECT r.roleparam, mor.personids
+FROM moduleoptionalroles AS mor NATURAL JOIN roles AS r
+WHERE mor.module_ident = %s
+""", (module_ident,))
+                roles = dict(cursor.fetchall())
+
+        # Check to see if roles raises key errors because
+        # these entries should not be in the roles table.
+        self.assertRaises(KeyError, lambda: roles['translators'])
+        self.assertRaises(KeyError, lambda: roles['editors'])
+        self.assertRaises(KeyError, lambda: roles['authors'])
+        self.assertRaises(KeyError, lambda: roles['licensors'])
 
     def test_document_insertion_w_id_n_version_provided(self):
         id, version = '3a70f722-b7b0-4b41-83dd-2790cee98c39', '1'
