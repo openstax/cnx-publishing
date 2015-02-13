@@ -12,6 +12,9 @@ from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from . import config
+from .exceptions import (
+    UserFetchError,
+    )
 from .db import (
     add_publication,
     poke_publication_state,
@@ -21,6 +24,7 @@ from .db import (
     upsert_acl, remove_acl,
     upsert_license_requests, remove_license_requests,
     upsert_role_requests, remove_role_requests,
+    upsert_users,
     )
 
 
@@ -417,6 +421,10 @@ SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
 INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
                 else:
                     raise httpexceptions.HTTPNotFound()
+            try:
+                upsert_users(cursor, [r['uid'] for r in posted_roles])
+            except UserFetchError as exc:
+                raise httpexceptions.HTTPBadRequest(exc.message)
             upsert_role_requests(cursor, uuid_, posted_roles)
 
     resp = request.response

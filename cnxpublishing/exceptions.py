@@ -8,6 +8,32 @@
 import json
 
 
+# ###################### #
+#   General Exceptions   #
+# ###################### #
+
+class UserFetchError(Exception):
+    """Raised when a user's info cannot be retrieved from the accounts system.
+    """
+
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+    @property
+    def message(self):
+        msg = "User, named '{}', cannot be found in the accounts system." \
+            .format(self.user_id)
+        return msg
+
+    @property
+    def args(self):
+        return (self.message, self.__dict__,)
+
+
+# ########################## #
+#   Publication Exceptions   #
+# ########################## #
+
 class PublicationException(Exception):
     """Base class for more detailed exceptions.
     This exception is utilized when and only when a publication

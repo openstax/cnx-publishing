@@ -340,6 +340,19 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
+        # *. Check for user info persistence. This is an upsert done when
+        #    a role is submitted.
+        cursor.execute("SELECT username, "
+                       "ARRAY[first_name IS NOT NULL, "
+                       "      last_name IS NOT NULL, "
+                       "      full_name IS NOT NULL] "
+                       "FROM users ORDER BY username")
+        users = {u:set(b) for u, b in cursor.fetchall()}
+        self.assertEqual(users.keys(), sorted([x['uid'] for x in data]))
+        for username, null_checks in users.items():
+            self.assertNotIn(None, null_checks,
+                             '{} has a null value'.format(username))
+
         # 2.
         expected = [
             {'uuid': str(uuid_), 'uid': 'charrose',
