@@ -148,11 +148,8 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
         config = testing.setUp(settings=self.settings)
-        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
-        accounts_db_conn_str = self.settings[accounts_config_key]
         archive_settings = {
             archive_config.CONNECTION_STRING: self.db_conn_str,
-            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
             }
         archive_initdb(archive_settings)
         from ..db import initdb
