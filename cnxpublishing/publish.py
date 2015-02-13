@@ -62,16 +62,6 @@ module_insertion AS (
   RETURNING
     module_ident,
     uuid||'@'||concat_ws('.',major_version,minor_version) AS ident_hash),
-translator_roles AS (
-  INSERT INTO moduleoptionalroles
-    (module_ident, roleid, personids)
-  VALUES
-    ((SELECT module_ident FROM module_insertion), 4, %(translators)s)),
-editor_roles AS (
-  INSERT INTO moduleoptionalroles
-    (module_ident, roleid, personids)
-  VALUES
-    ((SELECT module_ident FROM module_insertion), 5, %(editors)s)),
 subjects AS (
   INSERT INTO moduletags
     SELECT (SELECT module_ident FROM module_insertion),
@@ -98,6 +88,7 @@ keywords_relationship_from_existing AS (
 SELECT module_ident, ident_hash FROM module_insertion
 """
 
+
 TREE_NODE_INSERT = """
 INSERT INTO trees
   (nodeid, parent_id, documentid,
@@ -123,6 +114,26 @@ def parse_parent_ident_hash(model):
     derived_from = model.metadata.get('derived_from_uri')
     if derived_from:
         return derived_from.rsplit('/', 1)[-1]
+
+
+def _insert_optional_roles(cursor, model, ident):
+    """Inserts the optional roles if values for the optional roles
+    exist.
+    """
+    optional_roles = [
+        # (<metadata-attr>, <db-role-id>,),
+        ('translators', 4,),
+        ('editors', 5,),
+        ]
+    for attr, role_id in optional_roles:
+        roles = model.metadata.get(attr)
+        if not roles:
+            # Bail out, no roles for this type.
+            continue
+        usernames = [parse_user_uri(x['id']) for x in roles]
+        cursor.execute("""\
+INSERT INTO moduleoptionalroles (module_ident, roleid, personids)
+VALUES (%s, %s, %s)""", (ident, role_id, usernames,))
 
 
 def _insert_metadata(cursor, model, publisher, message):
@@ -172,25 +183,13 @@ def _insert_metadata(cursor, model, publisher, message):
             '__moduleid__': "DEFAULT",
             })
 
-    ##################################
-    # FIXME : removal of empty       #
-    # editors and translators        #
-    # arrays should be handled       #
-    # when SQL stmt is generated     #
-    ##################################
-    if params['editors'] == []:
-        params['editors'] = None
-
-    if params['translators'] == []:
-        params['translators'] = None
-
+    # Insert the metadata
     cursor.execute(stmt, params)
+    module_ident, ident_hash = cursor.fetchone()
+    # Insert optional roles
+    _insert_optional_roles(cursor, model, module_ident)
 
-    ident_hash = cursor.fetchone()
-
-    cursor.execute("DELETE FROM moduleoptionalroles WHERE personids IS NULL")
-
-    return ident_hash
+    return module_ident, ident_hash
 
 
 def _insert_resource_file(cursor, module_ident, resource):
