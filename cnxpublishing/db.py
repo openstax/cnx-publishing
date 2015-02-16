@@ -171,6 +171,9 @@ WHERE id = %s""", (document_id,))
     acceptors = set([(uid, _role_type_to_db_type(type_),)
                      for uid, type_ in _dissect_roles(metadata)])
 
+    # Upsert the user info.
+    upsert_users(cursor, [x[0] for x in acceptors])
+
     # Acquire a list of existing acceptors.
     cursor.execute("""\
 SELECT user_id, role_type

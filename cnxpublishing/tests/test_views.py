@@ -828,6 +828,21 @@ GROUP BY user_id, accepted
                                       "the licenses.".format(user_id)
                     self.assertTrue(has_accepted, failure_message)
 
+        # *. Check for user info persistence. This is an upsert done when
+        #    a role is submitted.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT username, "
+                               "ARRAY[first_name IS NOT NULL, "
+                               "      last_name IS NOT NULL, "
+                               "      full_name IS NOT NULL] "
+                               "FROM users ORDER BY username")
+                users = {u:set(b) for u, b in cursor.fetchall()}
+        self.assertEqual(sorted(users.keys()), sorted(uids))
+        for username, null_checks in users.items():
+            self.assertNotIn(None, null_checks,
+                             '{} has a null value'.format(username))
+
         # *. --
         self.app_check_state(publication_id, 'Waiting for acceptance',
                              headers=api_key_headers)
