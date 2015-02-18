@@ -1,0 +1,15 @@
+[run]
+source = cnxpublishing
+omit =
+    cnxpublishing/tests/*
+    cnxpublishing/scripts/*
+
+
+[report]
+exclude_lines =
+    pragma: no cover
+
+    if __name__ == .__main__.:
+omit =
+    cnxpublishing/scripts/*
+    cnxpublishing/tests/*
