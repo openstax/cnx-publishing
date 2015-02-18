@@ -24,11 +24,7 @@ def parse_archive_uri(uri):
     """Given an archive URI, parse to a split ident-hash."""
     parsed = urlparse(uri)
     path = parsed.path.rstrip('/').split('/')
-    try:
-        ident_hash = path[-1]
-    except:
-        raise ValueError("Expected a path like /contents/{ident_hash}, "
-                         "got '{}' instead.".format(path))
+    ident_hash = path[-1]
     ident_hash = unquote(ident_hash)
     return ident_hash
 
