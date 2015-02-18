@@ -51,11 +51,8 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
     def setUp(self):
-        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
-        accounts_db_conn_str = self.settings[accounts_config_key]
         archive_settings = {
             archive_config.CONNECTION_STRING: self.db_conn_str,
-            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
             }
         archive_initdb(archive_settings)
         from ..db import initdb
@@ -550,6 +547,46 @@ ORDER BY user_id""", (uuid_,))
         entries = cursor.fetchall()
         self.assertEqual(entries, values)
 
+
+class RoleRequestTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify user upsert functionality"""
+
+    def call_target(self, *args, **kwargs):
+        from ..db import upsert_users
+        return upsert_users(*args, **kwargs)
+
+    @db_connect
+    def test_success(self, cursor):
+        """upsert user info"""
+
+        # Create existing role records.
+        uids = ['charrose', 'frahablar', 'impicky', 'marknewlyn',
+                'ream', 'rings']
+        first_set_size = 3
+
+        # Call the target on the first group.
+        self.call_target(cursor, uids[:first_set_size])
+
+        # Check the additions.
+        cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        expected = uids[:first_set_size]
+        self.assertEqual(entries, expected)
+
+        # Call the target on the second group.
+        self.call_target(cursor, uids)
+
+        # Check the additions.
+        cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        self.assertEqual(entries, uids)
+
+    @db_connect
+    def test_fetch_error(self, cursor):
+        """Verify user fetch error"""
+        from ..db import UserFetchError
+        with self.assertRaises(UserFetchError) as caught_exc:
+            self.call_target(cursor, ['mia'])
 
 
 class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):

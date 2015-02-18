@@ -148,11 +148,8 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
         config = testing.setUp(settings=self.settings)
-        accounts_config_key = archive_config.ACCOUNTS_CONNECTION_STRING
-        accounts_db_conn_str = self.settings[accounts_config_key]
         archive_settings = {
             archive_config.CONNECTION_STRING: self.db_conn_str,
-            archive_config.ACCOUNTS_CONNECTION_STRING: accounts_db_conn_str,
             }
         archive_initdb(archive_settings)
         from ..db import initdb
@@ -342,6 +339,19 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             ]
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
+
+        # *. Check for user info persistence. This is an upsert done when
+        #    a role is submitted.
+        cursor.execute("SELECT username, "
+                       "ARRAY[first_name IS NOT NULL, "
+                       "      last_name IS NOT NULL, "
+                       "      full_name IS NOT NULL] "
+                       "FROM users ORDER BY username")
+        users = {u:set(b) for u, b in cursor.fetchall()}
+        self.assertEqual(users.keys(), sorted([x['uid'] for x in data]))
+        for username, null_checks in users.items():
+            self.assertNotIn(None, null_checks,
+                             '{} has a null value'.format(username))
 
         # 2.
         expected = [
@@ -817,6 +827,21 @@ GROUP BY user_id, accepted
                     failure_message = "{} has not accepted " \
                                       "the licenses.".format(user_id)
                     self.assertTrue(has_accepted, failure_message)
+
+        # *. Check for user info persistence. This is an upsert done when
+        #    a role is submitted.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT username, "
+                               "ARRAY[first_name IS NOT NULL, "
+                               "      last_name IS NOT NULL, "
+                               "      full_name IS NOT NULL] "
+                               "FROM users ORDER BY username")
+                users = {u:set(b) for u, b in cursor.fetchall()}
+        self.assertEqual(sorted(users.keys()), sorted(uids))
+        for username, null_checks in users.items():
+            self.assertNotIn(None, null_checks,
+                             '{} has a null value'.format(username))
 
         # *. --
         self.app_check_state(publication_id, 'Waiting for acceptance',

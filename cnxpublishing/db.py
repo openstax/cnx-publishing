@@ -29,7 +29,10 @@ from pyramid.threadlocal import (
 
 from . import exceptions
 from .config import CONNECTION_STRING
-from .exceptions import ResourceFileExceededLimitError
+from .exceptions import (
+    ResourceFileExceededLimitError,
+    UserFetchError,
+    )
 from .utils import parse_archive_uri, parse_user_uri
 from .publish import publish_model, republish_binders
 
@@ -167,6 +170,9 @@ WHERE id = %s""", (document_id,))
 
     acceptors = set([(uid, _role_type_to_db_type(type_),)
                      for uid, type_ in _dissect_roles(metadata)])
+
+    # Upsert the user info.
+    upsert_users(cursor, [x[0] for x in acceptors])
 
     # Acquire a list of existing acceptors.
     cursor.execute("""\
@@ -1127,6 +1133,67 @@ def remove_acl(cursor, uuid_, permissions):
 DELETE FROM document_acl
 WHERE uuid = %s AND user_id = %s AND permission = %s""",
                        (uuid_, uid, permission,))
+
+
+def _upsert_users(cursor, user_ids, lookup_func):
+    """Upsert's user info into the database.
+    The model contains the user info as part of the role values.
+    """
+    user_ids = list(set(user_ids))  # cleanse data
+
+    # Check for existing records to update.
+    cursor.execute("SELECT username from users where username = ANY (%s)",
+                   (user_ids,))
+    try:
+        existing_user_ids = [x[0] for x in cursor.fetchall()]
+    except TypeError:
+        existing_user_ids = []
+    new_user_ids = [u for u in user_ids if u not in existing_user_ids]
+
+    # Update existing records.
+    for user_id in existing_user_ids:
+        # TODO only update based on a delta against the 'updated' column.
+        user_info = lookup_func(user_id)
+        cursor.execute("""\
+UPDATE users
+SET (updated, username, first_name, last_name, full_name, title) =
+    (CURRENT_TIMESTAMP, %(username)s, %(first_name)s, %(last_name)s,
+     %(full_name)s, %(title)s)
+WHERE username = %(username)s""", user_info)
+
+    # Insert new records.
+    for user_id in new_user_ids:
+        user_info = lookup_func(user_id)
+        cursor.execute("""\
+INSERT INTO users
+(username, first_name, last_name, full_name, suffix, title)
+VALUES
+(%(username)s, %(first_name)s, %(last_name)s, %(full_name)s,
+ %(suffix)s, %(title)s)""", user_info)
+
+
+def upsert_users(cursor, user_ids):
+    """Given a set of user identifiers (``user_ids``),
+    upsert them into the database after checking accounts for
+    the latest information.
+    """
+    accounts = get_current_registry().getUtility(IOpenstaxAccounts)
+
+    def lookup_profile(username):
+        user_infos = accounts.global_search('username:{}'.format(username))
+        # See structure documentation at:
+        #   https://<accounts-instance>/api/docs/v1/users/index
+        count = user_infos['total_count']
+        if count > 1 or count == 0:
+            raise UserFetchError(username)
+        user_info = user_infos['items'][0]
+        opt_attrs = ('first_name', 'last_name', 'full_name',
+                     'title', 'suffix',)
+        for attr in opt_attrs:
+            user_info.setdefault(attr, None)
+        return user_info
+
+    _upsert_users(cursor, user_ids, lookup_profile)
 
 
 NOTIFICATION_TEMPLATE = jinja2.Template("""\
