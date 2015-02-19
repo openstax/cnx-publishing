@@ -42,6 +42,7 @@ setup(
     include_package_data=True,
     package_data={
         'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql'],
+        'cnxpublishing.tests': ['data/*.*'],
         },
     entry_points="""\
     [paste.app_factory]
