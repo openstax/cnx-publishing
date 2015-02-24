@@ -1183,10 +1183,15 @@ def upsert_users(cursor, user_ids):
         user_infos = accounts.global_search('username:{}'.format(username))
         # See structure documentation at:
         #   https://<accounts-instance>/api/docs/v1/users/index
-        count = user_infos['total_count']
-        if count > 1 or count == 0:
+        user_info = None
+        for item in user_infos['items']:
+            if item['username'] == username:
+                # Ensure an exact match.
+                user_info = item
+                break
+        if user_info is None:
             raise UserFetchError(username)
-        user_info = user_infos['items'][0]
+
         opt_attrs = ('first_name', 'last_name', 'full_name',
                      'title', 'suffix',)
         for attr in opt_attrs:
