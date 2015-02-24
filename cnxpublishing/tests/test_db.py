@@ -548,7 +548,7 @@ ORDER BY user_id""", (uuid_,))
         self.assertEqual(entries, values)
 
 
-class RoleRequestTestCase(BaseDatabaseIntegrationTestCase):
+class UserUpsertTestCase(BaseDatabaseIntegrationTestCase):
     """Verify user upsert functionality"""
 
     def call_target(self, *args, **kwargs):
@@ -561,7 +561,7 @@ class RoleRequestTestCase(BaseDatabaseIntegrationTestCase):
 
         # Create existing role records.
         uids = ['charrose', 'frahablar', 'impicky', 'marknewlyn',
-                'ream', 'rings']
+                'ream', 'rings', 'smoo']
         first_set_size = 3
 
         # Call the target on the first group.
@@ -574,12 +574,21 @@ class RoleRequestTestCase(BaseDatabaseIntegrationTestCase):
         self.assertEqual(entries, expected)
 
         # Call the target on the second group.
-        self.call_target(cursor, uids)
+        self.call_target(cursor, uids[:-1])
 
         # Check the additions.
         cursor.execute("SELECT username FROM users ORDER BY username")
         entries = [x[0] for x in cursor.fetchall()]
-        self.assertEqual(entries, uids)
+        self.assertEqual(entries, uids[:-1])
+
+        # Check for similar usernames.
+        # ... smoo & smoopy
+        self.call_target(cursor, uids[-1:])
+
+        # Check the additions.
+        cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        self.assertIn(uids[-1], entries)
 
     @db_connect
     def test_fetch_error(self, cursor):
