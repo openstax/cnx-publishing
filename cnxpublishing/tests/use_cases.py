@@ -64,6 +64,7 @@ BOOK = cnxepub.Binder(
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None,
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -120,7 +121,10 @@ BOOK = cnxepub.Binder(
                                                  u'type': u'cnx-id'}],
                                 u'translators': [{u'id': u'frahablar',
                                                   u'name': u'Francis Hablar',
-                                                  u'type': u'cnx-id'}]},
+                                                  u'type': u'cnx-id'}],
+                                u'print_style': u'*print style*',
+                            }
+
                             ),
                     ]),
                 ]),
@@ -179,7 +183,10 @@ PAGE_ONE = cnxepub.Document(
                          u'type': u'cnx-id'}],
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
-                          u'type': u'cnx-id'}]}
+                          u'type': u'cnx-id'}],
+        u'print_style': None,
+    },
+
     )
 
 PAGE_TWO = cnxepub.Document(
@@ -217,7 +224,9 @@ PAGE_TWO = cnxepub.Document(
                          u'type': u'cnx-id'}],
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
-                          u'type': u'cnx-id'}]}
+                          u'type': u'cnx-id'}],
+        u'print_style': None, },
+
     )
 
 PAGE_THREE = cnxepub.Document(
@@ -255,7 +264,9 @@ PAGE_THREE = cnxepub.Document(
                         ],
         u'translators': [{u'id': u'frahablar',
                           u'name': u'Francis Hablar',
-                          u'type': u'cnx-id'}]}
+                          u'type': u'cnx-id'}],
+        u'print_style': None, },
+
     )
 
 PAGE_FOUR = cnxepub.Document(
@@ -287,7 +298,8 @@ PAGE_FOUR = cnxepub.Document(
                         {u'id': u'rings',
                          u'name': u'Rings',
                          u'type': u'cnx-id'}],
-        u'translators': []
+        u'translators': [],
+        u'print_style': None,
         }
     )
 
@@ -327,7 +339,8 @@ PAGE_FIVE = cnxepub.Document(
                         {u'id': u'charrose',
                          u'name': u'Charmaine St. Rose',
                          u'type': u'cnx-id'}],
-        u'translators': []
+        u'translators': [],
+        u'print_style': None,
         }
     )
 
@@ -362,6 +375,7 @@ COMPLEX_BOOK_ONE = cnxepub.Binder(
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None,
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -407,6 +421,7 @@ COMPLEX_BOOK_TWO = cnxepub.Binder(
                           u'name': u'Francis Hablar',
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None
         },
     nodes=[
         cnxepub.TranslucentBinder(
@@ -443,6 +458,7 @@ COMPLEX_BOOK_THREE = cnxepub.Binder(
             {u'id': u'ream', u'name': u'Ream', u'type': u'cnx-id'}],
         u'translators': [],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None
         },
     title_overrides=['D One', 'D Two'],
     nodes=[PAGE_TWO, PAGE_FOUR],
