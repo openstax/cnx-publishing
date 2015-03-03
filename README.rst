@@ -56,6 +56,9 @@ application in your webserver.
 
     pserve <your-config>.ini
 
+If you're using **cnx-authoring** together with **cnx-publishing**, please make sure
+your development.ini use the **same openstax_accounts settings**.
+
 Testing
 -------
 
