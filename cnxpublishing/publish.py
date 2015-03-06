@@ -44,7 +44,7 @@ module_insertion AS (
      parentauthors,
      authors, maintainers, licensors,
      google_analytics, buylink,
-     stateid, doctype)
+     stateid, doctype,print_style)
   VALUES
     ({__uuid__}, {__major_version__}, {__minor_version__},
      DEFAULT, %(_portal_type)s, {__moduleid__},
@@ -58,7 +58,7 @@ module_insertion AS (
         WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
      %(authors)s, %(publishers)s, %(copyright_holders)s,
      DEFAULT, DEFAULT,
-     DEFAULT, ' ')
+     DEFAULT, ' ',%(print_style)s)
   RETURNING
     module_ident,
     uuid||'@'||concat_ws('.',major_version,minor_version) AS ident_hash),

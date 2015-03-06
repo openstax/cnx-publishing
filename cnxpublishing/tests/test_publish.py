@@ -110,6 +110,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
             'copyright_holders': [{'id': 'ream', 'type': None}],
             'subjects': ['Arts', 'Business', 'Mathematics and Statistics'],
             'keywords': ['bates', 'dilemma', 'dingbat'],
+            'print_style': None,
             }
         publisher = 'ream'
         message = 'no msg'
@@ -232,6 +233,7 @@ ORDER BY k.word ASC
             'authors': [{'id': 'rbates', 'type': 'cnx-id',
                          'name': 'Richard Bates'}, ],
             'copyright_holders': [{'id': 'ream', 'type': None}],
+            'print_style': None,
             }
         publisher = 'ream'
         message = 'no msg'
@@ -293,6 +295,7 @@ WHERE mor.module_ident = %s
             'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
             'keywords': ['dingbat', 'bates', 'dilemma'],
             'version': version,
+            'print_style': None,
             }
         publisher = 'ream'
         message = 'no msg'
@@ -341,6 +344,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
             'copyright_holders': [{'id': 'ream', 'type': None}],
             'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
             'keywords': ['dingbat', 'bates', 'dilemma'],
+            'print_style': '* first print style* ',
             }
         publisher = 'ream'
         message = 'no msg'
@@ -371,6 +375,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
             'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
             'keywords': ['dingbat', 'bates', 'dilemma'],
             'derived_from_uri': 'http://cnx.org/contents/{}'.format(ident_hash),
+            'print_style': '* second print style* ',
             }
         publisher = 'someone'
         message = 'derived a copy'
@@ -395,6 +400,18 @@ WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
         self.assertEqual(title, "Copy of Dingbat's Dilemma")
         self.assertEqual(parent, ident_hash)
         self.assertEqual(parentauthors, ['rbates'])
+
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("SELECT print_style FROM modules m"
+                               "    WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s", (ident_hash,))
+                print_style = cursor.fetchone()[0]
+                self.assertEqual(print_style, '* first print style* ')
+
+                cursor.execute("SELECT print_style FROM modules m"
+                               "    WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s", (derived_ident_hash,))
+                print_style = cursor.fetchone()[0]
+                self.assertEqual(print_style, '* second print style* ')
 
 
 class RepublishTestCase(unittest.TestCase):
