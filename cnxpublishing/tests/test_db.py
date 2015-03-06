@@ -942,9 +942,29 @@ WHERE id = %s""", (publication_id,))
              }]
         self.assertEqual(state_messages, expected_state_messages)
 
-    def test_add_pending_document_w_invalid_references(self):
+    @db_connect
+    def test_add_pending_document_w_invalid_references(self, cursor):
         """Add a pending document with an invalid content references."""
         publication_id = self.make_publication()
+
+        # Insert a valid module for referencing...
+        cursor.execute("""\
+INSERT INTO abstracts (abstract) VALUES ('abstract')
+RETURNING abstractid""")
+        cursor.execute("""\
+INSERT INTO modules
+(module_ident, portal_type, name,
+ created, revised, abstractid, licenseid,
+ doctype, submitter, submitlog, stateid, parent, parentauthors,
+ language, authors, maintainers, licensors,
+ google_analytics, buylink)
+VALUES
+(1, 'Module', 'referenced module',
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT) RETURNING uuid || '@' || major_version""")
+        doc_ident_hash = cursor.fetchone()[0]
 
         # Create and add a document for the publication.
         metadata = {
@@ -963,37 +983,38 @@ WHERE id = %s""", (publication_id,))
             <a href="http://cnx.org/contents/8bef27ba@55">
               external reference to internal content
             </a>
-            <a href="/contents/8bef27ba@55">
-              relative reference to internal content
+            <a href="/contents/765792e0-5e65-4411-88d3-90df8f48eb3a@55">
+              relative reference to internal content that does not exist
             </a>
             <!-- Valid reference -->
+            <a href="/contents/{}">
+              relative reference to internal content
+            </a>
             <a href="#hello">anchor link</a>
-            <a href="http://example.org/">external link</a>"""
+            <a href="http://example.org/">external link</a>""" \
+                .format(doc_ident_hash)
         document = self.make_document(content=content, metadata=metadata)
 
         # Here we are testing the function of add_pending_document.
         from ..db import add_pending_model, add_pending_model_content
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_model(
-                    cursor, publication_id, document)
-                add_pending_model_content(cursor, publication_id, document)
+        document_ident_hash = add_pending_model(
+            cursor, publication_id, document)
+        add_pending_model_content(cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
         # This doesn't seem like much, but we only need to check that
         # the entry was added.
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""
+        cursor.execute("""
 SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
-                expected_ident_hash = cursor.fetchone()[0]
-                cursor.execute("""
+        expected_ident_hash = cursor.fetchone()[0]
+        cursor.execute("""
 SELECT "state", "state_messages"
 FROM publications
 WHERE id = %s""", (publication_id,))
-                state, state_messages = cursor.fetchone()
+        state, state_messages = cursor.fetchone()
+
         self.assertEqual(state, 'Failed/Error')
         xpath = u'/div/img'
         ref_value = u'../resources/8bef27ba.png'
