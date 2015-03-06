@@ -30,6 +30,7 @@ from pyramid.threadlocal import (
 from . import exceptions
 from .config import CONNECTION_STRING
 from .exceptions import (
+    DocumentLookupError,
     ResourceFileExceededLimitError,
     UserFetchError,
     )
@@ -486,6 +487,26 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
     return pending_ident_hash
 
 
+def lookup_document_pointer(ident_hash, cursor):
+    """Lookup a document by id and version."""
+    id, version = split_ident_hash(ident_hash, split_version=True)
+    stmt = "SELECT name FROM modules WHERE uuid = %s"
+    args = [id]
+    if version and version[0] is not None:
+        operator = version[1] is None and 'is' or '='
+        stmt += " AND (major_version = %s AND minor_version {} %s)" \
+            .format(operator)
+        args.extend(version)
+    cursor.execute(stmt, args)
+    try:
+        title = cursor.fetchone()[0]
+    except TypeError:
+        raise DocumentLookupError()
+    else:
+        metadata = {'title': title}
+    return cnxepub.DocumentPointer(ident_hash, metadata)
+
+
 def add_pending_model_content(cursor, publication_id, model):
     """Updates the pending model's content.
     This is a secondary step not in ``add_pending_model, because
@@ -507,6 +528,14 @@ def add_pending_model_content(cursor, publication_id, model):
         exc.publication_id = publication_id
         exc.pending_document_id, exc.pending_ident_hash = document_info
 
+    def mark_invalid_reference(reference):
+        """Set the publication to failure and attach invalid reference
+        to the publication.
+        """
+        exc = exceptions.InvalidReference(reference)
+        attach_info_to_exception(exc)
+        set_publication_failure(cursor, exc)
+
     if isinstance(model, cnxepub.Document):
         for resource in model.resources:
             add_pending_resource(cursor, resource)
@@ -515,15 +544,21 @@ def add_pending_model_content(cursor, publication_id, model):
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')
             elif reference.remote_type == cnxepub.INTERNAL_REFERENCE_TYPE:
-                if not reference.uri.startswith('#'):
-                    exc = exceptions.InvalidReference(reference)
-                    attach_info_to_exception(exc)
-                    set_publication_failure(cursor, exc)
+                if reference.uri.startswith('#'):
+                    pass
+                elif reference.uri.startswith('/contents'):
+                    ident_hash = parse_archive_uri(reference.uri)
+                    try:
+                        doc_pointer = lookup_document_pointer(ident_hash, cursor)
+                    except DocumentLookupError:
+                        mark_invalid_reference(reference)
+                    else:
+                        reference.bind(doc_pointer, "/contents/{}")
+                else:
+                    mark_invalid_reference(reference)
             # This will check cnx.org and openstaxcnx.org.
             elif reference.uri_parts.netloc.find('cnx.org') >= 0:
-                exc = exceptions.InvalidReference(reference)
-                attach_info_to_exception(exc)
-                set_publication_failure(cursor, exc)
+                mark_invalid_reference(reference)
             # else, it's a remote reference... Do nothing.
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),

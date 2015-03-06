@@ -30,6 +30,11 @@ class UserFetchError(Exception):
         return (self.message, self.__dict__,)
 
 
+class DocumentLookupError(Exception):
+    """Generally used when a document cannot be found."""
+
+
+
 # ########################## #
 #   Publication Exceptions   #
 # ########################## #
