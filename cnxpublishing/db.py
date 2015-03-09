@@ -556,10 +556,7 @@ def add_pending_model_content(cursor, publication_id, model):
                         reference.bind(doc_pointer, "/contents/{}")
                 else:
                     mark_invalid_reference(reference)
-            # This will check cnx.org and openstaxcnx.org.
-            elif reference.uri_parts.netloc.find('cnx.org') >= 0:
-                mark_invalid_reference(reference)
-            # else, it's a remote reference... Do nothing.
+            # else, it's a remote or cnx.org reference ...Do nothing.
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
