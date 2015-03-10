@@ -672,6 +672,32 @@ INSERT INTO document_acl (uuid, user_id, permission)
 VALUES (%s, %s, %s)""", (uuid_, user_id, permission,))
 
 
+def _insert_user_info(model, cursor):
+    """Insert the user shadow table info."""
+    user_ids = set([])
+    for role_attr in cnxepub.ATTRIBUTED_ROLE_KEYS:
+        for role in model.metadata.get(role_attr, []):
+            user_ids.add(role['id'])
+
+    # Check for existing records to update.
+    cursor.execute("SELECT username from users where username = ANY (%s)",
+                   (list(user_ids),))
+    try:
+        existing_user_ids = [x[0] for x in cursor.fetchall()]
+    except TypeError:
+        existing_user_ids = []
+    new_user_ids = [u for u in user_ids if u not in existing_user_ids]
+
+    # At this time, we don't need to store the actual user details.
+    # So, making an entry that contains only a username should be enough.
+
+    # Insert new records.
+    for user_id in new_user_ids:
+        cursor.execute("""\
+INSERT INTO users (username, is_moderated)
+VALUES (%s, 't')""", (user_id,))
+
+
 def setup_BOOK_in_archive(test_case, cursor):
     """Set up BOOK"""
     binder = deepcopy(BOOK)
@@ -688,10 +714,12 @@ def setup_BOOK_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     _insert_control_id(document.id, cursor)
+    _insert_user_info(document, cursor)
     publish_model(cursor, document, publisher, publication_message)
     _set_uri(document)
     _insert_acl_for_model(document, cursor)
     _insert_control_id(binder.id, cursor)
+    _insert_user_info(binder, cursor)
     publish_model(cursor, binder, publisher, publication_message)
     _set_uri(binder)
     _insert_acl_for_model(binder,cursor)
@@ -711,6 +739,7 @@ def setup_PAGE_ONE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -730,6 +759,7 @@ def setup_PAGE_TWO_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -749,6 +779,7 @@ def setup_PAGE_THREE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -768,6 +799,7 @@ def setup_PAGE_FOUR_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -796,6 +828,7 @@ def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -822,6 +855,7 @@ def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -846,6 +880,7 @@ def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
