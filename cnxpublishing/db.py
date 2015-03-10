@@ -79,11 +79,14 @@ def initdb(connection_string):
 
 def with_db_cursor(func):
     """Decorator that supplies a cursor to the function.
-    This passes in a psycopg2 Cursor as the keyword argument 'cursor'.
+    This passes in a psycopg2 Cursor as the argument 'cursor'.
+    It also accepts a cursor if one is given.
     """
 
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
+        if 'cursor' in kwargs or func.func_code.co_argcount == len(args):
+            return func(*args, **kwargs)
         registry = get_current_registry()
         conn_str = registry.settings[CONNECTION_STRING]
         with psycopg2.connect(conn_str) as db_connection:
@@ -754,6 +757,27 @@ WHERE id = %s""",
                    args)
 
 @with_db_cursor
+def is_revision_publication(publication_id, cursor):
+    """Checks to see if the publication contains any revised models.
+    Revised in this context means that it is a new version of an
+    existing piece of content.
+    """
+    cursor.execute("""\
+SELECT 't'::boolean FROM latest_modules
+WHERE uuid IN (SELECT uuid
+               FROM pending_documents
+               WHERE publication_id = %s)
+LIMIT 1""", (publication_id,))
+    try:
+        cursor.fetchone()[0]
+    except TypeError:  # NoneType
+        has_revision_models = False
+    else:
+        has_revision_models = True
+    return has_revision_models
+
+
+@with_db_cursor
 def poke_publication_state(publication_id, cursor):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
@@ -808,13 +832,40 @@ WHERE p.id = %s
     # Are all the documents ready for publication?
     state_lump = set([l and r for l, r in publication_state_mapping.values()])
     is_publish_ready = not (False in state_lump) and not (None in state_lump)
+    change_state = "Done/Success"
+    if not is_publish_ready:
+        change_state = "Waiting for acceptance"
+
+    # Does this publication need moderation? (ignore on pre-publication)
+    # TODO Is this a revision publication? If so, it doesn't matter who the
+    #      user is, because they have been vetted by the previous publisher.
+    #      This has loopholes...
+    if not is_pre_publication and is_publish_ready:
+        # Has this publisher been moderated before?
+        cursor.execute("""\
+SELECT is_moderated
+FROM users AS u LEFT JOIN publications AS p ON (u.username = p.publisher)
+WHERE p.id = %s""",
+                       (publication_id,))
+        try:
+            is_publisher_moderated = cursor.fetchone()[0]
+        except TypeError:
+            is_publisher_moderated = False
+
+        # Are any of these documents a revision? Thus vetting of
+        #   the publisher was done by a vetted peer.
+        if not is_publisher_moderated \
+           and not is_revision_publication(publication_id, cursor):
+                # Hold up! This publish needs moderation.
+                change_state = "Waiting for moderation"
+                is_publish_ready = False
 
     # Publish the pending documents.
     if is_publish_ready:
+        change_state = "Done/Success"
         if not is_pre_publication:
             publication_state = publish_pending(cursor, publication_id)
         else:
-            change_state = "Done/Success"
             cursor.execute("""\
 UPDATE publications
 SET state = %s
@@ -822,13 +873,14 @@ WHERE id = %s
 RETURNING state, state_messages""", (change_state, publication_id,))
             publication_state, messages = cursor.fetchone()
     else:
-        change_state = "Waiting for acceptance"
+        # `change_state` set prior to this...
         cursor.execute("""\
 UPDATE publications
 SET state = %s
 WHERE id = %s
 RETURNING state, state_messages""", (change_state, publication_id,))
         publication_state, messages = cursor.fetchone()
+
     return publication_state, messages
 
 
