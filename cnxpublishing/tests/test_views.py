@@ -728,6 +728,19 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         path = '/contents/{}/permissions'.format(uuid_)
         resp = self.app.post_json(path, data, headers=headers)
 
+    def app_get_moderation(self, headers=[]):
+        """Gets a list of the publication that are currently being moderated.
+        """
+        path = '/moderations'
+        resp = self.app.get(path, headers=headers)
+        return resp
+
+    def app_post_moderation(self, publication_id, data, headers=[]):
+        """Moderate the publication by sending an accept/reject state."""
+        path = '/moderations/{}'.format(publication_id)
+        resp = self.app.post_json(path, data, headers=headers)
+        return resp
+
     # ######### #
     #   Tests   #
     # ######### #
@@ -877,16 +890,12 @@ GROUP BY user_id, accepted
                     self.assertTrue(has_accepted, failure_message)
 
         # 4. (manual)
-        # FIXME This needs to be done as a moderator and directly
-        #       calling the route.
-        # Assume moderation acceptance && Manually call poke
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-UPDATE users SET (is_moderated) = ('t')
-WHERE username = %s""", (publisher,))
-        from ..db import poke_publication_state
-        poke_publication_state(publication_id)
+        # FIXME This needs to be done as a moderator.
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation approval.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
 
         # *. --
         # This is publication completion,
@@ -896,6 +905,75 @@ WHERE username = %s""", (publisher,))
 
         # 5. (manual)
         self._check_published_to_archive(use_cases.BOOK)
+
+    def test_publishing_spam(self):
+        """\
+        Publish *new* documents.
+        This includes application and user interactions with publishing.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        *. Accept the roles and license.
+
+        2. Wait for moderation acceptance from a moderator.
+
+        3. Verify rejection. [HACKED]
+
+        """
+        publisher = u'happy'
+        epub_filepath = self.make_epub(use_cases.SPAM, publisher,
+                                       u'please publish my spam')
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
+        publication_id = resp.json['publication']
+
+        # *. --
+        # Assume this person as passed through approval by virtue
+        #   of being the creating user (from the cnx-authoring perspective).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT uuid from pending_documents WHERE publication_id = %s""",
+                               (publication_id,))
+                uuids = [x[0] for x in cursor.fetchall()]
+                cursor.execute("""\
+UPDATE role_acceptances SET (accepted) = ('t');
+UPDATE license_acceptances SET (accepted) = ('t');""")
+
+        # Poke the publication into moderation.
+        from ..db import poke_publication_state
+        poke_publication_state(publication_id)
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for moderation',
+                             headers=api_key_headers)
+
+        # 2. (manual)
+        # FIXME This needs to be done as a moderator.
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation rejection.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': False})
+
+        # *. --
+        # This is publication completion.
+        self.app_check_state(publication_id, 'Rejected',
+                             headers=api_key_headers)
+
+        # 5. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT 'eek' FROM modules WHERE uuid = ANY (%s)""", (uuids,))
+                self.assertIsNone(cursor.fetchone())
 
     def test_new_to_pre_publication(self):
         """\
@@ -1531,16 +1609,12 @@ GROUP BY user_id, accepted
         publication_id = resp.json['publication']
 
         # 5. (manual)
-        # FIXME This needs to be done as a moderator and directly
-        #       calling the route.
-        # Assume moderation acceptance && Manually call poke
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-UPDATE users SET (is_moderated) = ('t')
-WHERE username = %s""", (publisher,))
-        from ..db import poke_publication_state
-        poke_publication_state(publication_id)
+        # FIXME This needs to be done as a moderator
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation approval.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
 
         # *. --
         # This is publication completion,

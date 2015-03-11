@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Moderation List</h1>
+  <table>
+    <tr>
+      <th>Publication ID</th>
+      <th>Created</th>
+      <th>Publisher</th>
+      <th>Publication message</th>
+      <th>Models</th>
+      <th>Accept?</th>
+    </tr>
+    {% for pub in moderations %}
+      <tr id="{{ pub.id ~ '-row' }}">
+        <td>{{ pub.id }}</td>
+        <td>{{ pub.created }}</td>
+        <td>{{ pub.publisher }}</td>
+        <td>{{ pub.publication_message }}</td>
+        <td>
+          <ul>
+            {% for item in pub.models %}
+              <li>
+                <span class="{{ item.type }}">{{ item.type[0] }}</span>
+                <a href="{{ request.route_url('get-content', ident_hash=join_ident_hash(item.uuid, (item.major_version, item.minor_version,))) }}">
+                  {{ item.metadata.title }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </td>
+        <td>
+          <button name="{{ pub.id }}" value="accept">Accept</button>
+          <button name="{{ pub.id }}" value="reject">Reject</button>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
+{% block script %}
+$(document).ready(function($) {
+  $('button').each(function(idx) {
+    $(this).click(function(e) {
+      console.log('moo')
+      var url = '/moderations/' + this.name,
+          isAccepted = this.value === 'accept',
+          pubId = this.name;
+      console.log("Button clicked: " + isAccepted);
+      $.ajax({
+        url: url,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({'is_accepted': isAccepted})
+      })
+      .done(function(data, textStatus, xhr) {
+        $('#' + pubId + '-row').remove();
+      });
+      return false;
+    });
+  });
+});
+{% endblock %}

@@ -143,6 +143,64 @@ REVISED_BOOK[0].metadata['title'] = u"Stifled with Good Inténsions"
 REVISED_BOOK[0].set_title_for_node(REVISED_BOOK[0][0], u"Infinity Plus")
 
 
+SPAM = cnxepub.Binder(
+    id='94f4d0f5@draft',
+    metadata={
+        u'title': u'Eat more spam',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': [
+            u'Mathematics and Statistics',
+            u'Science and Technology',
+            ],
+        u'authors': [
+            {u'id': u'happy', u'name': u'Happy Go Lucky',
+             u'type': u'cnx-id'}],
+        u'copyright_holders': [],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [
+            {u'id': u'happy', u'name': u'Happy Go Lucky',
+             u'type': u'cnx-id'}],
+        u'translators': [],
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None,
+        },
+    nodes=[
+        cnxepub.Document(
+            id=u'2cf4d7d3@draft',
+            data=u'<p class="para">Yummy Yummy SPAM!!!</p>',
+            resources=[],
+            metadata={
+                u'title': u'Eat up!',
+                u'created': u'2013/03/19 15:01:16 -0500',
+                u'revised': u'2013/03/19 15:01:16 -0500',
+                u'keywords': [],
+                u'subjects': [],
+                u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>spam</span>",
+                u'language': u'en',
+                u'license_text': u'CC-By 4.0',
+                u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+                u'authors': [{u'id': u'happy',
+                              u'name': u'Happy Go Lucky',
+                              u'type': u'cnx-id'}],
+                u'copyright_holders': [],
+                u'editors': [],
+                u'illustrators': [],
+                u'publishers': [{u'id': u'happy',
+                                 u'name': u'Happy Go Lucky',
+                                 u'type': u'cnx-id'}],
+                u'translators': [],
+                u'print_style': u'*print style*',
+            },
+        ),
+    ])
+
+
 PAGE_ONE = cnxepub.Document(
     id=u'2cf4d7d3@draft',
     data=u'<p class="para">If you finish the book, there will be cake.</p>',

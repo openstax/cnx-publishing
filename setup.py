@@ -12,6 +12,7 @@ install_requires = (
     'openstax-accounts>=0.14.0',
     'psycopg2',
     'pyramid>=1.5',
+    'pyramid_jinja2',
     'pyramid_multiauth',
     )
 tests_require = [

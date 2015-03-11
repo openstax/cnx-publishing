@@ -7,10 +7,12 @@
 # ###
 import tempfile
 
+from cnxarchive.utils import join_ident_hash
 from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid.config import Configurator
 from pyramid import security
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.httpexceptions import default_exceptionresponse_view
 from pyramid.session import SignedCookieSessionFactory
 from pyramid_multiauth import MultiAuthenticationPolicy
 
@@ -21,7 +23,7 @@ __version__ = '0.1'
 __name__ = 'cnxpublishing'
 
 
-def declare_routes(config):
+def declare_api_routes(config):
     """Declaration of routing"""
     add_route = config.add_route
     add_route('get-content', '/contents/{ident_hash}')
@@ -39,6 +41,37 @@ def declare_routes(config):
               '/publications/{id}/license-acceptances/{uid}')
     add_route('publication-role-acceptance',
               '/publications/{id}/role-acceptances/{uid}')
+
+    # Moderation routes
+    add_route('moderation', '/moderations')
+    add_route('moderate', '/moderations/{id}')
+
+
+def declare_browsable_routes(config):
+    """Declaration of routes that can be browsed by users."""
+    config.include('pyramid_jinja2')
+    config.add_jinja2_renderer('.html')
+    config.add_static_view(name='static', path="cnxpublishing:static/")
+    # Place a few globals in the template environment.
+    config.commit()
+    jinja2_env = config.get_jinja2_environment('.html')
+    jinja2_env.globals.update(
+        join_ident_hash=join_ident_hash,
+        )
+
+    # This makes our routes slashed, which is good browser behavior.
+    config.add_notfound_view(default_exceptionresponse_view,
+                             append_slash=True)
+
+    add_route = config.add_route
+    add_route('admin-index', '/a/')
+    add_route('admin-moderation', '/a/moderation/')
+
+
+def declare_routes(config):
+    """Declare all routes."""
+    declare_api_routes(config)
+    declare_browsable_routes(config)
 
 
 def _parse_api_key_lines(settings):

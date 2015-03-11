@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Navigation</h1>
+  <ul>
+  {% for nav_item in navigation %}
+    <li><a href="{{ nav_item.uri }}">{{ nav_item.name }}</a></li>
+  {% endfor %}
+  </ul>
+{% endblock %}

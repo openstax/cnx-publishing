@@ -12,7 +12,8 @@ CREATE TYPE publication_states AS ENUM (
   'Processing',  -- Processing any part of the publication.
   'Waiting for acceptance',
   'Failed/Error',
-  'Waiting for moderation'  -- Needs moderator approval
+  'Waiting for moderation',  -- Needs moderator approval
+  'Rejected' -- A moderator rejected the publication
 );
 
 

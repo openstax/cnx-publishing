@@ -56,6 +56,8 @@ SCHEMA_FILES = (
     'schema-indexes.sql',
     'schema-triggers.sql',
     )
+END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
+                        'Failed/Error', 'Rejected',)
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
 # itself. Temporarily call it directly.
 register_uuid()
@@ -789,7 +791,7 @@ WHERE id = %s""", (publication_id,))
     row = cursor.fetchone()
     current_state, messages, is_pre_publication, publisher = row
 
-    if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
+    if current_state in END_N_INTERIM_STATES:
         # Bailout early, because the publication is either in progress
         # or has been completed.
         return current_state, messages
@@ -810,14 +812,14 @@ WHERE p.id = %s
         has_changed_state = False
         if is_license_accepted and are_roles_accepted:
             continue
-        elif not is_license_accepted:
+        if not is_license_accepted:
             accepted = _check_pending_document_license_state(
                 cursor, id)
             if accepted != is_license_accepted:
                 has_changed_state = True
                 is_license_accepted = accepted
                 publication_state_mapping[id][0] = accepted
-        elif not are_roles_accepted:
+        if not are_roles_accepted:
             accepted = _check_pending_document_role_state(
                 cursor, id)
             if accepted != are_roles_accepted:

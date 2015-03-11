@@ -8,9 +8,10 @@
 
 CREATE TABLE publications (
   "id" SERIAL PRIMARY KEY,
+  "created" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   "publisher" TEXT NOT NULL,
   "publication_message" TEXT NOT NULL,
-  "epub" BYTEA NOT NULL,
+  "epub" BYTEA,
   -- Pre-publication, do not commit to *archive*.
   "is_pre_publication" BOOLEAN DEFAULT FALSE,
   -- State information, included an optional message.
