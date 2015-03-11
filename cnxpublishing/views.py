@@ -605,5 +605,7 @@ def admin_index(request):  # pragma: no cover
 
 @view_config(route_name='admin-moderation', request_method='GET',
              renderer="cnxpublishing:templates/moderations.html")
+@view_config(route_name='moderation-rss', request_method='GET',
+             renderer="cnxpublishing:templates/moderations.rss")
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}

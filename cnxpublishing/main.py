@@ -45,20 +45,11 @@ def declare_api_routes(config):
     # Moderation routes
     add_route('moderation', '/moderations')
     add_route('moderate', '/moderations/{id}')
+    add_route('moderation-rss', '/feeds/moderations.rss')
 
 
 def declare_browsable_routes(config):
     """Declaration of routes that can be browsed by users."""
-    config.include('pyramid_jinja2')
-    config.add_jinja2_renderer('.html')
-    config.add_static_view(name='static', path="cnxpublishing:static/")
-    # Place a few globals in the template environment.
-    config.commit()
-    jinja2_env = config.get_jinja2_environment('.html')
-    jinja2_env.globals.update(
-        join_ident_hash=join_ident_hash,
-        )
-
     # This makes our routes slashed, which is good browser behavior.
     config.add_notfound_view(default_exceptionresponse_view,
                              append_slash=True)
@@ -70,6 +61,18 @@ def declare_browsable_routes(config):
 
 def declare_routes(config):
     """Declare all routes."""
+    config.include('pyramid_jinja2')
+    config.add_jinja2_renderer('.html')
+    config.add_jinja2_renderer('.rss')
+    config.add_static_view(name='static', path="cnxpublishing:static/")
+    # Place a few globals in the template environment.
+    config.commit()
+    for ext in ('.html', '.rss',):
+        jinja2_env = config.get_jinja2_environment(ext)
+        jinja2_env.globals.update(
+            join_ident_hash=join_ident_hash,
+            )
+
     declare_api_routes(config)
     declare_browsable_routes(config)
 
