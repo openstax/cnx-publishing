@@ -977,16 +977,19 @@ VALUES
         content = """
             <!-- Invalid references -->
             <img src="../resources/8bef27ba.png"/>
+            <a href="/contents/765792e0-5e65-4411-88d3-90df8f48eb3a@55">
+              relative reference to internal content that does not exist
+            </a>
+            <!-- Valid reference -->
             <a href="http://openstaxcnx.org/contents/8bef27ba@55">
               external reference to internal content
             </a>
             <a href="http://cnx.org/contents/8bef27ba@55">
               external reference to internal content
             </a>
-            <a href="/contents/765792e0-5e65-4411-88d3-90df8f48eb3a@55">
-              relative reference to internal content that does not exist
+             <a href="http://demo.cnx.org/images/logo.png">
+              external reference to internal content
             </a>
-            <!-- Valid reference -->
             <a href="/contents/{}">
               relative reference to internal content
             </a>
@@ -1032,7 +1035,7 @@ WHERE id = %s""", (publication_id,))
             u'xpath': xpath,
             u'value': ref_value,
             }
-        self.assertEqual(len(state_messages), 4)
+        self.assertEqual(len(state_messages), 2)
         self.assertEqual(state_messages[-1], expected_state_message)
 
     @db_connect
