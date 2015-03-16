@@ -9,6 +9,7 @@ from __future__ import print_function
 import os
 import sys
 import io
+import functools
 import json
 import uuid
 
@@ -55,6 +56,8 @@ SCHEMA_FILES = (
     'schema-indexes.sql',
     'schema-triggers.sql',
     )
+END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
+                        'Failed/Error', 'Rejected',)
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
 # itself. Temporarily call it directly.
 register_uuid()
@@ -74,6 +77,27 @@ def initdb(connection_string):
                         print("File '{}' had issues executing." \
                               .format(schema_filepath), file=sys.stderr)
                         raise
+
+
+def with_db_cursor(func):
+    """Decorator that supplies a cursor to the function.
+    This passes in a psycopg2 Cursor as the argument 'cursor'.
+    It also accepts a cursor if one is given.
+    """
+
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        if 'cursor' in kwargs or func.func_code.co_argcount == len(args):
+            return func(*args, **kwargs)
+        registry = get_current_registry()
+        conn_str = registry.settings[CONNECTION_STRING]
+        with psycopg2.connect(conn_str) as db_connection:
+            with db_connection.cursor() as cursor:
+                kwargs['cursor'] = cursor
+                return func(*args, **kwargs)
+
+    return wrapped
+
 
 # FIXME Cache the database query in this function. Cache for forever.
 # TODO Move to cnx-archive.
@@ -731,90 +755,131 @@ SET (license_accepted, roles_accepted) = (%s, %s)
 WHERE id = %s""",
                    args)
 
+@with_db_cursor
+def is_revision_publication(publication_id, cursor):
+    """Checks to see if the publication contains any revised models.
+    Revised in this context means that it is a new version of an
+    existing piece of content.
+    """
+    cursor.execute("""\
+SELECT 't'::boolean FROM latest_modules
+WHERE uuid IN (SELECT uuid
+               FROM pending_documents
+               WHERE publication_id = %s)
+LIMIT 1""", (publication_id,))
+    try:
+        cursor.fetchone()[0]
+    except TypeError:  # NoneType
+        has_revision_models = False
+    else:
+        has_revision_models = True
+    return has_revision_models
 
-def poke_publication_state(publication_id, current_state=None):
+
+@with_db_cursor
+def poke_publication_state(publication_id, cursor):
     """Invoked to poke at the publication to update and acquire its current
     state. This is used to persist the publication to archive.
     """
-    registry = get_current_registry()
-    conn_str = registry.settings[CONNECTION_STRING]
-    with psycopg2.connect(conn_str) as db_conn:
-        with db_conn.cursor() as cursor:
-            if current_state is None:
-                cursor.execute("""\
-SELECT "state", "state_messages", "is_pre_publication"
+    cursor.execute("""\
+SELECT "state", "state_messages", "is_pre_publication", "publisher"
 FROM publications
 WHERE id = %s""", (publication_id,))
-                current_state, messages, is_pre_publication = cursor.fetchone()
-    if current_state in ('Publishing', 'Done/Success', 'Failed/Error',):
+    row = cursor.fetchone()
+    current_state, messages, is_pre_publication, publisher = row
+
+    if current_state in END_N_INTERIM_STATES:
         # Bailout early, because the publication is either in progress
         # or has been completed.
         return current_state, messages
 
     # Check for acceptance...
-    with psycopg2.connect(conn_str) as db_conn:
-        with db_conn.cursor() as cursor:
-            cursor.execute("""\
+    cursor.execute("""\
 SELECT
   pd.id, license_accepted, roles_accepted
 FROM publications AS p JOIN pending_documents AS pd ON p.id = pd.publication_id
 WHERE p.id = %s
-""",
-                           (publication_id,))
-            pending_document_states = cursor.fetchall()
-            publication_state_mapping = {}
-            for document_state in pending_document_states:
-                id, is_license_accepted, are_roles_accepted = document_state
-                publication_state_mapping[id] = [is_license_accepted,
-                                                 are_roles_accepted]
-                has_changed_state = False
-                if is_license_accepted and are_roles_accepted:
-                    continue
-                elif not is_license_accepted:
-                    accepted = _check_pending_document_license_state(
-                        cursor, id)
-                    if accepted != is_license_accepted:
-                        has_changed_state = True
-                        is_license_accepted = accepted
-                        publication_state_mapping[id][0] = accepted
-                elif not are_roles_accepted:
-                    accepted = _check_pending_document_role_state(
-                        cursor, id)
-                    if accepted != are_roles_accepted:
-                        has_changed_state = True
-                        are_roles_accepted = accepted
-                        publication_state_mapping[id][1] = accepted
-                if has_changed_state:
-                    _update_pending_document_state(cursor, id,
-                                                   is_license_accepted,
-                                                   are_roles_accepted)
+""", (publication_id,))
+    pending_document_states = cursor.fetchall()
+    publication_state_mapping = {}
+    for document_state in pending_document_states:
+        id, is_license_accepted, are_roles_accepted = document_state
+        publication_state_mapping[id] = [is_license_accepted,
+                                         are_roles_accepted]
+        has_changed_state = False
+        if is_license_accepted and are_roles_accepted:
+            continue
+        if not is_license_accepted:
+            accepted = _check_pending_document_license_state(
+                cursor, id)
+            if accepted != is_license_accepted:
+                has_changed_state = True
+                is_license_accepted = accepted
+                publication_state_mapping[id][0] = accepted
+        if not are_roles_accepted:
+            accepted = _check_pending_document_role_state(
+                cursor, id)
+            if accepted != are_roles_accepted:
+                has_changed_state = True
+                are_roles_accepted = accepted
+                publication_state_mapping[id][1] = accepted
+        if has_changed_state:
+            _update_pending_document_state(cursor, id,
+                                           is_license_accepted,
+                                           are_roles_accepted)
 
     # Are all the documents ready for publication?
     state_lump = set([l and r for l, r in publication_state_mapping.values()])
     is_publish_ready = not (False in state_lump) and not (None in state_lump)
+    change_state = "Done/Success"
+    if not is_publish_ready:
+        change_state = "Waiting for acceptance"
+
+    # Does this publication need moderation? (ignore on pre-publication)
+    # TODO Is this a revision publication? If so, it doesn't matter who the
+    #      user is, because they have been vetted by the previous publisher.
+    #      This has loopholes...
+    if not is_pre_publication and is_publish_ready:
+        # Has this publisher been moderated before?
+        cursor.execute("""\
+SELECT is_moderated
+FROM users AS u LEFT JOIN publications AS p ON (u.username = p.publisher)
+WHERE p.id = %s""",
+                       (publication_id,))
+        try:
+            is_publisher_moderated = cursor.fetchone()[0]
+        except TypeError:
+            is_publisher_moderated = False
+
+        # Are any of these documents a revision? Thus vetting of
+        #   the publisher was done by a vetted peer.
+        if not is_publisher_moderated \
+           and not is_revision_publication(publication_id, cursor):
+                # Hold up! This publish needs moderation.
+                change_state = "Waiting for moderation"
+                is_publish_ready = False
 
     # Publish the pending documents.
-    with psycopg2.connect(conn_str) as db_conn:
-        with db_conn.cursor() as cursor:
-            if is_publish_ready:
-                if not is_pre_publication:
-                    publication_state = publish_pending(cursor, publication_id)
-                else:
-                    change_state = "Done/Success"
-                    cursor.execute("""\
+    if is_publish_ready:
+        change_state = "Done/Success"
+        if not is_pre_publication:
+            publication_state = publish_pending(cursor, publication_id)
+        else:
+            cursor.execute("""\
 UPDATE publications
 SET state = %s
 WHERE id = %s
 RETURNING state, state_messages""", (change_state, publication_id,))
-                    publication_state, messages = cursor.fetchone()
-            else:
-                change_state = "Waiting for acceptance"
-                cursor.execute("""\
+            publication_state, messages = cursor.fetchone()
+    else:
+        # `change_state` set prior to this...
+        cursor.execute("""\
 UPDATE publications
 SET state = %s
 WHERE id = %s
 RETURNING state, state_messages""", (change_state, publication_id,))
-                publication_state, messages = cursor.fetchone()
+        publication_state, messages = cursor.fetchone()
+
     return publication_state, messages
 
 

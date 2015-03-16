@@ -106,6 +106,58 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
         add_pending_model_content(cursor, publication_id, model)
 
 
+class DatabaseUtilitiesTestCase(BaseDatabaseIntegrationTestCase):
+    """Verify various utilties that interact with the database."""
+
+    @db_connect
+    def test_is_revision_publication(self, cursor):
+        archive_ids = (
+            '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
+            'd648765a-9a05-4414-a772-71466ec3a1bf',
+            )
+        pending_ids = (
+            '5e254713-2050-4fa7-9b4c-5e5e8a71768a',  # new id
+            '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
+            'd648765a-9a05-4414-a772-71466ec3a1bf',
+            )
+        publication_id = self.make_publication()
+
+        # Setup stub entries for these values.
+        for id in archive_ids:
+            cursor.execute("""\
+INSERT INTO modules (uuid, name, licenseid, doctype)
+VALUES (%s, 'title', 11, '')""", (id,))
+        for id in pending_ids:
+            cursor.execute("INSERT INTO document_controls (uuid) VALUES (%s)",
+                           (id,))
+            cursor.execute("""\
+INSERT INTO pending_documents (uuid, publication_id, type)
+VALUES (%s, %s, 'Document')""", (id, publication_id,))
+
+        from ..db import is_revision_publication
+        self.assertTrue(is_revision_publication(publication_id, cursor))
+
+    @db_connect
+    def test_is_not_revision_publication(self, cursor):
+        pending_ids = (
+            '5e254713-2050-4fa7-9b4c-5e5e8a71768a',  # new id
+            '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
+            'd648765a-9a05-4414-a772-71466ec3a1bf',
+            )
+        publication_id = self.make_publication()
+
+        # Setup stub entries for these values.
+        for id in pending_ids:
+            cursor.execute("INSERT INTO document_controls (uuid) VALUES (%s)",
+                           (id,))
+            cursor.execute("""\
+INSERT INTO pending_documents (uuid, publication_id, type)
+VALUES (%s, %s, 'Document')""", (id, publication_id,))
+
+        from ..db import is_revision_publication
+        self.assertFalse(is_revision_publication(publication_id, cursor))
+
+
 class PublicationLicenseAcceptanceTestCase(BaseDatabaseIntegrationTestCase):
     """Verify license acceptance functionality"""
 

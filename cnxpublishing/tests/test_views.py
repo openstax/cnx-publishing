@@ -728,6 +728,19 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         path = '/contents/{}/permissions'.format(uuid_)
         resp = self.app.post_json(path, data, headers=headers)
 
+    def app_get_moderation(self, headers=[]):
+        """Gets a list of the publication that are currently being moderated.
+        """
+        path = '/moderations'
+        resp = self.app.get(path, headers=headers)
+        return resp
+
+    def app_post_moderation(self, publication_id, data, headers=[]):
+        """Moderate the publication by sending an accept/reject state."""
+        path = '/moderations/{}'.format(publication_id)
+        resp = self.app.post_json(path, data, headers=headers)
+        return resp
+
     # ######### #
     #   Tests   #
     # ######### #
@@ -757,7 +770,9 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
            - As [an attributed role], accept my attribution
              on these documents/binders in this publication.
 
-        4. Verify documents are in the archive. [HACKED]
+        4. Wait for moderation acceptance from a moderator.
+
+        5. Verify documents are in the archive. [HACKED]
 
         """
         publisher = u'ream'
@@ -874,14 +889,91 @@ GROUP BY user_id, accepted
                                       "role attribution.".format(user_id)
                     self.assertTrue(has_accepted, failure_message)
 
+        # 4. (manual)
+        # FIXME This needs to be done as a moderator.
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation approval.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
+
         # *. --
         # This is publication completion,
         # because all licenses and roles have been accepted.
         self.app_check_state(publication_id, 'Done/Success',
                              headers=api_key_headers)
 
-        # 4. (manual)
+        # 5. (manual)
         self._check_published_to_archive(use_cases.BOOK)
+
+    def test_publishing_spam(self):
+        """\
+        Publish *new* documents.
+        This includes application and user interactions with publishing.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        *. Accept the roles and license.
+
+        2. Wait for moderation acceptance from a moderator.
+
+        3. Verify rejection. [HACKED]
+
+        """
+        publisher = u'happy'
+        epub_filepath = self.make_epub(use_cases.SPAM, publisher,
+                                       u'please publish my spam')
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # 1. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
+        publication_id = resp.json['publication']
+
+        # *. --
+        # Assume this person as passed through approval by virtue
+        #   of being the creating user (from the cnx-authoring perspective).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT uuid from pending_documents WHERE publication_id = %s""",
+                               (publication_id,))
+                uuids = [x[0] for x in cursor.fetchall()]
+                cursor.execute("""\
+UPDATE role_acceptances SET (accepted) = ('t');
+UPDATE license_acceptances SET (accepted) = ('t');""")
+
+        # Poke the publication into moderation.
+        from ..db import poke_publication_state
+        poke_publication_state(publication_id)
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for moderation',
+                             headers=api_key_headers)
+
+        # 2. (manual)
+        # FIXME This needs to be done as a moderator.
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation rejection.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': False})
+
+        # *. --
+        # This is publication completion.
+        self.app_check_state(publication_id, 'Rejected',
+                             headers=api_key_headers)
+
+        # 5. (manual)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+SELECT 'eek' FROM modules WHERE uuid = ANY (%s)""", (uuids,))
+                self.assertIsNone(cursor.fetchone())
 
     def test_new_to_pre_publication(self):
         """\
@@ -1014,6 +1106,10 @@ GROUP BY user_id, accepted
         Publish *revised* documents.
         This includes application and user interactions with publishing.
 
+        Note, the original publication was done by the user, 'rings',
+        while this one is done by 'ream'. 'reams' has vouched for 'rings',
+        which means moderation won't be necessary.
+
         *. After each step, check the state of the publication.
 
         1. Submit an EPUB containing a book of documents.
@@ -1040,6 +1136,156 @@ GROUP BY user_id, accepted
                                        u'públishing this book')
         api_key = self.api_keys_by_uid['no-trust']
         api_key_headers = [('x-api-key', api_key,)]
+
+        # Moderation is not required, because the publisher is already
+        #   vetted by having previously been attributed on one or more
+        #   published documents.
+
+        # 1. --
+        resp = self.app_post_publication(epub_filepath,
+                                         headers=api_key_headers)
+        self.assertEqual(resp.json['state'], 'Waiting for acceptance')
+        publication_id = resp.json['publication']
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
+
+        # 2. --
+        # TODO This uses the JSON get/post parts; revision publications
+        #      should attempt to use the HTML form.
+        #      Check the form contains for the correct documents and default
+        #      values. This is going to be easier to look
+        #      at and verify in a revision publication, where we can depend
+        #      on known uuid values.
+        uids = (
+            'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
+            'rings', 'sarblyth',
+            )
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_license_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_license_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, accepted
+FROM license_acceptances
+GROUP BY user_id, accepted
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "the licenses.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # *. --
+        self.app_check_state(publication_id, 'Waiting for acceptance',
+                             headers=api_key_headers)
+
+        # 3. --
+        for uid in uids:
+            # -- Check the form has the correct values.
+            resp = self.app_get_role_acceptance(
+                publication_id, uid,
+                headers=[('Accept', 'application/json',)])
+            acceptance_data = resp.json
+            document_acceptance_data = [e for e in acceptance_data['documents']]
+            for doc_record in document_acceptance_data:
+                doc_record[u'is_accepted'] = True
+            acceptance_data['documents'] = document_acceptance_data
+            resp = self.app_post_json_role_acceptance(
+                publication_id, uid, acceptance_data)
+        # -- (manual) Check the records for acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+SELECT user_id, accepted
+FROM role_acceptances
+GROUP BY user_id, accepted
+""")
+                acceptance_records = cursor.fetchall()
+                for user_id, has_accepted in acceptance_records:
+                    failure_message = "{} has not accepted " \
+                                      "role attribution.".format(user_id)
+                    self.assertTrue(has_accepted, failure_message)
+
+        # *. --
+        # This is publication completion,
+        # because all licenses and roles have been accepted.
+        self.app_check_state(publication_id, 'Done/Success',
+                             headers=api_key_headers)
+
+        # 4. (manual)
+        self._check_published_to_archive(use_cases.REVISED_BOOK)
+
+    def test_revision_w_new_vetted_publisher(self):
+        """\
+        Publish *revised* documents as a *new publisher*.
+        This includes application and user interactions with publishing.
+
+        Note, the original publication was done by the user, 'rings',
+        while this one is done by 'ream'. The moderation of this
+        publication has been done by 'reams'.
+
+        The new publisher 'able' is not a member of any published content.
+        Therefore, 'able' has not been *moderated* for publications.
+        However, by virtue of being added as a publisher to this content
+        'able' has been vetted by someone on the content. This only
+        works if one or more of the published documents are a revision.
+
+        *. After each step, check the state of the publication.
+
+        1. Submit an EPUB containing a book of documents.
+
+        2. For each *attributed role*...
+
+           - As the publisher, accept the license.
+           - As the copyright-holder, accept the license.
+           - As [other attributed roles], accept the license.
+
+        3. For each *attributed role*...
+
+           - As [an attributed role], accept my attribution
+             on these documents/binders in this publication.
+
+        4. Verify documents are in the archive. [HACKED]
+
+        """
+        # Insert the BOOK use-case in order to make a revision of it.
+        self._setup_to_archive(use_cases.BOOK)
+
+        publisher = u'able'
+        epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
+                                       u'públishing this book')
+        api_key = self.api_keys_by_uid['no-trust']
+        api_key_headers = [('x-api-key', api_key,)]
+
+        # Moderation is not required, because the publisher is
+        #   vetted by virtue of being added by a another vetted user.
+
+        # Add this publisher to the ACL.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                book = use_cases.REVISED_BOOK
+                ident_hashs = [book.id]
+                ident_hashs.extend(
+                    [d.id for d in cnxepub.flatten_to_documents(book)])
+                from cnxarchive.utils import split_ident_hash
+                for ident_hash in ident_hashs:
+                    id, _ = split_ident_hash(ident_hash)
+                    cursor.execute("""\
+INSERT INTO document_acl (uuid, user_id, permission)
+VALUES (%s, %s, 'publish')""", (id, publisher,))
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -1276,7 +1522,9 @@ GROUP BY user_id, accepted
 
         4. Submit an EPUB containing a book of documents.
 
-        5. Verify documents are in the archive. [HACKED]
+        5. Moderate the publication.
+
+        6. Verify documents are in the archive. [HACKED]
 
         """
         publisher = u'ream'
@@ -1357,8 +1605,16 @@ GROUP BY user_id, accepted
         # 4. --
         resp = self.app_post_publication(epub_filepath,
                                          headers=api_key_headers)
-        self.assertEqual(resp.json['state'], 'Done/Success')
+        self.assertEqual(resp.json['state'], 'Waiting for moderation')
         publication_id = resp.json['publication']
+
+        # 5. (manual)
+        # FIXME This needs to be done as a moderator
+        # Check that our publication is in the moderation list.
+        resp = self.app_get_moderation()
+        self.assertIn(publication_id, [p['id'] for p in resp.json])
+        # Now post the moderation approval.
+        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
 
         # *. --
         # This is publication completion,
@@ -1366,7 +1622,7 @@ GROUP BY user_id, accepted
         self.app_check_state(publication_id, 'Done/Success',
                              headers=api_key_headers)
 
-        # 5. (manual)
+        # 6. (manual)
         # Checks ``latest_modules`` by virtue of the ``tree_to_json``
         # plsql function.
         binder = use_cases.REVISED_BOOK
@@ -1568,6 +1824,13 @@ WHERE portal_type = 'Collection'""")
                                          headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Waiting for acceptance')
         publication_id = resp.json['publication']
+
+        # Assume moderation acceptance.
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+UPDATE users SET (is_moderated) = ('t')
+WHERE username = %s""", (publisher,))
 
         # Post the last accepted licensor.
         for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):

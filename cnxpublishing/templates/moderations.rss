@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+  <title>Publishing Moderation List</title>
+  <link>{{ request.route_url('admin-moderation') }}</link>
+  <description></description>
+  {% for pub in moderations %}
+    <item>
+      <title>Publication #{{ pub.id }}</title>
+      <link>{{ request.route_url('admin-moderation') }}</link>
+      <description>
+        &lt;span&gt;Created: {{ pub.created }}&lt;/span&gt;
+        &lt;br/&gt;
+        &lt;span&gt;By: {{ pub.publisher }}&lt;/span&gt;
+        &lt;br/&gt;
+        &lt;span&gt;Message: {{ pub.publication_message }}&lt;/span&gt;
+        &lt;br/&gt;
+        &lt;div&gt;
+          &lt;ul&gt;
+            {% for item in pub.models %}
+              &lt;li&gt;
+                &lt;span class="{{ item.type }}"&gt;{{ item.type[0] }}&lt;/span&gt;
+                &lt;a href="{{ request.route_url('get-content', ident_hash=join_ident_hash(item.uuid, (item.major_version, item.minor_version,))) }}"&gt;
+                  {{ item.metadata.title }}
+                &lt;/a&gt;
+              &lt;/li&gt;
+            {% endfor %}
+          &lt;/ul&gt;
+        &lt;/div&gt;
+      </description>
+    </item>
+  {% endfor %}
+</channel>
+</rss>

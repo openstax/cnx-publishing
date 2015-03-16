@@ -143,6 +143,64 @@ REVISED_BOOK[0].metadata['title'] = u"Stifled with Good Inténsions"
 REVISED_BOOK[0].set_title_for_node(REVISED_BOOK[0][0], u"Infinity Plus")
 
 
+SPAM = cnxepub.Binder(
+    id='94f4d0f5@draft',
+    metadata={
+        u'title': u'Eat more spam',
+        u'created': u'2013/03/19 15:01:16 -0500',
+        u'revised': u'2013/03/19 15:01:16 -0500',
+        u'keywords': [],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': [
+            u'Mathematics and Statistics',
+            u'Science and Technology',
+            ],
+        u'authors': [
+            {u'id': u'happy', u'name': u'Happy Go Lucky',
+             u'type': u'cnx-id'}],
+        u'copyright_holders': [],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [
+            {u'id': u'happy', u'name': u'Happy Go Lucky',
+             u'type': u'cnx-id'}],
+        u'translators': [],
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None,
+        },
+    nodes=[
+        cnxepub.Document(
+            id=u'2cf4d7d3@draft',
+            data=u'<p class="para">Yummy Yummy SPAM!!!</p>',
+            resources=[],
+            metadata={
+                u'title': u'Eat up!',
+                u'created': u'2013/03/19 15:01:16 -0500',
+                u'revised': u'2013/03/19 15:01:16 -0500',
+                u'keywords': [],
+                u'subjects': [],
+                u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>spam</span>",
+                u'language': u'en',
+                u'license_text': u'CC-By 4.0',
+                u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+                u'authors': [{u'id': u'happy',
+                              u'name': u'Happy Go Lucky',
+                              u'type': u'cnx-id'}],
+                u'copyright_holders': [],
+                u'editors': [],
+                u'illustrators': [],
+                u'publishers': [{u'id': u'happy',
+                                 u'name': u'Happy Go Lucky',
+                                 u'type': u'cnx-id'}],
+                u'translators': [],
+                u'print_style': u'*print style*',
+            },
+        ),
+    ])
+
+
 PAGE_ONE = cnxepub.Document(
     id=u'2cf4d7d3@draft',
     data=u'<p class="para">If you finish the book, there will be cake.</p>',
@@ -672,6 +730,32 @@ INSERT INTO document_acl (uuid, user_id, permission)
 VALUES (%s, %s, %s)""", (uuid_, user_id, permission,))
 
 
+def _insert_user_info(model, cursor):
+    """Insert the user shadow table info."""
+    user_ids = set([])
+    for role_attr in cnxepub.ATTRIBUTED_ROLE_KEYS:
+        for role in model.metadata.get(role_attr, []):
+            user_ids.add(role['id'])
+
+    # Check for existing records to update.
+    cursor.execute("SELECT username from users where username = ANY (%s)",
+                   (list(user_ids),))
+    try:
+        existing_user_ids = [x[0] for x in cursor.fetchall()]
+    except TypeError:
+        existing_user_ids = []
+    new_user_ids = [u for u in user_ids if u not in existing_user_ids]
+
+    # At this time, we don't need to store the actual user details.
+    # So, making an entry that contains only a username should be enough.
+
+    # Insert new records.
+    for user_id in new_user_ids:
+        cursor.execute("""\
+INSERT INTO users (username, is_moderated)
+VALUES (%s, 't')""", (user_id,))
+
+
 def setup_BOOK_in_archive(test_case, cursor):
     """Set up BOOK"""
     binder = deepcopy(BOOK)
@@ -688,10 +772,12 @@ def setup_BOOK_in_archive(test_case, cursor):
 
     from ..publish import publish_model
     _insert_control_id(document.id, cursor)
+    _insert_user_info(document, cursor)
     publish_model(cursor, document, publisher, publication_message)
     _set_uri(document)
     _insert_acl_for_model(document, cursor)
     _insert_control_id(binder.id, cursor)
+    _insert_user_info(binder, cursor)
     publish_model(cursor, binder, publisher, publication_message)
     _set_uri(binder)
     _insert_acl_for_model(binder,cursor)
@@ -711,6 +797,7 @@ def setup_PAGE_ONE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -730,6 +817,7 @@ def setup_PAGE_TWO_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -749,6 +837,7 @@ def setup_PAGE_THREE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -768,6 +857,7 @@ def setup_PAGE_FOUR_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -796,6 +886,7 @@ def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -822,6 +913,7 @@ def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
@@ -846,6 +938,7 @@ def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):
         _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
         publish_model(cursor, model, publisher, publication_message)
         _insert_acl_for_model(model, cursor)
     _set_uri(model)
