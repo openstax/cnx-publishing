@@ -532,7 +532,7 @@ def delete_acl_request(request):
 
 @view_config(route_name='moderation', request_method='GET',
              accept="application/json",
-             renderer='json')
+             renderer='json', permission='moderate')
 def get_moderation(request):
     """Return the list of publications that need moderation."""
     settings = request.registry.settings
@@ -553,7 +553,7 @@ SELECT row_to_json(combined_rows) FROM (
 
 
 @view_config(route_name='moderate', request_method='POST',
-             accept="application/json")
+             accept="application/json", permission='moderate')
 def post_moderation(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
@@ -592,7 +592,8 @@ WHERE id = %s""", (publication_id,))
 
 
 @view_config(route_name='admin-index', request_method='GET',
-             renderer="cnxpublishing:templates/index.html")
+             renderer="cnxpublishing:templates/index.html",
+             permission='preview')
 def admin_index(request):  # pragma: no cover
     return {
         'navigation': [
@@ -604,8 +605,10 @@ def admin_index(request):  # pragma: no cover
 
 
 @view_config(route_name='admin-moderation', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.html")
+             renderer="cnxpublishing:templates/moderations.html",
+             permission='moderate')
 @view_config(route_name='moderation-rss', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.rss")
+             renderer="cnxpublishing:templates/moderations.rss",
+             permission='view')
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}
