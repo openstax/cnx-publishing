@@ -64,7 +64,7 @@ class APIKeyAuthenticationPolicy(object):
         return principals
 
     def remember(self, request, principal, **kw):
-        pass  # No session information is saved when using API keys.
+        return []  # No session information is saved when using API keys.
 
     def forget(self, request):
-        pass  # No need to forget when everything is already forgotten.
+        return []  # No need to forget when everything is already forgotten.
