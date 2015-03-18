@@ -9,7 +9,7 @@ import cnxepub
 import psycopg2
 from pyramid import httpexceptions
 from pyramid.settings import asbool
-from pyramid.view import view_config
+from pyramid.view import forbidden_view_config, view_config
 
 from . import config
 from .exceptions import (
@@ -26,6 +26,14 @@ from .db import (
     upsert_role_requests, remove_role_requests,
     upsert_users,
     )
+
+
+@forbidden_view_config()
+def forbidden(request):
+    if request.path.startswith('/a/'):
+        path = request.route_path('login', _query={'redirect': '/a/'})
+        return httpexceptions.HTTPFound(location=path)
+    return httpexceptions.HTTPForbidden()
 
 
 # ############## #
