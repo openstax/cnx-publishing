@@ -1277,23 +1277,17 @@ def upsert_users(cursor, user_ids):
     accounts = get_current_registry().getUtility(IOpenstaxAccounts)
 
     def lookup_profile(username):
-        user_infos = accounts.global_search('username:{}'.format(username))
+        profile = accounts.get_profile_by_username(username)
         # See structure documentation at:
         #   https://<accounts-instance>/api/docs/v1/users/index
-        user_info = None
-        for item in user_infos['items']:
-            if item['username'] == username:
-                # Ensure an exact match.
-                user_info = item
-                break
-        if user_info is None:
+        if profile is None:
             raise UserFetchError(username)
 
         opt_attrs = ('first_name', 'last_name', 'full_name',
                      'title', 'suffix',)
         for attr in opt_attrs:
-            user_info.setdefault(attr, None)
-        return user_info
+            profile.setdefault(attr, None)
+        return profile
 
     _upsert_users(cursor, user_ids, lookup_profile)
 
