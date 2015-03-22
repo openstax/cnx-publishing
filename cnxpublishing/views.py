@@ -9,7 +9,7 @@ import cnxepub
 import psycopg2
 from pyramid import httpexceptions
 from pyramid.settings import asbool
-from pyramid.view import view_config
+from pyramid.view import forbidden_view_config, view_config
 
 from . import config
 from .exceptions import (
@@ -26,6 +26,14 @@ from .db import (
     upsert_role_requests, remove_role_requests,
     upsert_users,
     )
+
+
+@forbidden_view_config()
+def forbidden(request):
+    if request.path.startswith('/a/'):
+        path = request.route_path('login', _query={'redirect': '/a/'})
+        return httpexceptions.HTTPFound(location=path)
+    return httpexceptions.HTTPForbidden()
 
 
 # ############## #
@@ -532,7 +540,7 @@ def delete_acl_request(request):
 
 @view_config(route_name='moderation', request_method='GET',
              accept="application/json",
-             renderer='json')
+             renderer='json', permission='moderate')
 def get_moderation(request):
     """Return the list of publications that need moderation."""
     settings = request.registry.settings
@@ -553,7 +561,7 @@ SELECT row_to_json(combined_rows) FROM (
 
 
 @view_config(route_name='moderate', request_method='POST',
-             accept="application/json")
+             accept="application/json", permission='moderate')
 def post_moderation(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
@@ -592,7 +600,8 @@ WHERE id = %s""", (publication_id,))
 
 
 @view_config(route_name='admin-index', request_method='GET',
-             renderer="cnxpublishing:templates/index.html")
+             renderer="cnxpublishing:templates/index.html",
+             permission='preview')
 def admin_index(request):  # pragma: no cover
     return {
         'navigation': [
@@ -604,8 +613,10 @@ def admin_index(request):  # pragma: no cover
 
 
 @view_config(route_name='admin-moderation', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.html")
+             renderer="cnxpublishing:templates/moderations.html",
+             permission='moderate')
 @view_config(route_name='moderation-rss', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.rss")
+             renderer="cnxpublishing:templates/moderations.rss",
+             permission='view')
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}

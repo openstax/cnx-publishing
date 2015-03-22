@@ -99,7 +99,7 @@ def main(global_config, **settings):
 
     api_key_entities = _parse_api_key_lines(settings)
     api_key_authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
-    config.include('openstax_accounts.main')
+    config.include('openstax_accounts')
     openstax_authn_policy = config.registry.getUtility(IOpenstaxAccountsAuthenticationPolicy)
     policies = [api_key_authn_policy, openstax_authn_policy]
     authn_policy = MultiAuthenticationPolicy(policies)
@@ -120,7 +120,7 @@ class RootFactory(object):
     __acl__ = (
         (security.Allow, security.Everyone, 'view'),
         (security.Allow, security.Authenticated, 'publish'),
-        (security.Allow, 'group:trusted-publishers',
+        (security.Allow, 'g:trusted-publishers',
          ('publish.assign-acceptance',  # Used when assigning user actions requests.
           'publish.remove-acceptance',
           'publish.assign-acl',  # Used when assigning access control on documents.
@@ -128,12 +128,15 @@ class RootFactory(object):
           'publish.create-identifier',  # Used when content does not yet exist.
           'publish.remove-identifier',
           )),
-        (security.Allow, 'group:publishers',
+        (security.Allow, 'g:publishers',
          ('publish.assign-acceptance',  # Used when assigning user actions requests.
           'publish.remove-acceptance',
           'publish.assign-acl',  # Used when assigning access control on documents.
           'publish.remove-acl',
           )),
+        (security.Allow, 'g:reviewers', ('preview',)),
+        (security.Allow, 'g:moderators', ('preview', 'moderate',)),
+        (security.Allow, 'g:administrators', ('preview', 'moderate',)),
         security.DENY_ALL,
         )
 

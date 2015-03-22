@@ -24,6 +24,7 @@ Interface for:
 - Submitting publications to the archive database
 - Accepting or denying role requests
 - Kicking off post-publication jobs 
+- Moderating publications for first time publishers
 
 Getting started
 ---------------
@@ -72,6 +73,27 @@ be created using the following commands::
 The tests can then be run using::
 
     python setup.py test
+
+Permissions
+-----------
+
+**Note**: Permissions are assigned to users and groups via
+``cnxpublishing.main.RootFactory``. See that class for details about
+which permissions users/groups have in this application.
+
+:view: Allows one to view content.
+:publish: Allows one to publish content.
+:preview: Allows one to view a publication's contents prior
+    to persistence to archive.
+:moderate: Allows one to moderate, accept or reject, a publication.
+
+:publish.assign-acceptance: Allows one to assign user actions requests.
+:publish.remove-acceptance: Allows one to remove user actions requests.
+:publish.assign-acl: Allows one to assign access control on documents.
+:publish.remove-acl: Allows one to remove access control on documents.
+:publish.create-identifier: Allows one to create a content identifier.
+    This is primarily used as a sub-permission on actions requests.
+:publish.remove-identifier: Allows one to remove a content identifier.
 
 HTTP API
 --------

@@ -741,6 +741,27 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         resp = self.app.post_json(path, data, headers=headers)
         return resp
 
+    def app_login(self, username, password):
+        """Logins in to the app using (a stub) accounts."""
+        path = '/stub-login-form'
+        data = {
+            'username': username,
+            'password': password,
+            }
+        resp = self.app.post(path, data)
+        return resp
+
+    def app_logout(self):
+        """Logout of the app."""
+        path = '/logout'
+        resp = self.app.get(path)
+        return resp
+
+    def _extract_cookie_header(self, resp):
+        """Extracts the cookie header from a login response."""
+        cookie = resp.headers['set-cookie']
+        return [('cookie', cookie,)]
+
     # ######### #
     #   Tests   #
     # ######### #
@@ -890,12 +911,15 @@ GROUP BY user_id, accepted
                     self.assertTrue(has_accepted, failure_message)
 
         # 4. (manual)
-        # FIXME This needs to be done as a moderator.
         # Check that our publication is in the moderation list.
-        resp = self.app_get_moderation()
+        resp = self.app_login('direwolf', 'direwolf')
+        headers = self._extract_cookie_header(resp)
+        resp = self.app_get_moderation(headers=headers)
         self.assertIn(publication_id, [p['id'] for p in resp.json])
         # Now post the moderation approval.
-        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
+        resp = self.app_post_moderation(publication_id,
+                                        {'is_accepted': True},
+                                        headers=headers)
 
         # *. --
         # This is publication completion,
@@ -956,12 +980,15 @@ UPDATE license_acceptances SET (accepted) = ('t');""")
                              headers=api_key_headers)
 
         # 2. (manual)
-        # FIXME This needs to be done as a moderator.
         # Check that our publication is in the moderation list.
-        resp = self.app_get_moderation()
+        resp = self.app_login('direwolf', 'direwolf')
+        headers = self._extract_cookie_header(resp)
+        resp = self.app_get_moderation(headers=headers)
         self.assertIn(publication_id, [p['id'] for p in resp.json])
         # Now post the moderation rejection.
-        resp = self.app_post_moderation(publication_id, {'is_accepted': False})
+        resp = self.app_post_moderation(publication_id,
+                                        {'is_accepted': False},
+                                        headers=headers)
 
         # *. --
         # This is publication completion.
@@ -1609,12 +1636,15 @@ GROUP BY user_id, accepted
         publication_id = resp.json['publication']
 
         # 5. (manual)
-        # FIXME This needs to be done as a moderator
         # Check that our publication is in the moderation list.
-        resp = self.app_get_moderation()
+        resp = self.app_login('direwolf', 'direwolf')
+        headers = self._extract_cookie_header(resp)
+        resp = self.app_get_moderation(headers=headers)
         self.assertIn(publication_id, [p['id'] for p in resp.json])
         # Now post the moderation approval.
-        resp = self.app_post_moderation(publication_id, {'is_accepted': True})
+        resp = self.app_post_moderation(publication_id,
+                                        {'is_accepted': True},
+                                        headers=headers)
 
         # *. --
         # This is publication completion,
