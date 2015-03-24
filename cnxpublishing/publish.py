@@ -197,16 +197,17 @@ def _insert_resource_file(cursor, module_ident, resource):
     create a new file entry or associates an existing one.
     """
     cursor.execute("""\
-SELECT md5, exists_in_archive FROM pending_resources WHERE hash = %s""",
+SELECT hash, exists_in_archive FROM pending_resources WHERE hash = %s""",
                    (resource.hash,))
     try:
-        md5, exists_in_archive = cursor.fetchone()
+        hash, exists_in_archive = cursor.fetchone()
     except TypeError:  # NoneType
         # Can't depend on the pending_* tables in publish procedures.
-        md5, exists_in_archive = None, False
+        hash, exists_in_archive = None, False
     if exists_in_archive:
-        cursor.execute("SELECT fileid FROM files WHERE md5 = %s LIMIT 1",
-                       (md5,))
+        cursor.execute("SELECT fileid FROM files WHERE {} = %s LIMIT 1" \
+                       .format(cnxepub.RESOURCE_HASH_TYPE),
+                       (hash,))
         fileid = cursor.fetchone()[0]
     else:
         with resource.open() as file:
