@@ -160,9 +160,12 @@ Examples that follow...
 All the examples that follow use the following imports and base
 variables::
 
+    >>> import json
+    >>> from pprint import pprint
     >>> import tempfile
     >>> import requests
     >>> import cnxepub
+
     # As configured in development.ini
     >>> api_key = 'developer'
     >>> base_url = 'http://localhost:6543'
@@ -177,14 +180,14 @@ a publishing format, which contains a few required details.
 The following is an example publication using some pre-build content::
 
     # The example content we will publish...
-    >>> from cnxpublishing.tests.use_cases import BOOK
+    >>> from cnxpublishing.tests.use_cases import EXAMPLE_BOOK
 
     # Set up the epub that will be submitted.
     >>> _, epub_filepath = tempfile.mkstemp('.publication.epub')
     >>> publisher = 'ream'
     >>> publication_message = 'Example publication'
     >>> with open(epub_filepath, 'wb') as epub:
-    ...     cnxepub.make_publication_epub(BOOK, publisher,
+    ...     cnxepub.make_publication_epub(EXAMPLE_BOOK, publisher,
     ...                                   publication_message, epub)
 
     # Send the book for publication.
@@ -197,10 +200,9 @@ The following is an example publication using some pre-build content::
     >>> assert resp.status_code == 200
 
     # The info returned from a successful POST looks something like this.
-    >>> pub_info = resp.json()
-    {u'mapping': {
-         u'07509e07-3732-45d9-a102-dd9a4dad5456': u'07509e07-3732-45d9-a102-dd9a4dad5456@1.1',
-         u'de73751b-7a14-4e59-acd9-ba66478e4710': u'de73751b-7a14-4e59-acd9-ba66478e4710@1'},
+    >>> pprint(resp.json())
+    {u'mapping': {u'07509e07-3732-45d9-a102-dd9a4dad5456': u'07509e07-3732-45d9-a102-dd9a4dad5456@1.1',
+                  u'de73751b-7a14-4e59-acd9-ba66478e4710': u'de73751b-7a14-4e59-acd9-ba66478e4710@1'},
      u'messages': None,
      u'publication': 1,
      u'state': u'Waiting for acceptance'}
@@ -289,7 +291,7 @@ content using the ``/contents/{id}/permissions`` path. For example::
     >>> uuid = 'de73751b-7a14-4e59-acd9-ba66478e4710'
     >>> url = "{}/contents/{}/permissions".format(base_url, uuid)
     >>> resp = requests.get(url)
-    >>> resp.json()
+    >>> pprint(resp.json())
     [{u'permission': u'publish',
       u'uid': u'ream',
       u'uuid': u'de73751b-7a14-4e59-acd9-ba66478e4710'}]
@@ -301,7 +303,7 @@ the publishing ability on a specific piece of content::
     >>> data = [{'uid': 'rings', 'permission': 'publish'}]
     >>> resp = requests.post(url, headers=headers, data=json.dumps(data))
     >>> assert resp.status_code == 202
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'permission': u'publish',
       u'uid': u'ream',
       u'uuid': u'de73751b-7a14-4e59-acd9-ba66478e4710'},
@@ -314,7 +316,7 @@ publish permission for the user 'rings'::
 
     >>> resp = requests.delete(url, headers=headers, data=json.dumps(data))
     >>> assert resp.status_code == 200
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'permission': u'publish',
       u'uid': u'ream',
       u'uuid': u'de73751b-7a14-4e59-acd9-ba66478e4710'}]
@@ -336,7 +338,7 @@ To view the current roles and license acceptance use the
 ::
 
     >>> url = "{}/contents/{}/roles".format(base_url, uuid)
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'has_accepted': None,
       u'role': u'Author',
       u'uid': u'charrose',
@@ -352,7 +354,7 @@ To view the current roles and license acceptance use the
      ...]
 
     >>> url = "{}/contents/{}/licensors".format(base_url, uuid)
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     {u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
      u'licensors': [{u'has_accepted': None,
        u'uid': u'charrose',
@@ -375,7 +377,7 @@ To adjust and add a new role::
     >>> data = [{'uid': 'charrose', 'role': 'Author', 'has_accepted': True}]
     >>> resp = requests.post(url, data=json.dumps(data), headers=headers)
     >>> assert resp.status_code == 202
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'has_accepted': True,
       u'role': u'Author',
       u'uid': u'charrose',
@@ -395,7 +397,7 @@ And deletion is very similar::
     >>> data = [{'uid': 'frahablar', 'role': 'Translator'}]
     >>> resp = requests.delete(url, data=json.dumps(data), headers=headers)
     >>> assert resp.status_code == 200
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'has_accepted': True,
       u'role': u'Author',
       u'uid': u'charrose',
@@ -415,7 +417,7 @@ Here is an example of how this would look::
 
     >>> url = "{}/contents/{}/licensors".format(base_url, uuid)
     >>> headers = {'x-api-key': api_key, 'content-type': 'application/json'}
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     {u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
      u'licensors': [{u'has_accepted': None,
        u'uid': u'charrose',
@@ -430,14 +432,14 @@ Here is an example of how this would look::
     ...     'licensors': [{'uid': 'frahablar', 'has_accepted': False}]}
     >>> resp = requests.post(url, data=json.dumps(data), headers=headers)
     >>> assert resp.status_code == 202
-    >>> data = {'licensors': [{'uid': 'charrose'}]
+    >>> data = {'licensors': [{'uid': 'charrose'}]}
     >>> resp = requests.delete(url, data=json.dumps(data), headers=headers)
     >>> assert resp.status_code == 200
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     {u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
-     u'licensors': [{u'has_accepted': None,
-       u'uid': u'charrose',
-       u'uuid': u'de73751b-7a14-4e59-acd9-ba66478e4710'},
+     u'licensors': [{u'has_accepted': False,
+                     u'uid': u'frahablar',
+                     u'uuid': u'de73751b-7a14-4e59-acd9-ba66478e4710'},
       ...]}
 
 Creating identifiers on-the-fly
@@ -459,9 +461,10 @@ create identifiers where one previously did not exist.
     ...     'x-api-key': 'b07',  # b07 is a trusted app in development.ini
     ...     'content-type': 'application/json'}
     >>> assert requests.get(url).status_code == 404
-    >>> resp = request.post(url, data=json.dumps(data), headers=headers)
+    >>> data = [{'uid': 'impicky', 'permission': 'publish'}]
+    >>> resp = requests.post(url, data=json.dumps(data), headers=headers)
     >>> assert resp.status_code == 202
-    >>> requests.get(url).json()
+    >>> pprint(requests.get(url).json())
     [{u'permission': u'publish',
       u'uid': u'impicky',
       u'uuid': u'7a268e3a-1e3a-4f4d-aaab-5ecd046187c1'}]
