@@ -18,13 +18,18 @@ __all__ = ('integration_test_settings', 'db_connection_factory', 'db_connect',)
 here = os.path.abspath(os.path.dirname(__file__))
 
 
-def integration_test_settings():
-    """Integration settings initializer"""
+def config_uri():
+    """Return the file path of the testing config uri"""
     config_uri = os.environ.get('TESTING_CONFIG', None)
     if config_uri is None:
         project_root = os.path.join(here, '..', '..')
         config_uri = os.path.join(project_root, 'testing.ini')
-    settings = get_appsettings(config_uri)
+    return config_uri
+
+
+def integration_test_settings():
+    """Integration settings initializer"""
+    settings = get_appsettings(config_uri())
     return settings
 
 

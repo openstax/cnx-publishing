@@ -129,6 +129,17 @@ BOOK = cnxepub.Binder(
                     ]),
                 ]),
         ])
+
+# EXAMPLE_BOOK is used in README
+EXAMPLE_BOOK = deepcopy(BOOK)
+# Set the id of the book
+EXAMPLE_BOOK.id = '07509e07-3732-45d9-a102-dd9a4dad5456@draft'
+# Set the id of the page
+EXAMPLE_BOOK[0][0][0].id = 'de73751b-7a14-4e59-acd9-ba66478e4710'
+# Make sure the id stay the same when it's published
+EXAMPLE_BOOK.metadata['cnx-archive-uri'] = 'http://archive.cnx.org/content/07509e07-3732-45d9-a102-dd9a4dad5456'
+EXAMPLE_BOOK[0][0][0].metadata['cnx-archive-uri'] = 'http://archive.cnx.org/content/de73751b-7a14-4e59-acd9-ba66478e4710'
+
 REVISED_BOOK = deepcopy(BOOK)
 # Take out a layer of the structure to shuffle the tree.
 # This replaces the a translucent binder with it's single document sibling.
