@@ -196,24 +196,42 @@ def _insert_resource_file(cursor, module_ident, resource):
     """Insert a resource into the modules_files table. This will
     create a new file entry or associates an existing one.
     """
-    cursor.execute("""\
-SELECT md5, exists_in_archive FROM pending_resources WHERE hash = %s""",
+    exists_in_archive = False
+    cursor.execute("SELECT fileid FROM files WHERE {} = %s LIMIT 1" \
+                   .format(cnxepub.RESOURCE_HASH_TYPE),
                    (resource.hash,))
     try:
-        md5, exists_in_archive = cursor.fetchone()
-    except TypeError:  # NoneType
-        # Can't depend on the pending_* tables in publish procedures.
-        md5, exists_in_archive = None, False
-    if exists_in_archive:
-        cursor.execute("SELECT fileid FROM files WHERE md5 = %s LIMIT 1",
-                       (md5,))
         fileid = cursor.fetchone()[0]
-    else:
+    except TypeError:  # NoneType
+        # Does not exist in archive
         with resource.open() as file:
             cursor.execute("""\
 INSERT INTO files (file) VALUES (%s) RETURNING fileid""",
                            (memoryview(file.read()),))
         fileid = cursor.fetchone()[0]
+    else:
+        exists_in_archive = True
+
+    if exists_in_archive:
+        # Is this file legitimately used twice within the same content?
+        cursor.execute("""\
+select
+  (fileid = %s) as is_same_file
+from module_files
+where module_ident = %s and filename = %s""",
+                       (fileid, module_ident, resource.filename,))
+        try:
+            is_same_file = cursor.fetchone()[0]
+        except TypeError:  # NoneType
+            is_same_file = None
+        if is_same_file:
+            # All is good, bail out.
+            return
+        elif is_same_file is not None:  # pragma: no cover
+            # This means the file is not the same, but a filename
+            #   conflict exists.
+            # FFF At this time, it is impossible to get to this logic.
+            raise Exception("filename conflict")
 
     args = (module_ident, fileid, resource.filename, resource.media_type,)
     cursor.execute("""\
@@ -268,6 +286,8 @@ def publish_model(cursor, model, publisher, message):
     module_ident, ident_hash = _insert_metadata(cursor, model,
                                                 publisher, message)
     if isinstance(model, Document):
+        for resource in model.resources:
+            _insert_resource_file(cursor, module_ident, resource)
         file_arg = {
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
@@ -283,8 +303,7 @@ VALUES
   (%(module_ident)s,
    (SELECT fileid FROM file_insertion), 
    %(filename)s, %(mime_type)s)""", file_arg)
-        for resource in model.resources:
-            _insert_resource_file(cursor, module_ident, resource)
+
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
         tree = _insert_tree(cursor, tree)

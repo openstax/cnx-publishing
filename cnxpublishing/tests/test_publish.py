@@ -25,6 +25,7 @@ from pyramid import testing
 
 from . import use_cases
 from .testing import (
+    TEST_DATA_DIR,
     integration_test_settings,
     db_connection_factory,
     db_connect,
@@ -76,11 +77,14 @@ class PublishIntegrationTestCase(unittest.TestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
+    def make_resource(self, id, data, media_type):
+        resource = cnxepub.Resource(id, data, media_type)
+        return resource
+
     def make_document(self, id=None, content=None, metadata=None):
         if content is None:
             content = io.BytesIO(b'<p>Blank.</p>')
-        document = cnxepub.Document(id, content,
-                                    metadata=metadata)
+        document = cnxepub.Document(id, content, metadata=metadata)
         return document
 
     def test_document_insertion_wo_id_n_version(self):
@@ -412,6 +416,43 @@ WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
                                "    WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s", (derived_ident_hash,))
                 print_style = cursor.fetchone()[0]
                 self.assertEqual(print_style, '* second print style* ')
+
+    def test_double_resource_usage(self):
+        """
+        Ensure that a document with a resource can be inserted.
+        This specifically tests a document with a resource
+        that is used more than once within the same document.
+        """
+        # https://github.com/Connexions/cnx-publishing/issues/94
+        resource_path = os.path.join(TEST_DATA_DIR, '85c441fc.png')
+        with open(resource_path, 'rb') as f:
+            resource = self.make_resource('dummy', io.BytesIO(f.read()),
+                                          'image/png')
+            resource.id = resource.hash
+
+        from ..publish import _insert_resource_file
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                # Insert a stub module
+                cursor.execute("""\
+INSERT INTO abstracts (abstract) VALUES (' ') RETURNING abstractid""")
+                abstractid = cursor.fetchone()[0]
+                cursor.execute("""\
+INSERT INTO modules
+  (moduleid, portal_type, version, name,
+   authors, maintainers, licensors, stateid, licenseid, doctype,
+   submitter, submitlog, language, parent, abstractid)
+VALUES
+  ('m42119', 'Module', '1.1', 'New Version',
+   NULL, NULL, NULL, NULL, 11,'',
+   '', '', 'en', NULL, %s)
+RETURNING module_ident""", (abstractid,))
+                module_ident = cursor.fetchone()[0]
+
+                _insert_resource_file(cursor, module_ident, resource)
+                # And call it again, to simulate a second reference to
+                #   the same resource.
+                _insert_resource_file(cursor, module_ident, resource)
 
 
 class RepublishTestCase(unittest.TestCase):

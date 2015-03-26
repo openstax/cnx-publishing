@@ -12,11 +12,15 @@ import psycopg2
 from pyramid.paster import get_appsettings
 
 
-__all__ = ('integration_test_settings', 'db_connection_factory', 'db_connect',)
+__all__ = (
+    'TEST_DATA_DIR'
+    'integration_test_settings',
+    'db_connection_factory', 'db_connect',
+    )
 
 
 here = os.path.abspath(os.path.dirname(__file__))
-
+TEST_DATA_DIR = os.path.join(here, 'data')
 
 def config_uri():
     """Return the file path of the testing config uri"""
