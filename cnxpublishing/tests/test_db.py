@@ -625,11 +625,22 @@ class UserUpsertTestCase(BaseDatabaseIntegrationTestCase):
         expected = uids[:first_set_size]
         self.assertEqual(entries, expected)
 
+        # Check the additions in legacy.
+        cursor.execute("SELECT personid FROM persons ORDER BY personid")
+        entries = [x[0] for x in cursor.fetchall()]
+        expected = uids[:first_set_size]
+        self.assertEqual(entries, expected)
+
         # Call the target on the second group.
         self.call_target(cursor, uids[:-1])
 
         # Check the additions.
         cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        self.assertEqual(entries, uids[:-1])
+
+        # Check the additions in legacy.
+        cursor.execute("SELECT personid FROM persons ORDER BY personid")
         entries = [x[0] for x in cursor.fetchall()]
         self.assertEqual(entries, uids[:-1])
 
@@ -639,6 +650,11 @@ class UserUpsertTestCase(BaseDatabaseIntegrationTestCase):
 
         # Check the additions.
         cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        self.assertIn(uids[-1], entries)
+
+        # Check the additions in legacy.
+        cursor.execute("SELECT personid FROM persons ORDER BY personid")
         entries = [x[0] for x in cursor.fetchall()]
         self.assertIn(uids[-1], entries)
 
