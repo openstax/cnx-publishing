@@ -1241,10 +1241,9 @@ def _upsert_persons(cursor, person_ids, lookup_func):
     # Check for existing records to update.
     cursor.execute("SELECT personid from persons where personid = ANY (%s)",
                    (person_ids,))
-    try:
-        existing_person_ids = [x[0] for x in cursor.fetchall()]
-    except TypeError:
-        existing_person_ids = []
+
+    existing_person_ids = [x[0] for x in cursor.fetchall()]
+
     new_person_ids = [p for p in person_ids if p not in existing_person_ids]
 
     # Update existing records.
@@ -1277,10 +1276,9 @@ def _upsert_users(cursor, user_ids, lookup_func):
     # Check for existing records to update.
     cursor.execute("SELECT username from users where username = ANY (%s)",
                    (user_ids,))
-    try:
-        existing_user_ids = [x[0] for x in cursor.fetchall()]
-    except TypeError:
-        existing_user_ids = []
+
+    existing_user_ids = [x[0] for x in cursor.fetchall()]
+
     new_user_ids = [u for u in user_ids if u not in existing_user_ids]
 
     # Update existing records.
