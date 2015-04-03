@@ -608,6 +608,37 @@ class UserUpsertTestCase(BaseDatabaseIntegrationTestCase):
         return upsert_users(*args, **kwargs)
 
     @db_connect
+    def test_persons_table_email(self, cursor):
+        """check to see that persons table
+           contains an empty string for emails"""
+
+        # Create existing role records.
+        uids = ['charrose', 'frahablar', 'impicky', 'marknewlyn',
+                'ream', 'rings', 'smoo']
+        first_set_size = 3
+
+        # Call the target on the first group.
+        self.call_target(cursor, uids[:first_set_size])
+
+        # Check the additions.
+        cursor.execute("SELECT username FROM users ORDER BY username")
+        entries = [x[0] for x in cursor.fetchall()]
+        expected = uids[:first_set_size]
+        self.assertEqual(entries, expected)
+
+        # Check the additions in legacy.
+        cursor.execute("SELECT personid FROM persons ORDER BY personid")
+        entries = [x[0] for x in cursor.fetchall()]
+        expected = uids[:first_set_size]
+        self.assertEqual(entries, expected)
+
+        # Check the email in legacy.
+        cursor.execute("SELECT email FROM persons")
+        entries = [x[0] for x in cursor.fetchall()]
+        expected = [''] * first_set_size
+        self.assertEqual(entries, expected)
+
+    @db_connect
     def test_success(self, cursor):
         """upsert user info"""
 

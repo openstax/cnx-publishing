@@ -1258,13 +1258,19 @@ SET (personid, firstname, surname, fullname) =
 WHERE personid = %(username)s""", person_info)
 
     # Insert new records.
+    # Email is an empty string because 
+    # accounts no longer gives out user
+    # email info but a string datatype
+    # is still needed for legacy to 
+    # properly process the persons table
     for person_id in new_person_ids:
         person_info = lookup_func(person_id)
         cursor.execute("""\
 INSERT INTO persons
-(personid, firstname, surname, fullname)
+(personid, firstname, surname, fullname, email)
 VALUES
-(%(username)s, %(first_name)s, %(last_name)s, %(full_name)s)""", person_info)
+(%(username)s, %(first_name)s,
+%(last_name)s, %(full_name)s, '')""", person_info)
 
 
 def _upsert_users(cursor, user_ids, lookup_func):
