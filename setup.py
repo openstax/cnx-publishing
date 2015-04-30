@@ -42,7 +42,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql'],
+        'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql', 'templates/*.*'],
         'cnxpublishing.tests': ['data/*.*'],
         },
     entry_points="""\
