@@ -29,7 +29,7 @@ if not IS_PY3:
 
 setup(
     name='cnx-publishing',
-    version='0.2.0',
+    version='0.5.0',
     author='Connexions team',
     author_email='info@cnx.org',
     url="https://github.com/connexions/cnx-publishing",
