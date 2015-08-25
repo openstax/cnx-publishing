@@ -22,6 +22,7 @@ import cnxepub
 from cnxarchive import config as archive_config
 from cnxarchive.database import initdb as archive_initdb
 from cnxarchive.utils import join_ident_hash, split_ident_hash
+from lxml import etree
 from pyramid import testing
 
 from . import use_cases
@@ -1136,6 +1137,78 @@ WHERE id = %s""", (publication_id,))
             }
         self.assertEqual(len(state_messages), 2)
         self.assertEqual(state_messages[-1], expected_state_message)
+
+    @db_connect
+    def test_add_pending_document_w_mathml(self, cursor):
+        """Add a pending document with mathml that generates SVG."""
+        publication_id = self.make_publication()
+
+        # Insert a valid module for referencing...
+        cursor.execute("""\
+INSERT INTO abstracts (abstract) VALUES ('abstract')
+RETURNING abstractid""")
+        cursor.execute("""\
+INSERT INTO modules
+(module_ident, portal_type, name,
+ created, revised, abstractid, licenseid,
+ doctype, submitter, submitlog, stateid, parent, parentauthors,
+ language, authors, maintainers, licensors,
+ google_analytics, buylink)
+VALUES
+(1, 'Module', 'mathml module',
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT) RETURNING uuid || '@' || major_version""")
+        doc_ident_hash = cursor.fetchone()[0]
+
+        # Create and add a document for the publication.
+        metadata = {
+            'title': 'Document Title',
+            'summary': 'Document Summary',
+            'authors': [{u'id': u'able', u'type': u'cnx-id'}],
+            'publishers': [{'id': 'able', 'type': 'cnx-id'}],
+            'license_url': VALID_LICENSE_URL,
+            }
+        content = """\
+<div class="equation">
+<math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow> <mi>x</mi> <mo>=</mo> <mfrac> <mrow> <mo>&#8722;<!-- &#8722; --></mo> <mi>b</mi> <mo>&#177;<!-- &#177; --></mo> <msqrt> <msup> <mi>b</mi> <mn>2</mn> </msup> <mo>&#8722;<!-- &#8722; --></mo> <mn>4</mn> <mi>a</mi> <mi>c</mi> </msqrt> </mrow> <mrow> <mn>2</mn> <mi>a</mi> </mrow> </mfrac> </mrow></semantics></math>
+</div>"""
+        document = self.make_document(content=content, metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model, add_pending_model_content
+        document_ident_hash = add_pending_model(
+            cursor, publication_id, document)
+        from pyramid.threadlocal import get_current_registry
+
+        # Enable the mathml2svg service for this test.
+        get_current_registry().settings['mathml2svg.enabled?'] = 'on'
+
+        with mock.patch('requests.post') as post:
+            post.return_value.status_code = 200
+            post.return_value.headers = {'content-type': 'image/svg+xml'}
+            post.return_value.text = '<svg>mocked</svg>'
+            add_pending_model_content(cursor, publication_id, document)
+
+        # The communication to the mathml2svg service is mocked to return
+        # a stub svg element.
+
+        # This doesn't seem like much, but we only need to check that
+        # the entry was added and the SVG annotation exists.
+        cursor.execute("""
+SELECT convert_from(content, 'utf8')
+FROM pending_documents
+WHERE publication_id = %s""", (publication_id,))
+        persisted_content = cursor.fetchone()[0]
+        self.assertNotEqual(persisted_content, content)
+
+        elms = etree.fromstring(persisted_content)
+        annotation = elms.xpath(
+            '/div/m:math//m:annotation-xml[@encoding="image/svg+xml"]',
+            namespaces={'m': "http://www.w3.org/1998/Math/MathML"})[0]
+        expected = """<annotation-xml xmlns="http://www.w3.org/1998/Math/MathML" encoding="image/svg+xml"><svg>mocked</svg></annotation-xml>"""
+        self.assertEqual(etree.tostring(annotation), expected)
 
     @db_connect
     def test_add_pending_binder_w_document_pointers(self, cursor):

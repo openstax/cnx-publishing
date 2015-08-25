@@ -14,6 +14,7 @@ install_requires = (
     'pyramid>=1.5',
     'pyramid_jinja2',
     'pyramid_multiauth',
+    'requests',
     )
 tests_require = [
     'webtest',
