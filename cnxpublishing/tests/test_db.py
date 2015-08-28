@@ -22,7 +22,6 @@ import cnxepub
 from cnxarchive import config as archive_config
 from cnxarchive.database import initdb as archive_initdb
 from cnxarchive.utils import join_ident_hash, split_ident_hash
-from lxml import etree
 from pyramid import testing
 
 from . import use_cases
@@ -1180,35 +1179,16 @@ VALUES
         from ..db import add_pending_model, add_pending_model_content
         document_ident_hash = add_pending_model(
             cursor, publication_id, document)
-        from pyramid.threadlocal import get_current_registry
 
         # Enable the mathml2svg service for this test.
+        from pyramid.threadlocal import get_current_registry
         get_current_registry().settings['mathml2svg.enabled?'] = 'on'
 
-        with mock.patch('requests.post') as post:
-            post.return_value.status_code = 200
-            post.return_value.headers = {'content-type': 'image/svg+xml'}
-            post.return_value.text = '<svg>mocked</svg>'
+        # Mock the inject_mathml_svgs function.
+        with mock.patch('cnxpublishing.db.inject_mathml_svgs') as func:
+            func.return_value = content
             add_pending_model_content(cursor, publication_id, document)
-
-        # The communication to the mathml2svg service is mocked to return
-        # a stub svg element.
-
-        # This doesn't seem like much, but we only need to check that
-        # the entry was added and the SVG annotation exists.
-        cursor.execute("""
-SELECT convert_from(content, 'utf8')
-FROM pending_documents
-WHERE publication_id = %s""", (publication_id,))
-        persisted_content = cursor.fetchone()[0]
-        self.assertNotEqual(persisted_content, content)
-
-        elms = etree.fromstring(persisted_content)
-        annotation = elms.xpath(
-            '/div/m:math//m:annotation-xml[@encoding="image/svg+xml"]',
-            namespaces={'m': "http://www.w3.org/1998/Math/MathML"})[0]
-        expected = """<annotation-xml xmlns="http://www.w3.org/1998/Math/MathML" encoding="image/svg+xml"><svg>mocked</svg></annotation-xml>"""
-        self.assertEqual(etree.tostring(annotation), expected)
+            self.assertEqual(func.call_count, 1)
 
     @db_connect
     def test_add_pending_binder_w_document_pointers(self, cursor):

@@ -16,17 +16,14 @@ import uuid
 import cnxepub
 import psycopg2
 import jinja2
-import requests
 from cnxarchive.utils import (
     IdentHashSyntaxError,
     join_ident_hash, split_ident_hash,
     )
 from cnxepub import ATTRIBUTED_ROLE_KEYS
-from lxml import etree
 from openstax_accounts.interfaces import IOpenstaxAccounts
 from psycopg2.extras import register_uuid
 from pyramid.security import has_permission
-from pyramid.settings import asbool
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
@@ -38,8 +35,9 @@ from .exceptions import (
     ResourceFileExceededLimitError,
     UserFetchError,
     )
-from .utils import parse_archive_uri, parse_user_uri
+from .models import inject_mathml_svgs
 from .publish import publish_model, republish_binders
+from .utils import parse_archive_uri, parse_user_uri
 
 
 __all__ = (
@@ -534,40 +532,6 @@ def lookup_document_pointer(ident_hash, cursor):
     return cnxepub.DocumentPointer(ident_hash, metadata)
 
 
-def _inject_mathml_svgs(model):
-    """Inject MathML SVG annotations into the model's content."""
-    settings = get_current_registry().settings
-    is_enabled = asbool(settings.get('mathml2svg.enabled?', False))
-    url = settings.get('mathml2svg.url')
-
-    # Bailout when svg generation is disabled.
-    if not is_enabled:
-        return
-
-    xml = etree.fromstring(model.content)
-    mathml_namespace = "http://www.w3.org/1998/Math/MathML"
-    mathml_blocks = xml.xpath(
-        '//m:math[not(/m:annotation-xml[@encoding="image/svg+xml"])]',
-        namespaces={'m': mathml_namespace})
-    for mathml_block in mathml_blocks:
-        # Submit the MathML block to the SVG generation service.
-        payload = {'MathML': etree.tostring(mathml_block)}
-        response = requests.post(url, data=payload)
-        # Inject the SVG into the MathML as an annotation
-        # only if the resposne was good, otherwise skip over it.
-        semantic_block = mathml_block.getchildren()[0]
-        if response.status_code == 200:
-            svg = response.text
-            content_type = response.headers['content-type']
-            # Insert the svg into the content
-            annotation = etree.SubElement(
-                semantic_block,
-                '{{{}}}annotation-xml'.format(mathml_namespace))
-            annotation.set('encoding', content_type)
-            annotation.append(etree.fromstring(svg))
-    model.content = etree.tostring(xml)
-
-
 def add_pending_model_content(cursor, publication_id, model):
     """Updates the pending model's content.
     This is a secondary step not in ``add_pending_model, because
@@ -620,7 +584,7 @@ def add_pending_model_content(cursor, publication_id, model):
             # else, it's a remote or cnx.org reference ...Do nothing.
 
         # Generate SVGs for MathML
-        _inject_mathml_svgs(model)
+        model.content = inject_mathml_svgs(model.content)
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
