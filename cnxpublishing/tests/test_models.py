@@ -60,3 +60,20 @@ class SVGInjectionUtilTestCase(unittest.TestCase):
         expected = """<annotation-xml xmlns="http://www.w3.org/1998/Math/MathML" encoding="image/svg+xml"><svg>mocked</svg></annotation-xml>"""
 
         self.assertEqual(etree.tostring(annotation), expected)
+
+    def test_missing_semantics_wrapper(self):
+        content = """\
+<div class="equation">
+<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow> <mi>x</mi> <mo>=</mo> <mfrac> <mrow> <mo>&#8722;<!-- &#8722; --></mo> <mi>b</mi> <mo>&#177;<!-- &#177; --></mo> <msqrt> <msup> <mi>b</mi> <mn>2</mn> </msup> <mo>&#8722;<!-- &#8722; --></mo> <mn>4</mn> <mi>a</mi> <mi>c</mi> </msqrt> </mrow> <mrow> <mn>2</mn> <mi>a</mi> </mrow> </mfrac> </mrow></math>
+</div>"""
+
+        # Call the target function.
+        result = self.target(content)
+
+        elms = etree.fromstring(result)
+        annotation = elms.xpath(
+            '/div/m:math/m:semantics/m:annotation-xml[@encoding="image/svg+xml"]',
+            namespaces={'m': "http://www.w3.org/1998/Math/MathML"})[0]
+        expected = """<annotation-xml xmlns="http://www.w3.org/1998/Math/MathML" encoding="image/svg+xml"><svg>mocked</svg></annotation-xml>"""
+
+        self.assertEqual(etree.tostring(annotation), expected)
