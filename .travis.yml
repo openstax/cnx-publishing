@@ -36,6 +36,11 @@ before_install:
   # * Install cnx-archive
   - git clone https://github.com/Connexions/cnx-archive.git
   - cd cnx-archive && sudo /usr/bin/python setup.py install && cd ..
+  
+  # * Install cnx-publishing-builds
+  - git clone https://github.com/Connexions/cnx-publishing-builds.git
+  - cd cnx-publishing-builds && sudo /usr/bin/python setup.py install && cd ..
+  
   # Install the coverage utility and coveralls reporting utility
   - sudo apt-get install python-pip
   # Scripts get installed to /usr/local/bin
