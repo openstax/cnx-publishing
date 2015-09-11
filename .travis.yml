@@ -38,6 +38,10 @@ before_install:
   - cd cnx-archive && sudo /usr/bin/python setup.py install && cd ..
   
   # * Install cnx-publishing-builds
+  - git clone https://github.com/Connexions/cnx-transforms.git
+  - cd cnx-transforms && sudo /usr/bin/python setup.py install && cd ..
+  
+  # * Install cnx-publishing-builds
   - git clone https://github.com/Connexions/cnx-publishing-builds.git
   - cd cnx-publishing-builds && sudo /usr/bin/python setup.py install && cd ..
   
