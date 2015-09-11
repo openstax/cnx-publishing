@@ -109,7 +109,7 @@ def main(global_config, **settings):
 
     config.scan(ignore='cnxpublishing.tests')
     
-    config.include('cnx-publishing-builds')
+    config.include('cnxpublishingbuilds')
     return config.make_wsgi_app()
 
 
