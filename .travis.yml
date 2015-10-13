@@ -48,6 +48,8 @@ before_script:
   - sudo -u postgres psql -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
   # Set up the database
   - sudo -u postgres createdb -O cnxarchive cnxarchive-testing
+  - pip install pep8
+  - pep8 --exclude=tests *.py cnxpublishing/
 env:
   - TESTING_CONFIG="testing.ini"
 script:
