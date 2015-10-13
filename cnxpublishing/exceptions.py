@@ -34,7 +34,6 @@ class DocumentLookupError(Exception):
     """Generally used when a document cannot be found."""
 
 
-
 # ########################## #
 #   Publication Exceptions   #
 # ########################## #

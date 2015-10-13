@@ -53,9 +53,11 @@ module_insertion AS (
      (SELECT abstractid FROM abstract_insertion),
      (SELECT licenseid FROM license_lookup),
      (SELECT module_ident FROM modules
-        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
+        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = \
+              %(parent_ident_hash)s),
      (SELECT authors FROM modules
-        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(parent_ident_hash)s),
+        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = \
+              %(parent_ident_hash)s),
      %(authors)s, %(publishers)s, %(copyright_holders)s,
      DEFAULT, DEFAULT,
      DEFAULT, ' ',%(print_style)s)
@@ -197,7 +199,7 @@ def _insert_resource_file(cursor, module_ident, resource):
     create a new file entry or associates an existing one.
     """
     exists_in_archive = False
-    cursor.execute("SELECT fileid FROM files WHERE {} = %s LIMIT 1" \
+    cursor.execute("SELECT fileid FROM files WHERE {} = %s LIMIT 1"
                    .format(cnxepub.RESOURCE_HASH_TYPE),
                    (resource.hash,))
     try:
@@ -254,7 +256,7 @@ def _insert_tree(cursor, tree, parent_id=None, index=0):
             try:
                 document_id, document_title = cursor.fetchone()
             except TypeError as exc:  # NoneType
-                raise ValueError("Missing published document for '{}'."\
+                raise ValueError("Missing published document for '{}'."
                                  .format(tree['id']))
             if tree.get('title', None):
                 title = tree['title']
@@ -281,7 +283,7 @@ def publish_model(cursor, model, publisher, message):
     publishers = publisher
     if isinstance(publishers, list) and len(publishers) > 1:
         raise ValueError("Only one publisher is allowed. '{}' "
-                         "were given: {}" \
+                         "were given: {}"
                          .format(len(publishers), publishers))
     module_ident, ident_hash = _insert_metadata(cursor, model,
                                                 publisher, message)
@@ -301,7 +303,7 @@ INSERT INTO module_files
   (module_ident, fileid, filename, mimetype)
 VALUES
   (%(module_ident)s,
-   (SELECT fileid FROM file_insertion), 
+   (SELECT fileid FROM file_insertion),
    %(filename)s, %(mime_type)s)""", file_arg)
 
     elif isinstance(model, Binder):
@@ -317,7 +319,7 @@ def republish_binders(cursor, models):
     binders = set([])
     history_mapping = {}  # <previous-ident-hash>: <current-ident-hash>
     if not isinstance(models, (list, tuple, set,)):
-        raise TypeError("``models`` Must be a sequence of model objects." \
+        raise TypeError("``models`` Must be a sequence of model objects."
                         "We were given: {}".format(models))
     for model in models:
         if isinstance(model, (cnxepub.Binder,)):
@@ -482,7 +484,8 @@ def rebuild_collection_tree(cursor, ident_hash, history_map):
     new document ids
     """
     collection_tree_sql = """\
-WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, ident_hash, path) AS (
+WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, \
+                 ident_hash, path) AS (
   SELECT
     tr.nodeid, tr.parent_id, tr.documentid,
     tr.title, tr.childorder, tr.latest,
@@ -516,7 +519,8 @@ VALUES
   (DEFAULT, %(parent_id)s,
    (SELECT module_ident
     FROM modules
-    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %(ident_hash)s),
+    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = \
+          %(ident_hash)s),
    %(title)s, %(childorder)s, %(latest)s)
 RETURNING nodeid"""
 
@@ -530,8 +534,8 @@ RETURNING nodeid"""
         results = cursor.fetchone()[0]
         return results
 
-    tree = {} # {<current-nodeid>: {<row-data>...}, ...}
-    children = {} # {<nodeid>: [<child-nodeid>, ...], <child-nodeid>: [...]}
+    tree = {}  # {<current-nodeid>: {<row-data>...}, ...}
+    children = {}  # {<nodeid>: [<child-nodeid>, ...], <child-nodeid>: [...]}
     for node in get_tree():
         tree[node['nodeid']] = node
         children.setdefault(node['parent_id'], [])
