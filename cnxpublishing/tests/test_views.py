@@ -104,7 +104,6 @@ class EPUBMixInTestCase(object):
 class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     """Request/response client interactions"""
 
-
     settings = None
     db_conn_str = None
     db_connect = None
@@ -119,7 +118,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             from ..main import _parse_api_key_lines
             api_keys = _parse_api_key_lines(self.settings)
             setattr(self, attr_name, api_keys)
-        return {x[1]:x[0] for x in api_keys}
+        return {x[1]: x[0] for x in api_keys}
 
     def gen_api_key_headers(self, user):
         """Generate authentication headers for the given user."""
@@ -347,7 +346,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
                        "      last_name IS NOT NULL, "
                        "      full_name IS NOT NULL] "
                        "FROM users ORDER BY username")
-        users = {u:set(b) for u, b in cursor.fetchall()}
+        users = {u: set(b) for u, b in cursor.fetchall()}
         self.assertEqual(users.keys(), sorted([x['uid'] for x in data]))
         for username, null_checks in users.items():
             self.assertNotIn(None, null_checks,
@@ -580,7 +579,6 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             ]
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
-
 
     def test_create_identifier_for_all_routes(self):
         """Tests that creating an identifier result in non-404
@@ -873,7 +871,7 @@ GROUP BY user_id, accepted
                                "      last_name IS NOT NULL, "
                                "      full_name IS NOT NULL] "
                                "FROM users ORDER BY username")
-                users = {u:set(b) for u, b in cursor.fetchall()}
+                users = {u: set(b) for u, b in cursor.fetchall()}
         self.assertEqual(sorted(users.keys()), sorted(uids))
         for username, null_checks in users.items():
             self.assertNotIn(None, null_checks,

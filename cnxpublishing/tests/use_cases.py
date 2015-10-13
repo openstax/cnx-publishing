@@ -354,7 +354,7 @@ PAGE_FOUR = cnxepub.Document(
         u'authors': [{u'id': u'butcher',
                       u'name': u'James Doakes',
                       u'type': u'cnx-id'},
-                      ],
+                     ],
         u'copyright_holders': [
             {u'id': u'ream',
              u'name': u'Ream',
@@ -395,7 +395,7 @@ PAGE_FIVE = cnxepub.Document(
         u'authors': [{u'id': u'charrose',
                       u'name': u'Charmaine St. Rose',
                       u'type': u'cnx-id'},
-                      ],
+                     ],
         u'copyright_holders': [
             {u'id': u'ream',
              u'name': u'Ream',
@@ -791,7 +791,7 @@ def setup_BOOK_in_archive(test_case, cursor):
     _insert_user_info(binder, cursor)
     publish_model(cursor, binder, publisher, publication_message)
     _set_uri(binder)
-    _insert_acl_for_model(binder,cursor)
+    _insert_acl_for_model(binder, cursor)
     return binder
 
 

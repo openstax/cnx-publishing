@@ -104,7 +104,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
             # XXX We don't have a mapping.
             'publishers': [{'id': 'ream', 'type': None}],
             'authors': [{'id': 'rbates', 'type': 'cnx-id',
-                         'name': 'Richard Bates'},],
+                         'name': 'Richard Bates'}],
             'editors': [{'id': 'jone', 'type': None},
                         {'id': 'kahn', 'type': None}],
             # XXX We don't have a mapping.
@@ -288,7 +288,7 @@ WHERE mor.module_ident = %s
             # XXX We don't have a mapping.
             'publishers': [{'id': 'ream', 'type': None}],
             'authors': [{'id': 'rbates', 'type': 'cnx-id',
-                         'name': 'Richard Bates'},],
+                         'name': 'Richard Bates'}],
             'editors': [{'id': 'jone', 'type': None},
                         {'id': 'kahn', 'type': None}],
             # XXX We don't have a mapping.
@@ -340,7 +340,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
             'license_url': 'http://creativecommons.org/licenses/by/3.0/',
             'publishers': [{'id': 'ream', 'type': None}],  # XXX We don't have a mapping.
             'authors': [{'id': 'rbates', 'type': 'cnx-id',
-                         'name': 'Richard Bates'},],
+                         'name': 'Richard Bates'}],
             'editors': [{'id': 'jone', 'type': None}, {'id': 'kahn', 'type': None}],
             'illustrators': [{'id': 'AbagaleBates', 'type': None}],  # XXX We don't have a mapping.
             'translators': [{'id': 'RhowandaOkofarBates', 'type': None},
@@ -371,7 +371,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
             'license_url': 'http://creativecommons.org/licenses/by/3.0/',
             'publishers': [{'id': 'someone', 'type': None}],  # XXX We don't have a mapping.
             'authors': [{'id': 'someone', 'type': 'cnx-id',
-                         'name': 'Someone'},],
+                         'name': 'Someone'}],
             'editors': [],
             'illustrators': [],  # XXX We don't have a mapping.
             'translators': [],
@@ -389,7 +389,7 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 derived_ident_hash = _insert_metadata(cursor, document,
-                                              publisher, message)[1]
+                                                      publisher, message)[1]
 
         self.assertNotEqual(derived_ident_hash.split('@')[0], ident_hash.split('@')[0])
         with self.db_connect() as db_conn:
