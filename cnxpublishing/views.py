@@ -1,4 +1,4 @@
-5# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # ###
 # Copyright (c) 2013, Rice University
 # This software is subject to the provisions of the GNU Affero General
@@ -111,7 +111,8 @@ def get_accept_license(request):
 SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
-  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) AS ident_hash,
+  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) \
+    AS ident_hash,
   accepted AS is_accepted
 FROM
   pending_documents AS pd
@@ -190,7 +191,8 @@ def get_accept_role(request):
 SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
-  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) AS ident_hash,
+  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) \
+    AS ident_hash,
   accepted AS is_accepted
 FROM
   pending_documents AS pd
@@ -241,9 +243,9 @@ def post_accept_role(request):
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             accept_publication_role(cursor, publication_id, uid,
-                                       accepted, True)
+                                    accepted, True)
             accept_publication_role(cursor, publication_id, uid,
-                                       denied, False)
+                                    denied, False)
 
     location = request.route_url('publication-license-acceptance',
                                  id=publication_id, uid=uid)
@@ -276,7 +278,8 @@ def get_license_request(request):
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT l.url
-FROM licenses AS l RIGHT JOIN document_controls AS dc ON (dc.licenseid = l.licenseid)
+FROM licenses AS l
+RIGHT JOIN document_controls AS dc ON (dc.licenseid = l.licenseid)
 WHERE dc.uuid = %s""", (uuid_,))
             try:
                 license_url = cursor.fetchone()[0]
@@ -316,7 +319,8 @@ def post_license_request(request):
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT TRUE, l.url
-FROM document_controls AS dc LEFT JOIN licenses AS l ON (dc.licenseid = l.licenseid)
+FROM document_controls AS dc
+LEFT JOIN licenses AS l ON (dc.licenseid = l.licenseid)
 WHERE uuid = %s::UUID""", (uuid_,))
             try:
                 exists, existing_license_url = cursor.fetchone()
@@ -329,12 +333,14 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
                     raise httpexceptions.HTTPNotFound()
             if existing_license_url is None and license_url is None:
                 raise httpexceptions.HTTPBadRequest("license_url is required")
-            elif license_url != existing_license_url or existing_license_url is None:
+            elif (license_url != existing_license_url or
+                  existing_license_url is None):
                 cursor.execute("""\
 UPDATE document_controls AS dc
-SET licenseid = l.licenseid FROM licenses AS l WHERE url = %s and is_valid_for_publication = 't'
+SET licenseid = l.licenseid FROM licenses AS l
+WHERE url = %s and is_valid_for_publication = 't'
 RETURNING dc.licenseid""",
-                   (license_url,))
+                               (license_url,))
                 try:
                     valid_licenseid = cursor.fetchone()[0]
                 except TypeError:  # None returned

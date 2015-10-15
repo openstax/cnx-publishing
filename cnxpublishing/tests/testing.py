@@ -22,6 +22,7 @@ __all__ = (
 here = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_DIR = os.path.join(here, 'data')
 
+
 def config_uri():
     """Return the file path of the testing config uri"""
     config_uri = os.environ.get('TESTING_CONFIG', None)

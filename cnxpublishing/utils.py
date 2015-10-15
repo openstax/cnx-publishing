@@ -31,7 +31,7 @@ def parse_archive_uri(uri):
 
 def parse_user_uri(uri, type_='cnx-id'):
     if type_ != 'cnx-id':
-        raise ValueError("Can't parse a user uri of type '{}'." \
+        raise ValueError("Can't parse a user uri of type '{}'."
                          .format(type_))
     # FIXME A URI to an osc-accounts (i.e. cnx-id) does not exist.
     # We have added a unique UUID for each user; and that is what

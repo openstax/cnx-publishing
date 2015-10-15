@@ -17,6 +17,7 @@ from ..db import upsert_acl
 from .testing import config_uri
 from .test_views import BaseFunctionalViewTestCase
 
+
 class DocTestTestCase(BaseFunctionalViewTestCase):
     """Run all the examples"""
 
@@ -52,4 +53,4 @@ RETURNING dc.licenseid""", ('http://creativecommons.org/licenses/by/4.0/',))
 
         doctest.testfile(
             '../../README.rst',
-            optionflags=doctest.ELLIPSIS|doctest.NORMALIZE_WHITESPACE)
+            optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)

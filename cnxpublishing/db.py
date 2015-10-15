@@ -74,7 +74,7 @@ def initdb(connection_string):
                     try:
                         cursor.execute(schema)
                     except psycopg2.Error as exc:
-                        print("File '{}' had issues executing." \
+                        print("File '{}' had issues executing."
                               .format(schema_filepath), file=sys.stderr)
                         raise
 
@@ -250,7 +250,8 @@ def add_pending_resource(cursor, resource):
         }
     with resource.open() as data:
         if data.seek(0, 2) > int(settings['file-upload-limit']) * 1024 * 1024:
-            raise ResourceFileExceededLimitError(settings['file-upload-limit'], resource.filename)
+            raise ResourceFileExceededLimitError(
+                settings['file-upload-limit'], resource.filename)
         data.seek(0)
         args['data'] = psycopg2.Binary(data.read())
 
@@ -273,7 +274,7 @@ def obtain_licenses():
 SELECT combined_row.url, row_to_json(combined_row) FROM (
   SELECT "code", "version", "name", "url", "is_valid_for_publication"
   FROM licenses) AS combined_row""")
-            licenses = {r[0]:r[1] for r in cursor.fetchall()}
+            licenses = {r[0]: r[1] for r in cursor.fetchall()}
     return licenses
 
 
@@ -339,7 +340,7 @@ def _validate_derived_from(cursor, model):
         version_condition = " AND major_version = %s" \
                             " AND minor_version {} %s" \
                             .format(version[1] is None and 'is' or '=')
-    cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}""" \
+    cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}"""
                    .format(table, version_condition), args)
     try:
         exists = cursor.fetchone()[0]
@@ -496,8 +497,8 @@ RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
             set_publication_failure(cursor, exc)
         except:
             import traceback
-            print("Critical data error. Immediate attention is " \
-                  "required. On publication at '{}'." \
+            print("Critical data error. Immediate attention is "
+                  "required. On publication at '{}'."
                   .format(publication_id),
                   file=sys.stderr)
             # Print the critical exception.
@@ -538,7 +539,8 @@ def add_pending_model_content(cursor, publication_id, model):
     will appear in the end publication.
     """
     cursor.execute("""\
-        SELECT id, concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+        SELECT id, concat_ws('@', uuid,
+                             concat_ws('.', major_version, minor_version))
         FROM pending_documents
         WHERE publication_id = %s AND uuid = %s""",
                    (publication_id, model.id,))
@@ -573,7 +575,8 @@ def add_pending_model_content(cursor, publication_id, model):
                 elif reference.uri.startswith('/contents'):
                     ident_hash = parse_archive_uri(reference.uri)
                     try:
-                        doc_pointer = lookup_document_pointer(ident_hash, cursor)
+                        doc_pointer = lookup_document_pointer(
+                            ident_hash, cursor)
                     except DocumentLookupError:
                         mark_invalid_reference(reference)
                     else:
@@ -607,8 +610,10 @@ def add_pending_model_content(cursor, publication_id, model):
 SELECT dp.uuid, concat_ws('.', dp.maj_ver, dp.min_ver) AS version,
        dp.uuid = m.uuid AS exists,
        m.portal_type = 'Module' AS is_document
-FROM (SELECT unnest(%s::uuid[]), unnest(%s::integer[]), unnest(%s::integer[])) AS dp(uuid, maj_ver, min_ver)
-     LEFT JOIN modules AS m ON dp.uuid = m.uuid AND (dp.maj_ver = m.major_version OR dp.maj_ver is null)""",
+FROM (SELECT unnest(%s::uuid[]), unnest(%s::integer[]), unnest(%s::integer[]))\
+         AS dp(uuid, maj_ver, min_ver)
+     LEFT JOIN modules AS m ON dp.uuid = m.uuid AND \
+         (dp.maj_ver = m.major_version OR dp.maj_ver is null)""",
                            (list(uuids), list(major_vers), list(minor_vers),))
             valid_pointer_results = cursor.fetchall()
             for result_row in valid_pointer_results:
@@ -683,7 +688,8 @@ RETURNING id
             continue
         for document in cnxepub.flatten_to_documents(binder):
             if document not in models:
-                ident_hash = add_pending_model(cursor, publication_id, document)
+                ident_hash = add_pending_model(
+                    cursor, publication_id, document)
                 insert_mapping[document.id] = ident_hash
                 models.add(document)
         # The binding object could be translucent/see-through,
@@ -754,6 +760,7 @@ UPDATE pending_documents
 SET (license_accepted, roles_accepted) = (%s, %s)
 WHERE id = %s""",
                    args)
+
 
 @with_db_cursor
 def is_revision_publication(publication_id, cursor):
@@ -1122,7 +1129,7 @@ def upsert_role_requests(cursor, uuid_, roles):
     to true.
     """
     if not isinstance(roles, (list, set, tuple,)):
-        raise TypeError("``roles`` is an invalid type: {}" \
+        raise TypeError("``roles`` is an invalid type: {}"
                         .format(type(roles)))
 
     acceptors = set([(x['uid'], x['role'],) for x in roles])
@@ -1191,7 +1198,7 @@ def upsert_acl(cursor, uuid_, permissions):
     tuple of ``uid`` and ``permission``, upsert them into the database.
     """
     if not isinstance(permissions, (list, set, tuple,)):
-        raise TypeError("``permissions`` is an invalid type: {}" \
+        raise TypeError("``permissions`` is an invalid type: {}"
                         .format(type(permissions)))
 
     permissions = set(permissions)
@@ -1219,7 +1226,7 @@ def remove_acl(cursor, uuid_, permissions):
     of ``uid`` and ``permission``, remove these entries from the database.
     """
     if not isinstance(permissions, (list, set, tuple,)):
-        raise TypeError("``permissions`` is an invalid type: {}" \
+        raise TypeError("``permissions`` is an invalid type: {}"
                         .format(type(permissions)))
 
     permissions = set(permissions)
@@ -1258,10 +1265,10 @@ SET (personid, firstname, surname, fullname) =
 WHERE personid = %(username)s""", person_info)
 
     # Insert new records.
-    # Email is an empty string because 
+    # Email is an empty string because
     # accounts no longer gives out user
     # email info but a string datatype
-    # is still needed for legacy to 
+    # is still needed for legacy to
     # properly process the persons table
     for person_id in new_person_ids:
         person_info = lookup_func(person_id)
@@ -1338,7 +1345,7 @@ Hello {{full_name}},
 
 {% if licensor %}
 You have been assigned as a licenee on content.
-You will need to approve the license on content before it can be published. 
+You will need to approve the license on content before it can be published.
 {% endif %}
 
 {% if roles %}
@@ -1365,7 +1372,7 @@ FROM license_acceptances AS la
 WHERE
   la.uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
   AND la.notified IS NULL AND (NOT la.accepted or la.accepted IS UNKNOWN)
-""", (document_id,))    
+""", (document_id,))
     licensors = [x[0] for x in cursor.fetchall()]
 
     cursor.execute("""\
@@ -1395,7 +1402,7 @@ UPDATE license_acceptances SET notified = CURRENT_TIMESTAMP
 WHERE
   uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
   AND user_id = ANY (%s)""", (document_id, licensors,))
-    # FIXME overwrites notified for all roles types a user might have. 
+    # FIXME overwrites notified for all roles types a user might have.
     cursor.execute("""\
 UPDATE role_acceptances SET notified = CURRENT_TIMESTAMP
 WHERE

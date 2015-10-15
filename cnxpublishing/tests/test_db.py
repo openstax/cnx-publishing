@@ -218,9 +218,9 @@ RETURNING id, uuid""", (self.publication_id, metadata,))
 
         # Create existing licensor records.
         values = [
-            (uuid_, 'charrose', True), ##(uuid_, 'frahablar', None),
+            (uuid_, 'charrose', True),  # (uuid_, 'frahablar', None),
             (uuid_, 'impicky', True), (uuid_, 'marknewlyn', True),
-            (uuid_, 'ream', True), ##(uuid_, 'rings', None),
+            (uuid_, 'ream', True),  # (uuid_, 'rings', None),
             ]
         serial_values = []
         for v in values:
@@ -413,12 +413,12 @@ RETURNING id, uuid""", (self.publication_id, metadata,))
         values = [
             (uuid_, 'charrose', 'Author', True),
             (uuid_, 'frahablar', 'Translator', True),
-            ##(uuid_, 'frahablar', 'Illustrator', None),
+            # (uuid_, 'frahablar', 'Illustrator', None),
             (uuid_, 'impicky', 'Editor', True),
             (uuid_, 'marknewlyn', 'Author', True),
             (uuid_, 'ream', 'Copyright Holder', True),
             (uuid_, 'ream', 'Publisher', True),
-            ##(uuid_, 'rings', 'Publisher', None),
+            # (uuid_, 'rings', 'Publisher', None),
             ]
         serial_values = []
         for v in values:
@@ -559,7 +559,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         values = [
             (uuid_, 'charrose', 'Author', None),
             (uuid_, 'frahablar', 'Translator', None),
-            ##(uuid_, 'frahablar', 'Illustrator', None),
+            # (uuid_, 'frahablar', 'Illustrator', None),
             (uuid_, 'impicky', 'Editor', True),
             (uuid_, 'marknewlyn', 'Author', True),
             (uuid_, 'ream', 'Copyright Holder', True),
@@ -703,7 +703,7 @@ class DatabaseIntegrationTestCase(BaseDatabaseIntegrationTestCase):
     def test_add_duplicate_pending_resources(self):
         """Add duplicate pending resources to the database"""
         resource = cnxepub.Resource('a.txt', io.BytesIO('hello world\n'),
-                'text/plain')
+                                    'text/plain')
 
         from ..db import add_pending_resource
         with psycopg2.connect(self.db_conn_str) as db_conn:
@@ -716,9 +716,9 @@ SELECT COUNT(*) FROM pending_resources WHERE hash = %s""", [
                 self.assertEqual(cursor.fetchone()[0], 1)
 
         self.assertEqual(resource.hash,
-                '22596363b3de40b06f981fb85d82312e8c0ed511')
+                         '22596363b3de40b06f981fb85d82312e8c0ed511')
         self.assertEqual(resource.id,
-                '22596363b3de40b06f981fb85d82312e8c0ed511')
+                         '22596363b3de40b06f981fb85d82312e8c0ed511')
 
     def test_add_new_pending_document(self):
         """Add a pending document to the database."""
@@ -892,12 +892,12 @@ control_insert AS (
 INSERT INTO document_acl (uuid, user_id, permission)
 VALUES ((SELECT uuid from control_insert), 'ream', 'publish'::permission_type)
 """,
-                               (document_id,))
+                       (document_id,))
 
         # Create and add a document for the publication.
         metadata = {'authors': [{'id': 'able', 'type': 'cnx-id'}],
                     'publishers': [{'id': 'able', 'type': 'cnx-id'}],
-                    'cnx-archive-uri': 'http://cnx.org/contents/{}' \
+                    'cnx-archive-uri': 'http://cnx.org/contents/{}'
                                        .format(document_id),
                     }
         document = self.make_document(metadata=metadata)
@@ -1378,7 +1378,7 @@ INSERT INTO abstracts (abstractid, abstract) VALUES (1, 'abstract');
 INSERT INTO modules
 (module_ident, portal_type, moduleid, uuid, name,
  major_version, minor_version,
- created, revised, abstractid, licenseid, 
+ created, revised, abstractid, licenseid,
  doctype, submitter, submitlog, stateid, parent, parentauthors,
  language, authors, maintainers, licensors,
  google_analytics, buylink)
@@ -1425,7 +1425,7 @@ VALUES
         """
         # Create a Document model.
         invalid_derived_from_uri = \
-                u"http://cnx.org/contents/b07fd622-a2f1-4ccb-967c-9b966935961f"
+            u"http://cnx.org/contents/b07fd622-a2f1-4ccb-967c-9b966935961f"
         metadata = {u'derived_from_uri': invalid_derived_from_uri}
         model = self.make_document(metadata=metadata)
 
