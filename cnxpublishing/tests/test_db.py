@@ -1138,6 +1138,59 @@ WHERE id = %s""", (publication_id,))
         self.assertEqual(state_messages[-1], expected_state_message)
 
     @db_connect
+    def test_add_pending_document_w_mathml(self, cursor):
+        """Add a pending document with mathml that generates SVG."""
+        publication_id = self.make_publication()
+
+        # Insert a valid module for referencing...
+        cursor.execute("""\
+INSERT INTO abstracts (abstract) VALUES ('abstract')
+RETURNING abstractid""")
+        cursor.execute("""\
+INSERT INTO modules
+(module_ident, portal_type, name,
+ created, revised, abstractid, licenseid,
+ doctype, submitter, submitlog, stateid, parent, parentauthors,
+ language, authors, maintainers, licensors,
+ google_analytics, buylink)
+VALUES
+(1, 'Module', 'mathml module',
+ DEFAULT, DEFAULT, 1, 1,
+ 0, 'admin', 'log', NULL, NULL, NULL,
+ 'en', '{admin}', NULL, '{admin}',
+ DEFAULT, DEFAULT) RETURNING uuid || '@' || major_version""")
+        doc_ident_hash = cursor.fetchone()[0]
+
+        # Create and add a document for the publication.
+        metadata = {
+            'title': 'Document Title',
+            'summary': 'Document Summary',
+            'authors': [{u'id': u'able', u'type': u'cnx-id'}],
+            'publishers': [{'id': 'able', 'type': 'cnx-id'}],
+            'license_url': VALID_LICENSE_URL,
+            }
+        content = """\
+<div class="equation">
+<math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow> <mi>x</mi> <mo>=</mo> <mfrac> <mrow> <mo>&#8722;<!-- &#8722; --></mo> <mi>b</mi> <mo>&#177;<!-- &#177; --></mo> <msqrt> <msup> <mi>b</mi> <mn>2</mn> </msup> <mo>&#8722;<!-- &#8722; --></mo> <mn>4</mn> <mi>a</mi> <mi>c</mi> </msqrt> </mrow> <mrow> <mn>2</mn> <mi>a</mi> </mrow> </mfrac> </mrow></semantics></math>
+</div>"""
+        document = self.make_document(content=content, metadata=metadata)
+
+        # Here we are testing the function of add_pending_document.
+        from ..db import add_pending_model, add_pending_model_content
+        document_ident_hash = add_pending_model(
+            cursor, publication_id, document)
+
+        # Enable the mathml2svg service for this test.
+        from pyramid.threadlocal import get_current_registry
+        get_current_registry().settings['mathml2svg.enabled?'] = 'on'
+
+        # Mock the inject_mathml_svgs function.
+        with mock.patch('cnxpublishing.db.inject_mathml_svgs') as func:
+            func.return_value = content
+            add_pending_model_content(cursor, publication_id, document)
+            self.assertEqual(func.call_count, 1)
+
+    @db_connect
     def test_add_pending_binder_w_document_pointers(self, cursor):
         """Add a pending binder with document pointers."""
         publication_id = self.make_publication()

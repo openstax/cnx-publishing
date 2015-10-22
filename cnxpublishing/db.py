@@ -35,8 +35,9 @@ from .exceptions import (
     ResourceFileExceededLimitError,
     UserFetchError,
     )
-from .utils import parse_archive_uri, parse_user_uri
+from .models import inject_mathml_svgs
 from .publish import publish_model, republish_binders
+from .utils import parse_archive_uri, parse_user_uri
 
 
 __all__ = (
@@ -584,6 +585,9 @@ def add_pending_model_content(cursor, publication_id, model):
                 else:
                     mark_invalid_reference(reference)
             # else, it's a remote or cnx.org reference ...Do nothing.
+
+        # Generate SVGs for MathML
+        model.content = inject_mathml_svgs(model.content)
 
         args = (psycopg2.Binary(model.content.encode('utf-8')),
                 publication_id, model.id,)
