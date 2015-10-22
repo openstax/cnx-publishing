@@ -109,6 +109,8 @@ def main(global_config, **settings):
     config.set_authorization_policy(authz_policy)
 
     config.scan(ignore='cnxpublishing.tests')
+    
+    #config.include('cnxpublishingbuilds')
     return config.make_wsgi_app()
 
 
