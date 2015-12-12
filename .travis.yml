@@ -4,7 +4,7 @@ language: python
 python:
   - "2.7"
 addons:
-  postgresql: "9.3"
+  postgresql: "9.4"
 before_install:
   - sudo apt-get update
   # remove zope.interface installed from aptitude
@@ -13,36 +13,34 @@ before_install:
 
   # Installation for cnx-archive:
   # * Install the 'plpython' extension language
-  - sudo apt-get install postgresql-plpython-9.3
+  - sudo apt-get install postgresql-plpython-9.4
   # * Install the 'plxslt' extension language
-  - sudo apt-get install libxml2-dev libxslt-dev postgresql-server-dev-9.3
+  - sudo apt-get install libxml2-dev libxslt-dev postgresql-server-dev-9.4
   - git clone https://github.com/petere/plxslt.git
   - cd plxslt && sudo make && sudo make install && cd ..
   # * Install cnx-query-grammar
   - git clone https://github.com/Connexions/cnx-query-grammar.git
-  - cd cnx-query-grammar && sudo /usr/bin/python setup.py install && cd ..
+  - cd cnx-query-grammar && python setup.py install && cd ..
   # * Install rhaptos.cnxmlutils
   - git clone https://github.com/Connexions/rhaptos.cnxmlutils.git
-  - cd rhaptos.cnxmlutils && sudo /usr/bin/python setup.py install && cd ..
+  - cd rhaptos.cnxmlutils && python setup.py install && cd ..
   # * Install bug-fixes branch of plpydbapi
   - git clone -b bug-fixes https://github.com/Connexions/plpydbapi.git
-  - cd plpydbapi && sudo /usr/bin/python setup.py install && cd ..
+  - cd plpydbapi && python setup.py install && cd ..
 
   # Installation for cnx-publishing
   # * Install cnx-epub
   - git clone https://github.com/Connexions/cnx-epub.git
-  - cd cnx-epub && sudo /usr/bin/python setup.py install && cd ..
+  - cd cnx-epub && python setup.py install && cd ..
 
   # * Install cnx-archive
   - git clone https://github.com/Connexions/cnx-archive.git
-  - cd cnx-archive && sudo /usr/bin/python setup.py install && cd ..
+  - cd cnx-archive && python setup.py install && cd ..
   # Install the coverage utility and coveralls reporting utility
-  - sudo apt-get install python-pip
-  # Scripts get installed to /usr/local/bin
-  - sudo /usr/bin/pip install coverage
-  - sudo /usr/bin/pip install coveralls
+  - pip install coverage
+  - pip install coveralls
 install:
-  - sudo /usr/bin/pip install .
+  - pip install .
 before_script:
   # Set up postgres roles
   - sudo -u postgres psql -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
@@ -51,13 +49,18 @@ before_script:
   - pip install pep8
   - pep8 --exclude=tests *.py cnxpublishing/
   - pep8 --max-line-length=200 cnxpublishing/tests
+
+  - git clone https://github.com/okbob/session_exec
+  - cd session_exec
+  - make USE_PGXS=1 -e && sudo make USE_PGXS=1 -e install
+  - cd ..
 env:
   - TESTING_CONFIG="testing.ini"
 script:
   # This is the same as `python setup.py test` with a coverage wrapper.
-  - sudo /usr/local/bin/coverage run --source=cnxpublishing setup.py test
+  - coverage run --source=cnxpublishing setup.py test
 after_success:
   # Report test coverage to coveralls.io
-  - /usr/local/bin/coveralls
+  - coveralls
 notifications:
   email: false
