@@ -520,22 +520,29 @@ class RepublishTestCase(unittest.TestCase):
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
+            u'shortId': u'w7tL-ztT@1.2',
             u'title': u'Book of Infinity',
             u'contents': [
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part One',
                  u'contents': [
                      {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@1',
+                      u'shortId': u'LyhY6pM8@1',
                       u'title': u'Document One'},
                      {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'shortId': u'MrEezaHC@2',
                       u'title': u'Document Two'}],
                  },
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part Two',
                  u'contents': [
                      {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@1',
+                      u'shortId': u'AUQV3irg@1',
                       u'title': u'Document Three'},
                      {u'id': u'deadbeef-a927-4652-9a8d-deb2d28fb801@2',
+                      u'shortId': u'3q2-76kn@2',
                       u'title': u'Document Four'}],
                  }],
             }
@@ -544,20 +551,26 @@ class RepublishTestCase(unittest.TestCase):
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@1.2',
+            u'shortId': u'27KKa8rS@1.2',
             u'title': u'Book of Infinity',
             u'contents': [
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part One',
                  u'contents': [
                      {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'shortId': u'MrEezaHC@2',
                       u'title': u'Document One'},
                      {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@1',
+                      u'shortId': u'AUQV3irg@1',
                       u'title': u'Document Two'}],
                  },
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part Two',
                  u'contents': [
                      {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@1',
+                      u'shortId': u'LyhY6pM8@1',
                       u'title': u'Document Three'}],
                  }],
             }

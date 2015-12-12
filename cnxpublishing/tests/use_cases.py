@@ -563,17 +563,29 @@ FROM modules""")
     document_ident_hash = items['Module']
     binder_ident_hash = items['Collection']
 
+    cursor.execute("""\
+SELECT portal_type,
+       short_id(uuid)||'@'||concat_ws('.', major_version, minor_version)
+FROM modules""")
+    items = dict(cursor.fetchall())
+    document_short_id = items['Module']
+    binder_short_id = items['Collection']
+
     expected_tree = {
         "id": binder_ident_hash,
+        "shortId": binder_short_id,
         "title": "Book of Infinity",
         "contents": [
             {"id": "subcol",
+             "shortId": "subcol",
              "title": "Part One",
              "contents": [
                  {"id": "subcol",
+                  "shortId": "subcol",
                   "title": "Chapter One",
                   "contents": [
                       {"id": document_ident_hash,
+                       "shortId": document_short_id,
                        "title": "Document One"}]}]}]}
     cursor.execute("""\
 SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
@@ -648,12 +660,15 @@ FROM modules ORDER BY major_version ASC""")
                                           (2, None,))
     expected_tree = {
         u"id": unicode(binder_ident_hash),
+        u"shortId": u"1du9jtE3@2.1",
         u"title": u"Book of Infinity",
         u"contents": [
             {u"id": u"subcol",
+             u"shortId": u"subcol",
              u"title": REVISED_BOOK[0].metadata['title'],
              u"contents": [
                  {u"id": unicode(document_ident_hash),
+                  u"shortId": u"EeLmMXO1@2",
                   u"title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
     cursor.execute("""\
 SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version))

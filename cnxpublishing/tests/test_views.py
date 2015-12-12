@@ -1691,12 +1691,15 @@ FROM modules ORDER BY major_version ASC""")
                     split_ident_hash(document.id)[0], (1, None,))
                 expected_tree = {
                     u"id": unicode(binder_ident_hash),
+                    u"shortId": u"1du9jtE3@1.1",
                     u"title": u"Book of Infinity",
                     u"contents": [
                         {u"id": u"subcol",
+                         u"shortId": u"subcol",
                          u"title": use_cases.REVISED_BOOK[0].metadata['title'],
                          u"contents": [
                              {u"id": unicode(document_ident_hash),
+                              u"shortId": u"EeLmMXO1@1",
                               u"title": use_cases.REVISED_BOOK[0].get_title_for_node(document)}]}]}
                 cursor.execute("""\
 SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version))
