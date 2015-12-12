@@ -340,7 +340,7 @@ def _validate_derived_from(cursor, model):
         version_condition = " AND major_version = %s" \
                             " AND minor_version {} %s" \
                             .format(version[1] is None and 'is' or '=')
-    cursor.execute("""SELECT 't' FROM {} WHERE uuid = %s{}"""
+    cursor.execute("""SELECT 't' FROM {} WHERE uuid::text = %s{}"""
                    .format(table, version_condition), args)
     try:
         exists = cursor.fetchone()[0]
