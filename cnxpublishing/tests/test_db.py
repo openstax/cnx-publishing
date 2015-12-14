@@ -1498,22 +1498,29 @@ ORDER BY major_version ASC, minor_version ASC""")
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
+            u'shortId': u'w7tL-ztT@1.2',
             u'title': u'Book of Infinity',
             u'contents': [
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part One',
                  u'contents': [
                      {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@2',
+                      u'shortId': u'LyhY6pM8@2',
                       u'title': u'Document One'},
                      {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'shortId': u'MrEezaHC@2',
                       u'title': u'Document Two'}],
                  },
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part Two',
                  u'contents': [
                      {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@2',
+                      u'shortId': u'AUQV3irg@2',
                       u'title': u'Document Three'},
                      {u'id': u'deadbeef-a927-4652-9a8d-deb2d28fb801@1',
+                      u'shortId': u'3q2-76kn@1',
                       u'title': u'Document Four'}],
                  }],
             }
@@ -1523,20 +1530,26 @@ ORDER BY major_version ASC, minor_version ASC""")
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@2.1',
+            u'shortId': u'27KKa8rS@2.1',
             u'title': u'Book of Infinity',
             u'contents': [
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part One',
                  u'contents': [
                      {u'id': u'32b11ecd-a1c2-4141-95f4-7c27f8c71dff@2',
+                      u'shortId': u'MrEezaHC@2',
                       u'title': u'Document One'},
                      {u'id': u'014415de-2ae0-4053-91bc-74c9db2704f5@2',
+                      u'shortId': u'AUQV3irg@2',
                       u'title': u'Document Two'}],
                  },
                 {u'id': u'subcol',
+                 u'shortId': u'subcol',
                  u'title': u'Part Two',
                  u'contents': [
                      {u'id': u'2f2858ea-933c-4707-88d2-2e512e27252f@2',
+                      u'shortId': u'LyhY6pM8@2',
                       u'title': u'Document Three'}],
                  }],
             }
@@ -1574,17 +1587,21 @@ ORDER BY major_version ASC, minor_version ASC""")
         # * Ensure the binder was published with tree references to the existing
         # pages, which we are calling document pointers.
         cursor.execute("""\
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version)),
+       concat_ws('@', short_id(uuid), concat_ws('.', major_version, minor_version))
 FROM modules WHERE name = %s""", (title,))
-        binder_ident_hash = cursor.fetchone()[0]
+        binder_ident_hash, binder_short_id = cursor.fetchone()
 
         expected_tree = {
             "id": binder_ident_hash,
+            "shortId": binder_short_id,
             "title": title,
             "contents": [
                 {"id": book_three[0].ident_hash,
+                 "shortId": "MrEezaHC@1",
                  "title": "P One"},
                 {"id": book_three[1].ident_hash,
+                 "shortId": "3q2-76kn@1",
                  "title": "P Two"},
             ]}
         cursor.execute("""\
