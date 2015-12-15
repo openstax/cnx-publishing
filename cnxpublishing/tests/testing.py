@@ -27,8 +27,7 @@ def config_uri():
     """Return the file path of the testing config uri"""
     config_uri = os.environ.get('TESTING_CONFIG', None)
     if config_uri is None:
-        project_root = os.path.join(here, '..', '..')
-        config_uri = os.path.join(project_root, 'testing.ini')
+        config_uri = os.path.join(here, 'testing.ini')
     return config_uri
 
 
