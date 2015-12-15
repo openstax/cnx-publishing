@@ -54,8 +54,6 @@ before_script:
   - cd session_exec
   - make USE_PGXS=1 -e && sudo make USE_PGXS=1 -e install
   - cd ..
-env:
-  - TESTING_CONFIG="testing.ini"
 script:
   # This is the same as `python setup.py test` with a coverage wrapper.
   - coverage run --source=cnxpublishing setup.py test
