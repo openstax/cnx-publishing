@@ -77,17 +77,6 @@ def declare_routes(config):
     declare_browsable_routes(config)
 
 
-def _parse_api_key_lines(settings):
-    """Parse the api-key lines from the settings."""
-    api_key_entities = []
-    for line in settings['api-key-authnz'].split('\n'):
-        if not line.strip():
-            continue
-        entity = [x.strip() for x in line.split(',') if x.strip()]
-        api_key_entities.append(entity)
-    return api_key_entities
-
-
 def main(global_config, **settings):
     """Application factory"""
     config = Configurator(settings=settings, root_factory=RootFactory)
@@ -97,8 +86,7 @@ def main(global_config, **settings):
         settings.get('session_key', 'itsaseekreet'))
     config.set_session_factory(session_factory)
 
-    api_key_entities = _parse_api_key_lines(settings)
-    api_key_authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
+    api_key_authn_policy = APIKeyAuthenticationPolicy()
     config.include('openstax_accounts')
     openstax_authn_policy = config.registry.getUtility(
         IOpenstaxAccountsAuthenticationPolicy)

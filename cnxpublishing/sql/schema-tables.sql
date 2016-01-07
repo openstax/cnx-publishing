@@ -85,3 +85,17 @@ CREATE TABLE role_acceptances (
   PRIMARY KEY ("uuid", "user_id", "role_type"),
   FOREIGN KEY ("uuid") REFERENCES document_controls ("uuid")
 );
+
+
+CREATE TABLE api_keys (
+  "id" SERIAL PRIMARY KEY,
+  -- Any text that the service will use as an api key.
+  "key" TEXT NOT NULL,
+  -- This is a human readable name of the person, organization or service
+  -- that we are giving an api key.
+  "name" TEXT NOT NULL,
+  -- A list of groups that this api key is a member of.
+  -- For example, g:publishers or g:trusted-publishers.
+  -- See the documenation about available groups.
+  "groups" TEXT[]
+);

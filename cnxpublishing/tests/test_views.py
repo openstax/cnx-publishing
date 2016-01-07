@@ -109,22 +109,44 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     db_connect = None
 
     @property
-    def api_keys_by_uid(self):
+    def api_keys_by_name(self):
         """Mapping of uid to api key."""
         attr_name = '_api_keys'
         api_keys = getattr(self, attr_name, None)
+
+        def get_info():
+            from ..authnz import lookup_api_key_info
+            with self.db_connect() as db_conn:
+                with db_conn.cursor() as cursor:
+                    return lookup_api_key_info(cursor)
+
         if api_keys is None:
             self.addCleanup(delattr, self, attr_name)
-            from ..main import _parse_api_key_lines
-            api_keys = _parse_api_key_lines(self.settings)
+            api_keys = {}
+            for key, value in get_info().items():
+                api_keys[value['name']] = key
             setattr(self, attr_name, api_keys)
-        return {x[1]: x[0] for x in api_keys}
+        return api_keys
 
-    def gen_api_key_headers(self, user):
+    def gen_api_key_headers(self, name):
         """Generate authentication headers for the given user."""
-        api_key = self.api_keys_by_uid[user]
+        api_key = self.api_keys_by_name[name]
         api_key_header = [('x-api-key', api_key,)]
         return api_key_header
+
+    def set_up_api_keys(self):
+        # key_info_keys = ['key', 'name', 'groups']
+        key_info = (
+            # [key, name, groups]
+            ['4e8', 'no-trust', None],
+            ['b07', 'some-trust', ['g:trusted-publishers']],
+            ['dev', 'developer', ['g:trusted-publishers']],
+            )
+        # key_info = [dict(zip(key_info_keys, value)) for value in key_info]
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.executemany("INSERT INTO api_keys (key, name, groups) "
+                                   "VALUES (%s, %s, %s)", key_info)
 
     @classmethod
     def setUpClass(cls):
@@ -153,6 +175,9 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         archive_initdb(archive_settings)
         from ..db import initdb
         initdb(self.db_conn_str)
+
+        # Assign API keys for testing
+        self.set_up_api_keys()
 
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
@@ -185,8 +210,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['some-trust']
-        headers = [('x-api-key', api_key,)]
+        headers = self.gen_api_key_headers('some-trust')
 
         licensors = [
             {'uid': 'marknewlyn', 'has_accepted': True},
@@ -240,8 +264,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['some-trust']
-        headers = [('x-api-key', api_key,)]
+        headers = self.gen_api_key_headers('some-trust')
 
         licensors = [
             {'uid': 'marknewlyn', 'has_accepted': True},
@@ -274,8 +297,7 @@ INSERT INTO document_controls (uuid, licenseid) VALUES (DEFAULT, 11) RETURNING u
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['some-trust']
-        headers = [('x-api-key', api_key,)]
+        headers = self.gen_api_key_headers('some-trust')
 
         uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
 
@@ -324,8 +346,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_header = [('x-api-key', api_key,)]
+        api_key_header = self.gen_api_key_headers('some-trust')
         headers = [('content-type', 'application/json',)]
         headers.extend(api_key_header)
 
@@ -402,8 +423,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         uuid_ = cursor.fetchone()[0]
         cursor.connection.commit()
 
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_header = [('x-api-key', api_key,)]
+        api_key_header = self.gen_api_key_headers('some-trust')
         headers = [('content-type', 'application/json',)]
         headers.extend(api_key_header)
 
@@ -797,8 +817,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         publisher = u'ream'
         epub_filepath = self.make_epub(use_cases.BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -947,8 +966,7 @@ GROUP BY user_id, accepted
         publisher = u'happy'
         epub_filepath = self.make_epub(use_cases.SPAM, publisher,
                                        u'please publish my spam')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -1028,8 +1046,7 @@ SELECT 'eek' FROM modules WHERE uuid = ANY (%s)""", (uuids,))
         publisher = u'ream'
         epub_filepath = self.make_epub(use_cases.BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -1159,8 +1176,7 @@ GROUP BY user_id, accepted
         publisher = u'ream'
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # Moderation is not required, because the publisher is already
         #   vetted by having previously been attributed on one or more
@@ -1292,8 +1308,7 @@ GROUP BY user_id, accepted
         publisher = u'able'
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # Moderation is not required, because the publisher is
         #   vetted by virtue of being added by a another vetted user.
@@ -1427,8 +1442,7 @@ GROUP BY user_id, accepted
         publisher = u'ream'
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['no-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('no-trust')
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -1555,8 +1569,7 @@ GROUP BY user_id, accepted
         # We use the REVISED_BOOK here, because it contains fixed identifiers.
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('some-trust')
 
         # 1. --
         ids = [
@@ -1730,8 +1743,7 @@ WHERE portal_type = 'Collection'""")
         authors[0]['type'] = 'diaspora-id'
         epub_filepath = self.make_epub(use_case, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('some-trust')
 
         # 1. --
         resp = self.app_post_publication(epub_filepath,
@@ -1753,8 +1765,7 @@ WHERE portal_type = 'Collection'""")
         use_case.append(use_cases.PAGE_FIVE)
         epub_filepath = self.make_epub(use_case, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('some-trust')
 
         resp = self.app_post_publication(epub_filepath, headers=api_key_headers)
         self.assertEqual(resp.json['state'], 'Failed/Error')
@@ -1781,8 +1792,7 @@ WHERE portal_type = 'Collection'""")
             use_case, publisher, u'publishing this book')
 
         # upload to publishing
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('some-trust')
 
         resp = self.app_post_publication(epub_filepath,
                                          headers=api_key_headers)
@@ -1806,8 +1816,7 @@ WHERE portal_type = 'Collection'""")
         # We use the REVISED_BOOK here, because it contains fixed identifiers.
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
-        api_key = self.api_keys_by_uid['some-trust']
-        api_key_headers = [('x-api-key', api_key,)]
+        api_key_headers = self.gen_api_key_headers('some-trust')
 
         # Give publisher permission to publish
         ids = [
