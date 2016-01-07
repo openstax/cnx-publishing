@@ -5,6 +5,7 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import os
 import tempfile
 
 from cnxarchive.utils import join_ident_hash
@@ -21,6 +22,14 @@ from .authnz import APIKeyAuthenticationPolicy
 
 __version__ = '0.1'
 __name__ = 'cnxpublishing'
+
+
+def find_migrations_directory():  # pragma: no cover
+    """Finds and returns the location of the database migrations directory.
+    This function is used from a setuptools entry-point for db-migrator.
+    """
+    here = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(here, 'sql/migrations')
 
 
 def declare_api_routes(config):
