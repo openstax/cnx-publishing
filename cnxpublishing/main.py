@@ -17,8 +17,6 @@ from pyramid.httpexceptions import default_exceptionresponse_view
 from pyramid.session import SignedCookieSessionFactory
 from pyramid_multiauth import MultiAuthenticationPolicy
 
-from .authnz import APIKeyAuthenticationPolicy
-
 
 __version__ = '0.1'
 __name__ = 'cnxpublishing'
@@ -95,6 +93,7 @@ def main(global_config, **settings):
         settings.get('session_key', 'itsaseekreet'))
     config.set_session_factory(session_factory)
 
+    from .authnz import APIKeyAuthenticationPolicy
     api_key_authn_policy = APIKeyAuthenticationPolicy()
     config.include('openstax_accounts')
     openstax_authn_policy = config.registry.getUtility(

@@ -12,20 +12,23 @@ from zope.interface import implementer
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid import security
 
-from cnxpublishing.db import with_db_cursor
+from cnxpublishing.db import db_connect
 
 
 ALL_KEY_INFO_SQL_STMT = "SELECT id, key, name, groups FROM api_keys"
 
 
-def lookup_api_key_info(cursor):
+def lookup_api_key_info():
     """Given a dbapi cursor, lookup all the api keys and their information."""
     info = {}
-    cursor.execute(ALL_KEY_INFO_SQL_STMT)
-    for row in cursor.fetchall():
-        id, key, name, groups = row
-        user_id = "api_key:{}".format(id)
-        info[key] = dict(id=id, user_id=user_id, name=name, groups=groups)
+    with db_connect() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(ALL_KEY_INFO_SQL_STMT)
+            for row in cursor.fetchall():
+                id, key, name, groups = row
+                user_id = "api_key:{}".format(id)
+                info[key] = dict(id=id, user_id=user_id,
+                                 name=name, groups=groups)
     return info
 
 
@@ -33,13 +36,9 @@ def lookup_api_key_info(cursor):
 class APIKeyAuthenticationPolicy(object):
     """Authentication using preconfigured API keys"""
 
-    @with_db_cursor
-    def _lookup_api_key_info(self, cursor):
-        return lookup_api_key_info(cursor)
-
     @property
     def user_info_by_key(self):
-        return self._lookup_api_key_info()
+        return lookup_api_key_info()
 
     def _discover_requesting_party(self, request):
         """With the request object, discover who is making the request.

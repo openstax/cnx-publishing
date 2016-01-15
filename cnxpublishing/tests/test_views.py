@@ -118,7 +118,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             from ..authnz import lookup_api_key_info
             with self.db_connect() as db_conn:
                 with db_conn.cursor() as cursor:
-                    return lookup_api_key_info(cursor)
+                    return lookup_api_key_info()
 
         if api_keys is None:
             self.addCleanup(delattr, self, attr_name)
@@ -147,6 +147,12 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             with db_conn.cursor() as cursor:
                 cursor.executemany("INSERT INTO api_keys (key, name, groups) "
                                    "VALUES (%s, %s, %s)", key_info)
+        self.addCleanup(self.tear_down_api_keys)
+
+    def tear_down_api_keys(self):
+        # Invalidate the api_key lookup cache
+        from cnxpublishing import authnz
+        authnz.cache.invalidate(authnz.lookup_api_key_info)
 
     @classmethod
     def setUpClass(cls):

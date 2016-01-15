@@ -38,6 +38,7 @@ from .publish import publish_model, republish_binders
 
 
 __all__ = (
+    'db_connect',
     'initdb',
     'add_publication',
     'poke_publication_state', 'check_publication_state',
@@ -61,9 +62,16 @@ END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
 register_uuid()
 
 
+def db_connect(connection_string=None):
+    """Function to supply a database connection object."""
+    if connection_string is None:
+        connection_string = get_current_registry().settings[CONNECTION_STRING]
+    return psycopg2.connect(connection_string)
+
+
 def initdb(connection_string):
     """Initialize publishing in or along-side the archive database."""
-    with psycopg2.connect(connection_string) as db_conn:
+    with db_connect(connection_string) as db_conn:
         with db_conn.cursor() as cursor:
             for filename in SCHEMA_FILES:
                 schema_filepath = os.path.join(SQL_DIR, filename)
