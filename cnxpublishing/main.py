@@ -8,6 +8,8 @@
 import os
 import tempfile
 
+from beaker.cache import CacheManager
+from beaker.util import parse_cache_config_options
 from cnxarchive.utils import join_ident_hash
 from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid.config import Configurator
@@ -20,6 +22,11 @@ from pyramid_multiauth import MultiAuthenticationPolicy
 
 __version__ = '0.1'
 __name__ = 'cnxpublishing'
+
+
+# Provides a means of caching function results.
+# (This is reassigned with configuration in ``main()``.)
+cache = CacheManager()
 
 
 def find_migrations_directory():  # pragma: no cover
@@ -92,6 +99,9 @@ def main(global_config, **settings):
     session_factory = SignedCookieSessionFactory(
         settings.get('session_key', 'itsaseekreet'))
     config.set_session_factory(session_factory)
+
+    global cache
+    cache = CacheManager(**parse_cache_config_options(settings))
 
     from .authnz import APIKeyAuthenticationPolicy
     api_key_authn_policy = APIKeyAuthenticationPolicy()

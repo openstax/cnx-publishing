@@ -13,11 +13,13 @@ from pyramid.interfaces import IAuthenticationPolicy
 from pyramid import security
 
 from cnxpublishing.db import db_connect
+from cnxpublishing.main import cache
 
 
 ALL_KEY_INFO_SQL_STMT = "SELECT id, key, name, groups FROM api_keys"
 
 
+@cache.cache(expire=60*60*24)  # cache for one day
 def lookup_api_key_info():
     """Given a dbapi cursor, lookup all the api keys and their information."""
     info = {}

@@ -6,6 +6,7 @@ from setuptools import setup, find_packages
 IS_PY3 = sys.version_info > (3,)
 
 install_requires = (
+    'beaker',
     'cnx-archive',
     'cnx-epub',
     'jinja2',
