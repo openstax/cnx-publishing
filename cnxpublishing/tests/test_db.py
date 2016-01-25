@@ -21,9 +21,9 @@ import psycopg2
 import cnxepub
 from cnxarchive import config as archive_config
 from cnxarchive.database import initdb as archive_initdb
-from cnxarchive.utils import join_ident_hash, split_ident_hash
 from pyramid import testing
 
+from ..utils import join_ident_hash, split_ident_hash
 from . import use_cases
 from .testing import db_connect, integration_test_settings
 

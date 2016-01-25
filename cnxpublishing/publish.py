@@ -11,9 +11,8 @@ Functions used to commit publication works to the archive.
 import cnxepub
 import psycopg2
 from cnxepub import Document, Binder
-from cnxarchive.utils import join_ident_hash, split_ident_hash
 
-from .utils import parse_user_uri
+from .utils import parse_user_uri, join_ident_hash, split_ident_hash
 
 
 __all__ = ('publish_model',)
