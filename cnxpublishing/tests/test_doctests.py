@@ -51,6 +51,9 @@ UPDATE document_controls AS dc
 SET licenseid = l.licenseid FROM licenses AS l WHERE url = %s and is_valid_for_publication = 't'
 RETURNING dc.licenseid""", ('http://creativecommons.org/licenses/by/4.0/',))
 
-        doctest.testfile(
+        results = doctest.testfile(
             '../../README.rst',
             optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
+
+        if results.failed:
+            self.fail('DocTest failed: {}'.format(results))
