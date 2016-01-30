@@ -16,10 +16,7 @@ import uuid
 import cnxepub
 import psycopg2
 import jinja2
-from cnxarchive.utils import (
-    IdentHashSyntaxError,
-    join_ident_hash, split_ident_hash,
-    )
+from cnxarchive.utils import IdentHashSyntaxError, IdentHashShortId
 from cnxepub import ATTRIBUTED_ROLE_KEYS
 from openstax_accounts.interfaces import IOpenstaxAccounts
 from psycopg2.extras import register_uuid
@@ -35,7 +32,8 @@ from .exceptions import (
     ResourceFileExceededLimitError,
     UserFetchError,
     )
-from .utils import parse_archive_uri, parse_user_uri
+from .utils import (parse_archive_uri, parse_user_uri, join_ident_hash,
+                    split_ident_hash)
 from .publish import publish_model, republish_binders
 
 
@@ -327,7 +325,7 @@ def _validate_derived_from(cursor, model):
     try:
         ident_hash = parse_archive_uri(derived_from_uri)
         uuid_, version = split_ident_hash(ident_hash, split_version=True)
-    except (ValueError, IdentHashSyntaxError) as exc:
+    except (ValueError, IdentHashSyntaxError, IdentHashShortId) as exc:
         raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri,
                                          original_exception=exc)
     # Is the ident-hash a valid pointer?

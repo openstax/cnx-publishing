@@ -12,7 +12,8 @@ import json
 from copy import deepcopy
 
 import cnxepub
-from cnxarchive.utils import join_ident_hash, split_ident_hash
+
+from ..utils import join_ident_hash, split_ident_hash
 
 
 here = os.path.abspath(os.path.dirname(__file__))

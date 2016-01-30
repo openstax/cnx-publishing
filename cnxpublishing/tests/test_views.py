@@ -19,7 +19,6 @@ import psycopg2
 import cnxepub
 from cnxarchive import config as archive_config
 from cnxarchive.database import initdb as archive_initdb
-from cnxarchive.utils import join_ident_hash
 from webob import Request
 from webtest import TestApp
 from webtest import AppError
@@ -27,6 +26,7 @@ from webtest.forms import Upload
 from pyramid import testing
 from pyramid import httpexceptions
 
+from ..utils import join_ident_hash, split_ident_hash
 from . import use_cases
 from .testing import (
     integration_test_settings,
@@ -1305,7 +1305,6 @@ GROUP BY user_id, accepted
                 ident_hashs = [book.id]
                 ident_hashs.extend(
                     [d.id for d in cnxepub.flatten_to_documents(book)])
-                from cnxarchive.utils import split_ident_hash
                 for ident_hash in ident_hashs:
                     id, _ = split_ident_hash(ident_hash)
                     cursor.execute("""\
@@ -1560,7 +1559,6 @@ GROUP BY user_id, accepted
         api_key_headers = [('x-api-key', api_key,)]
 
         # 1. --
-        from cnxarchive.utils import split_ident_hash
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
@@ -1812,7 +1810,6 @@ WHERE portal_type = 'Collection'""")
         api_key_headers = [('x-api-key', api_key,)]
 
         # Give publisher permission to publish
-        from cnxarchive.utils import split_ident_hash
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],

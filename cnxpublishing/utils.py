@@ -14,8 +14,11 @@ try:
 except ImportError:
     from urllib2 import unquote
 
+import cnxarchive.utils
+
 
 __all__ = (
+    'join_ident_hash', 'split_ident_hash',
     'parse_archive_uri', 'parse_user_uri',
     )
 
@@ -37,3 +40,16 @@ def parse_user_uri(uri, type_='cnx-id'):
     # We have added a unique UUID for each user; and that is what
     # we will use in epub import/export for now.
     return uri
+
+
+def split_ident_hash(*args, **kwargs):
+    try:
+        return cnxarchive.utils.split_ident_hash(*args, **kwargs)
+    except cnxarchive.utils.IdentHashMissingVersion as e:
+        version = None
+        if kwargs.get('split_version'):
+            version = (None, None)
+        return e.id, version
+
+
+join_ident_hash = cnxarchive.utils.join_ident_hash
