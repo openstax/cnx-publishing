@@ -61,6 +61,10 @@ def declare_api_routes(config):
     add_route('moderate', '/moderations/{id}')
     add_route('moderation-rss', '/feeds/moderations.rss')
 
+    # API Key routes
+    add_route('api-keys', '/api-keys')
+    add_route('api-key', '/api-keys/{id}')
+
 
 def declare_browsable_routes(config):
     """Declaration of routes that can be browsed by users."""
@@ -71,6 +75,7 @@ def declare_browsable_routes(config):
     add_route = config.add_route
     add_route('admin-index', '/a/')
     add_route('admin-moderation', '/a/moderation/')
+    add_route('admin-api-keys', '/a/api-keys/')
 
 
 def declare_routes(config):
@@ -147,7 +152,10 @@ class RootFactory(object):
           )),
         (security.Allow, 'g:reviewers', ('preview',)),
         (security.Allow, 'g:moderators', ('preview', 'moderate',)),
-        (security.Allow, 'g:administrators', ('preview', 'moderate',)),
+        (security.Allow, 'g:administrators',
+         ('preview',
+          'moderate',
+          'administer')),
         security.DENY_ALL,
         )
 
