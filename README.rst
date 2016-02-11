@@ -167,7 +167,7 @@ variables::
     >>> import cnxepub
 
     # As configured in development.ini
-    >>> api_key = 'developer'
+    >>> api_key = 'dev'
     >>> base_url = 'http://localhost:6543'
 
 Publishing content
@@ -197,7 +197,7 @@ The following is an example publication using some pre-build content::
     ...               'application/octet-stream',),)]
     >>> headers = {'x-api-key': api_key}
     >>> resp = requests.post(url, files=file_payload, headers=headers)
-    >>> assert resp.status_code == 200
+    >>> assert resp.status_code == 200, resp.status_code
 
     # The info returned from a successful POST looks something like this.
     >>> pprint(resp.json())

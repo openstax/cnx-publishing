@@ -605,6 +605,34 @@ WHERE id = %s""", (publication_id,))
     return httpexceptions.HTTPAccepted()
 
 
+# ############ #
+#   API Keys   #
+# ############ #
+
+@view_config(route_name='api-keys', request_method='GET',
+             accept="application/json",
+             renderer='json', permission='administer')
+def get_api_keys(request):
+    """Return the list of API keys."""
+    settings = request.registry.settings
+
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT row_to_json(combined_rows) FROM (
+  SELECT id, key, name, groups FROM api_keys
+) AS combined_rows""")
+            api_keys = [x[0] for x in cursor.fetchall()]
+
+    return api_keys
+
+# TODO Add CRUD views for API Keys...
+
+
+# ################### #
+#   Admin Interface   #
+# ################### #
+
 @view_config(route_name='admin-index', request_method='GET',
              renderer="cnxpublishing:templates/index.html",
              permission='preview')
@@ -613,6 +641,9 @@ def admin_index(request):  # pragma: no cover
         'navigation': [
             {'name': 'Moderation List',
              'uri': request.route_url('admin-moderation'),
+             },
+            {'name': 'API Keys',
+             'uri': request.route_url('admin-api-keys'),
              },
             ],
         }
@@ -626,3 +657,16 @@ def admin_index(request):  # pragma: no cover
              permission='view')
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}
+
+
+@view_config(route_name='admin-api-keys', request_method='GET',
+             renderer="cnxpublishing:templates/api-keys.html",
+             permission='administer')
+def admin_api_keys(request):  # pragma: no cover
+    # Easter Egg that will invalidate the cache, just hit this page.
+    # FIXME Move this logic into the C[R]UD views...
+    from .authnz import lookup_api_key_info
+    from .main import cache
+    cache.invalidate(lookup_api_key_info)
+
+    return {'api_keys': get_api_keys(request)}

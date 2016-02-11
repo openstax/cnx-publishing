@@ -5,8 +5,11 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import os
 import tempfile
 
+from beaker.cache import CacheManager
+from beaker.util import parse_cache_config_options
 from cnxarchive.utils import join_ident_hash
 from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid.config import Configurator
@@ -16,11 +19,22 @@ from pyramid.httpexceptions import default_exceptionresponse_view
 from pyramid.session import SignedCookieSessionFactory
 from pyramid_multiauth import MultiAuthenticationPolicy
 
-from .authnz import APIKeyAuthenticationPolicy
-
 
 __version__ = '0.1'
 __name__ = 'cnxpublishing'
+
+
+# Provides a means of caching function results.
+# (This is reassigned with configuration in ``main()``.)
+cache = CacheManager()
+
+
+def find_migrations_directory():  # pragma: no cover
+    """Finds and returns the location of the database migrations directory.
+    This function is used from a setuptools entry-point for db-migrator.
+    """
+    here = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(here, 'sql/migrations')
 
 
 def declare_api_routes(config):
@@ -47,6 +61,10 @@ def declare_api_routes(config):
     add_route('moderate', '/moderations/{id}')
     add_route('moderation-rss', '/feeds/moderations.rss')
 
+    # API Key routes
+    add_route('api-keys', '/api-keys')
+    add_route('api-key', '/api-keys/{id}')
+
 
 def declare_browsable_routes(config):
     """Declaration of routes that can be browsed by users."""
@@ -57,6 +75,7 @@ def declare_browsable_routes(config):
     add_route = config.add_route
     add_route('admin-index', '/a/')
     add_route('admin-moderation', '/a/moderation/')
+    add_route('admin-api-keys', '/a/api-keys/')
 
 
 def declare_routes(config):
@@ -77,17 +96,6 @@ def declare_routes(config):
     declare_browsable_routes(config)
 
 
-def _parse_api_key_lines(settings):
-    """Parse the api-key lines from the settings."""
-    api_key_entities = []
-    for line in settings['api-key-authnz'].split('\n'):
-        if not line.strip():
-            continue
-        entity = [x.strip() for x in line.split(',') if x.strip()]
-        api_key_entities.append(entity)
-    return api_key_entities
-
-
 def main(global_config, **settings):
     """Application factory"""
     config = Configurator(settings=settings, root_factory=RootFactory)
@@ -97,8 +105,11 @@ def main(global_config, **settings):
         settings.get('session_key', 'itsaseekreet'))
     config.set_session_factory(session_factory)
 
-    api_key_entities = _parse_api_key_lines(settings)
-    api_key_authn_policy = APIKeyAuthenticationPolicy(api_key_entities)
+    global cache
+    cache = CacheManager(**parse_cache_config_options(settings))
+
+    from .authnz import APIKeyAuthenticationPolicy
+    api_key_authn_policy = APIKeyAuthenticationPolicy()
     config.include('openstax_accounts')
     openstax_authn_policy = config.registry.getUtility(
         IOpenstaxAccountsAuthenticationPolicy)
@@ -141,7 +152,10 @@ class RootFactory(object):
           )),
         (security.Allow, 'g:reviewers', ('preview',)),
         (security.Allow, 'g:moderators', ('preview', 'moderate',)),
-        (security.Allow, 'g:administrators', ('preview', 'moderate',)),
+        (security.Allow, 'g:administrators',
+         ('preview',
+          'moderate',
+          'administer')),
         security.DENY_ALL,
         )
 

@@ -6,6 +6,7 @@ from setuptools import setup, find_packages
 IS_PY3 = sys.version_info > (3,)
 
 install_requires = (
+    'beaker',
     'cnx-archive',
     'cnx-epub',
     'jinja2',
@@ -50,5 +51,7 @@ setup(
     main = cnxpublishing.main:main
     [console_scripts]
     cnx-publishing-initdb = cnxpublishing.scripts.initdb:main
+    [dbmigrator]
+    migrations_directory = cnxpublishing.main:find_migrations_directory
     """,
     )

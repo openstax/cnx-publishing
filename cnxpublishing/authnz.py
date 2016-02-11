@@ -12,22 +12,35 @@ from zope.interface import implementer
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid import security
 
+from cnxpublishing.db import db_connect
+from cnxpublishing.main import cache
+
+
+ALL_KEY_INFO_SQL_STMT = "SELECT id, key, name, groups FROM api_keys"
+
+
+@cache.cache(expire=60*60*24)  # cache for one day
+def lookup_api_key_info():
+    """Given a dbapi cursor, lookup all the api keys and their information."""
+    info = {}
+    with db_connect() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(ALL_KEY_INFO_SQL_STMT)
+            for row in cursor.fetchall():
+                id, key, name, groups = row
+                user_id = "api_key:{}".format(id)
+                info[key] = dict(id=id, user_id=user_id,
+                                 name=name, groups=groups)
+    return info
+
 
 @implementer(IAuthenticationPolicy)
 class APIKeyAuthenticationPolicy(object):
     """Authentication using preconfigured API keys"""
 
-    def __init__(self, entities=None):
-        """The ``entities`` value is a three value
-        tuple containing the api-key, user-id and list of groups.
-        """
-        self._api_key_index = {}
-        self._principals = []  # (<uid>, [<group>, ...],)
-        entities = entities or []
-        for i, entity in enumerate(entities):
-            key = entity[0]
-            self._principals.insert(i, entity[1:])
-            self._api_key_index[key] = i
+    @property
+    def user_info_by_key(self):
+        return lookup_api_key_info()
 
     def _discover_requesting_party(self, request):
         """With the request object, discover who is making the request.
@@ -36,15 +49,16 @@ class APIKeyAuthenticationPolicy(object):
         user_id = None
         api_key = request.headers.get('x-api-key', None)
         try:
-            principal_index = self._api_key_index[api_key]
+            principal_info = self.user_info_by_key[api_key]
         except KeyError:
-            principal_index = None
-        if principal_index is not None:
-            user_id = self._principals[principal_index][0]
-        return api_key, user_id
+            principal_info = None
+        if principal_info is not None:
+            user_id = principal_info['user_id']
+        return api_key, user_id, principal_info
 
     def authenticated_userid(self, request):
-        api_key, user_id = self._discover_requesting_party(request)
+        api_key, user_id, _ = self._discover_requesting_party(request)
+        return user_id
 
     # We aren't using a persistent store, for these,
     # so the implementation can be the same.
@@ -55,10 +69,13 @@ class APIKeyAuthenticationPolicy(object):
         including the userid and any groups belonged to by the current
         user, including 'system' groups such as Everyone and
         Authenticated. """
-        api_key, user_id = self._discover_requesting_party(request)
+        api_key, user_id, info = self._discover_requesting_party(request)
         if api_key is None or user_id is None:
             return []
-        principals = list(self._principals[self._api_key_index[api_key]])
+        try:
+            principals = list(info['groups'])
+        except TypeError:
+            principals = []
         principals.append(security.Everyone)
         principals.append(security.Authenticated)
         return principals

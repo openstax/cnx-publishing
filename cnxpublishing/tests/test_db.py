@@ -38,6 +38,23 @@ else:
     STDERR_MOCK_CLASS = StringIO
 
 
+class DatabaseUtilsTestCase(unittest.TestCase):
+    """Verify the database utility functions are working as expected"""
+
+    def test_db_connect(self):
+        from ..db import db_connect
+
+        settings = integration_test_settings()
+        from ..config import CONNECTION_STRING
+        db_conn_str = settings[CONNECTION_STRING]
+
+        with db_connect(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select true")
+                result = cur.fetchone()[0]
+        self.assertTrue(result)
+
+
 class BaseDatabaseIntegrationTestCase(unittest.TestCase):
     """Verify database interactions"""
 

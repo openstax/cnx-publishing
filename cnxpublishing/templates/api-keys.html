@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>API Keys</h1>
+  <table>
+    <tr>
+      <th>Key</th>
+      <th>Name</th>
+      <th>Groups</th>
+    </tr>
+    {% for info in api_keys %}
+      <tr id="{{ info.id ~ '-row' }}">
+        <td>{{ info.key }}</td>
+        <td>{{ info.name }}</td>
+        <td>{{ ', '.join(info.groups) }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
