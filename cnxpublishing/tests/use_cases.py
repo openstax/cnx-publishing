@@ -605,7 +605,7 @@ WHERE portal_type = 'Collection'""")
                            _read_file(RESOURCE_ONE_FILEPATH).read()) \
                       .hexdigest()
     cursor.execute("""\
-SELECT f.file, mf.mimetype,
+SELECT f.file, f.media_type,
        m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
 FROM files as f natural join module_files as mf, latest_modules as m
 WHERE
@@ -688,7 +688,7 @@ WHERE portal_type = 'Collection'""")
                            _read_file(RESOURCE_ONE_FILEPATH).read()) \
                       .hexdigest()
     cursor.execute("""\
-SELECT f.file, mf.mimetype,
+SELECT f.file, f.media_type,
        m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
 FROM files as f natural join module_files as mf, latest_modules as m
 WHERE

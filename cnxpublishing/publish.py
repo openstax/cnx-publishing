@@ -207,8 +207,8 @@ def _insert_resource_file(cursor, module_ident, resource):
         # Does not exist in archive
         with resource.open() as file:
             cursor.execute("""\
-INSERT INTO files (file) VALUES (%s) RETURNING fileid""",
-                           (memoryview(file.read()),))
+INSERT INTO files (file, media_type) VALUES (%s, %s) RETURNING fileid""",
+                           (memoryview(file.read()), resource.media_type,))
         fileid = cursor.fetchone()[0]
     else:
         exists_in_archive = True
@@ -234,10 +234,10 @@ where module_ident = %s and filename = %s""",
             # FFF At this time, it is impossible to get to this logic.
             raise Exception("filename conflict")
 
-    args = (module_ident, fileid, resource.filename, resource.media_type,)
+    args = (module_ident, fileid, resource.filename,)
     cursor.execute("""\
-INSERT INTO module_files (module_ident, fileid, filename, mimetype)
-VALUES (%s, %s, %s, %s)""", args)
+INSERT INTO module_files (module_ident, fileid, filename)
+VALUES (%s, %s, %s)""", args)
 
 
 def _insert_tree(cursor, tree, parent_id=None, index=0):
@@ -292,18 +292,19 @@ def publish_model(cursor, model, publisher, message):
         file_arg = {
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
-            'mime_type': 'text/html',
+            'media_type': 'text/html',
             'data': psycopg2.Binary(model.html.encode('utf-8')),
             }
         cursor.execute("""\
 WITH file_insertion AS (
-  INSERT INTO files (file) VALUES (%(data)s) RETURNING fileid)
+  INSERT INTO files (file, media_type) VALUES (%(data)s, %(media_type)s)
+  RETURNING fileid)
 INSERT INTO module_files
-  (module_ident, fileid, filename, mimetype)
+  (module_ident, fileid, filename)
 VALUES
   (%(module_ident)s,
    (SELECT fileid FROM file_insertion),
-   %(filename)s, %(mime_type)s)""", file_arg)
+   %(filename)s)""", file_arg)
 
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
