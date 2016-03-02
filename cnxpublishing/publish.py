@@ -289,11 +289,12 @@ def publish_model(cursor, model, publisher, message):
     if isinstance(model, Document):
         for resource in model.resources:
             _insert_resource_file(cursor, module_ident, resource)
+        html = str(cnxepub.DocumentContentFormatter(model))
         file_arg = {
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
             'media_type': 'text/html',
-            'data': psycopg2.Binary(model.html.encode('utf-8')),
+            'data': psycopg2.Binary(html.encode('utf-8')),
             }
         cursor.execute("""\
 WITH file_insertion AS (
