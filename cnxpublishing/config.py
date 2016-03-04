@@ -8,3 +8,8 @@
 from cnxarchive.config import (
     CONNECTION_STRING,
     )
+
+
+__all__ = (
+    'CONNECTION_STRING',
+    )

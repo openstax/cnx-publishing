@@ -85,3 +85,9 @@ class APIKeyAuthenticationPolicy(object):
 
     def forget(self, request):
         return []  # No need to forget when everything is already forgotten.
+
+
+__all__ = (
+    'APIKeyAuthenticationPolicy',
+    'lookup_api_key_info',
+    )

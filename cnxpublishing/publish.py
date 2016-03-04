@@ -15,9 +15,6 @@ from cnxepub import Document, Binder
 from .utils import parse_user_uri, join_ident_hash, split_ident_hash
 
 
-__all__ = ('publish_model',)
-
-
 ATTRIBUTED_ROLE_KEYS = (
     'authors', 'copyright_holders', 'editors', 'illustrators',
     'publishers', 'translators',
@@ -556,3 +553,13 @@ RETURNING nodeid"""
 
     root_node = children[None][0]
     build_tree(root_node, None)
+
+
+__all__ = (
+    'bump_version',
+    'get_previous_publication',
+    'publish_model',
+    'rebuild_collection_tree',
+    'republish_binders',
+    'republish_collection',
+    )

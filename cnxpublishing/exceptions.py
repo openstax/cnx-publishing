@@ -271,3 +271,18 @@ class ResourceFileExceededLimitError(PublicationException):
         data['size_limit'] = self._size_limit
         data['filename'] = self._filename
         return data
+
+
+__all__ = (
+    'DocumentLookupError',
+    'InvalidLicense',
+    'InvalidRole',
+    'InvalidMetadata',
+    'InvalidReference',
+    'InvalidDocumentPointer',
+    'MissingRequiredMetadata',
+    'NotAllowed',
+    'PublicationException',
+    'ResourceFileExceededLimitError',
+    'UserFetchError',
+    )

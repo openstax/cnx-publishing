@@ -17,12 +17,6 @@ except ImportError:
 import cnxarchive.utils
 
 
-__all__ = (
-    'join_ident_hash', 'split_ident_hash',
-    'parse_archive_uri', 'parse_user_uri',
-    )
-
-
 def parse_archive_uri(uri):
     """Given an archive URI, parse to a split ident-hash."""
     parsed = urlparse(uri)
@@ -53,3 +47,11 @@ def split_ident_hash(*args, **kwargs):
 
 
 join_ident_hash = cnxarchive.utils.join_ident_hash
+
+
+__all__ = (
+    'join_ident_hash',
+    'parse_archive_uri',
+    'parse_user_uri',
+    'split_ident_hash',
+    )
