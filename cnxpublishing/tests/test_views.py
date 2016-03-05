@@ -54,7 +54,7 @@ class PublishViewsTestCase(unittest.TestCase):
         post_data = {'epub': ('book.epub', b'')}
         request = Request.blank('/publications', POST=post_data)
 
-        from ..views import publish
+        from ..views.publishing import publish
         with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
             publish(request)
 
@@ -113,7 +113,7 @@ class ApiKeyViewsTestCase(unittest.TestCase):
         expected_api_keys = [dict(zip(_keys, x)) for x in expected_api_keys]
 
         # Call the target...
-        from ..views import get_api_keys
+        from ..views.api_keys import get_api_keys
         resp_data = get_api_keys(request)
 
         self.assertEqual(resp_data, expected_api_keys)
