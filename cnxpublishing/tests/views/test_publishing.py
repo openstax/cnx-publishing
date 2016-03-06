@@ -11,7 +11,6 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import cnxepub
-import psycopg2  # XXX
 from pyramid import httpexceptions
 from pyramid import testing
 from webob import Request
@@ -1204,7 +1203,7 @@ WHERE portal_type = 'Collection'""")
         # Check that the epub file is stored in the database
         with open(epub_filepath, 'r') as f:
             epub_content = f.read()
-        with psycopg2.connect(self.db_conn_str) as db_conn:
+        with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute('SELECT epub FROM publications'
                                '  WHERE id = %s', (publication_id,))

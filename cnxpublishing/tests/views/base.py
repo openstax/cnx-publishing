@@ -11,7 +11,6 @@ import shutil
 import unittest
 import zipfile
 
-import psycopg2  # XXX
 import cnxepub
 from cnxarchive import config as archive_config
 from cnxarchive.database import initdb as archive_initdb
@@ -148,7 +147,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         self.set_up_api_keys()
 
     def tearDown(self):
-        with psycopg2.connect(self.db_conn_str) as db_conn:
+        with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
