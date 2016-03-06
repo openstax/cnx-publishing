@@ -15,7 +15,7 @@ import psycopg2
 
 from ..db import upsert_acl
 from .testing import config_uri
-from .test_views import BaseFunctionalViewTestCase
+from .views.base import BaseFunctionalViewTestCase
 
 
 class DocTestTestCase(BaseFunctionalViewTestCase):
