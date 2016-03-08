@@ -143,9 +143,15 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
 """, (ident_hash,))
                 module = cursor.fetchone()
 
+        summary = b"""\
+<div class="description" data-type="description"\
+ xmlns="http://www.w3.org/1999/xhtml">
+  The options are limitless.
+</div>"""
+
         self.assertEqual(module[0], metadata['title'])
         self.assertEqual(module[1], metadata['language'])
-        self.assertEqual(module[2], metadata['summary'])
+        self.assertEqual(module[2], summary)
         self.assertEqual(module[3], metadata['license_url'])
         self.assertEqual(module[4], 1)
         self.assertEqual(module[5], None)
