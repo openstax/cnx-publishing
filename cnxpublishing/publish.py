@@ -144,6 +144,8 @@ def _insert_metadata(cursor, model, publisher, message):
     params['publication_message'] = message
     params['_portal_type'] = _model_to_portaltype(model)
 
+    params['summary'] = str(cnxepub.DocumentSummaryFormatter(model))
+
     # Transform person structs to id lists for database array entry.
     for person_field in ATTRIBUTED_ROLE_KEYS:
         params[person_field] = [parse_user_uri(x['id'])
