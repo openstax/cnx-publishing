@@ -1,41 +1,23 @@
 # -*- coding: utf-8 -*-
 # ###
-# Copyright (c) 2013, Rice University
+# Copyright (c) 2013-2016, Rice University
 # This software is subject to the provisions of the GNU Affero General
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import os
-import tempfile
 import json
-import shutil
 import unittest
-import uuid
-import zipfile
 from collections import OrderedDict
 from copy import deepcopy
 
-import psycopg2
 import cnxepub
-from cnxarchive import config as archive_config
-from cnxarchive.database import initdb as archive_initdb
-from webob import Request
-from webtest import TestApp
-from webtest import AppError
-from webtest.forms import Upload
-from pyramid import testing
 from pyramid import httpexceptions
+from pyramid import testing
+from webob import Request
+from webtest.forms import Upload
 
-from ..utils import join_ident_hash, split_ident_hash
-from . import use_cases
-from .testing import (
-    integration_test_settings,
-    db_connect, db_connection_factory,
-    )
-
-
-here = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(here, 'data')
+from .. import use_cases
+from .base import BaseFunctionalViewTestCase
 
 
 class PublishViewsTestCase(unittest.TestCase):
@@ -54,658 +36,12 @@ class PublishViewsTestCase(unittest.TestCase):
         post_data = {'epub': ('book.epub', b'')}
         request = Request.blank('/publications', POST=post_data)
 
-        from ..views import publish
+        from cnxpublishing.views.publishing import publish
         with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
             publish(request)
 
         exc = caught_exc.exception
         self.assertEqual(exc.args, ('Format not recognized.',))
-
-
-class ApiKeyViewsTestCase(unittest.TestCase):
-    # This ignores testing the security policy. The views are directly
-    # protected by permissions. If at some point a view starts checking
-    # for particular permissions inside the view, then you should test
-    # for that case.
-
-    @classmethod
-    def setUpClass(cls):
-        cls.settings = integration_test_settings()
-        from ..config import CONNECTION_STRING
-        cls.db_conn_str = cls.settings[CONNECTION_STRING]
-        cls.db_connect = staticmethod(db_connection_factory())
-
-    def setUp(self):
-        self.config = testing.setUp(settings=self.settings)
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from ..db import initdb
-        initdb(self.db_conn_str)
-
-    def tearDown(self):
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("DROP SCHEMA public CASCADE")
-                cursor.execute("CREATE SCHEMA public")
-        testing.tearDown()
-
-    def test_get(self):
-        request = testing.DummyRequest()
-
-        # Insert some keys to list in the view.
-        api_keys = [
-            ['abc', "ABC", ['g:publishers']],
-            ['xyz', "XYZ", ['g:trusted-publishers']],
-            ]
-        insert_stmt = "INSERT INTO api_keys (key, name, groups) " \
-                      "VALUES (%s, %s, %s)" \
-                      "RETURNING id, key, name, groups"
-        expected_api_keys = []
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                for values in api_keys:
-                    cursor.execute(insert_stmt, values)
-                    row = cursor.fetchone()
-                    expected_api_keys.append(row)
-        _keys = ['id', 'key', 'name', 'groups']
-        expected_api_keys = [dict(zip(_keys, x)) for x in expected_api_keys]
-
-        # Call the target...
-        from ..views import get_api_keys
-        resp_data = get_api_keys(request)
-
-        self.assertEqual(resp_data, expected_api_keys)
-
-
-class EPUBMixInTestCase(object):
-
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmpdir)
-
-    def make_epub(self, binder, publisher, message):
-        """Given a cnx-epub model, create an EPUB.
-        This returns a temporary file location where the EPUB can be found.
-        """
-        zip_fd, zip_filepath = tempfile.mkstemp('.epub', dir=self.tmpdir)
-        cnxepub.make_publication_epub(binder, publisher, message,
-                                      zip_filepath)
-        return zip_filepath
-
-    def pack_epub(self, directory):
-        """Given an directory containing epub contents,
-        pack it up and make return filepath.
-        Packed file is remove on test exit.
-        """
-        zip_fd, zip_filepath = tempfile.mkstemp('.epub', dir=self.tmpdir)
-        with zipfile.ZipFile(zip_filepath, 'w') as zippy:
-            base_path = os.path.abspath(directory)
-            for root, dirs, filenames in os.walk(directory):
-                # Strip the absolute path
-                archive_path = os.path.abspath(root)[len(base_path):]
-                for filename in filenames:
-                    filepath = os.path.join(root, filename)
-                    archival_filepath = os.path.join(archive_path, filename)
-                    zippy.write(filepath, archival_filepath)
-        return zip_filepath
-
-    def copy(self, src, dst_name='book'):
-        """Convenient method for copying test data directories."""
-        dst = os.path.join(self.tmpdir, dst_name)
-        shutil.copytree(src, dst)
-        return dst
-
-
-class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
-    """Request/response client interactions"""
-
-    settings = None
-    db_conn_str = None
-    db_connect = None
-
-    @property
-    def api_keys_by_name(self):
-        """Mapping of uid to api key."""
-        attr_name = '_api_keys'
-        api_keys = getattr(self, attr_name, None)
-
-        def get_info():
-            from ..authnz import lookup_api_key_info
-            with self.db_connect() as db_conn:
-                with db_conn.cursor() as cursor:
-                    return lookup_api_key_info()
-
-        if api_keys is None:
-            self.addCleanup(delattr, self, attr_name)
-            api_keys = {}
-            for key, value in get_info().items():
-                api_keys[value['name']] = key
-            setattr(self, attr_name, api_keys)
-        return api_keys
-
-    def gen_api_key_headers(self, name):
-        """Generate authentication headers for the given user."""
-        api_key = self.api_keys_by_name[name]
-        api_key_header = [('x-api-key', api_key,)]
-        return api_key_header
-
-    def set_up_api_keys(self):
-        # key_info_keys = ['key', 'name', 'groups']
-        key_info = (
-            # [key, name, groups]
-            ['4e8', 'no-trust', None],
-            ['b07', 'some-trust', ['g:trusted-publishers']],
-            ['dev', 'developer', ['g:trusted-publishers']],
-            )
-        # key_info = [dict(zip(key_info_keys, value)) for value in key_info]
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.executemany("INSERT INTO api_keys (key, name, groups) "
-                                   "VALUES (%s, %s, %s)", key_info)
-        self.addCleanup(self.tear_down_api_keys)
-
-    def tear_down_api_keys(self):
-        # Invalidate the api_key lookup cache
-        from cnxpublishing import authnz
-        authnz.cache.invalidate(authnz.lookup_api_key_info)
-
-    @classmethod
-    def setUpClass(cls):
-        cls.settings = integration_test_settings()
-        from ..config import CONNECTION_STRING
-        cls.db_conn_str = cls.settings[CONNECTION_STRING]
-        cls.db_connect = staticmethod(db_connection_factory())
-        cls._app = cls.make_app(cls.settings)
-
-    @staticmethod
-    def make_app(settings):
-        from ..main import main
-        app = main({}, **settings)
-        return app
-
-    @property
-    def app(self):
-        return TestApp(self._app)
-
-    def setUp(self):
-        EPUBMixInTestCase.setUp(self)
-        config = testing.setUp(settings=self.settings)
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from ..db import initdb
-        initdb(self.db_conn_str)
-
-        # Assign API keys for testing
-        self.set_up_api_keys()
-
-    def tearDown(self):
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("DROP SCHEMA public CASCADE")
-                cursor.execute("CREATE SCHEMA public")
-        testing.tearDown()
-
-
-class UserActionsAPIFunctionalTestCase(BaseFunctionalViewTestCase):
-    """User actions API request/response client interactions"""
-
-    @db_connect
-    def test_licensors_request(self, cursor):
-        """Submit a set of users to initial license acceptance.
-
-        1. Submit the license request.
-
-        2. Verify the request entry.
-
-        3. Submit a deletion request.
-
-        4. Verify the request entry.
-
-        """
-        # Set up a document_controls entry to make it appear as if we
-        # are working against a true piece of content.
-        cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
-        uuid_ = cursor.fetchone()[0]
-        cursor.connection.commit()
-
-        headers = self.gen_api_key_headers('some-trust')
-
-        licensors = [
-            {'uid': 'marknewlyn', 'has_accepted': True},
-            {'uid': 'charrose', 'has_accepted': True},
-            ]
-        license_url = u"http://creativecommons.org/licenses/by/4.0/"
-
-        # 1.
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {'license_url': license_url, 'licensors': licensors}
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # 2.
-        expected = {
-            u'license_url': license_url,
-            u'licensors': [
-                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
-                {u'uuid': unicode(uuid_), u'uid': u'marknewlyn', u'has_accepted': True},
-                ],
-            }
-        resp = self.app.get(path, headers=headers)
-        self.assertEqual(resp.json, expected)
-
-        # 3.
-        data = {'licensors': [{'uid': 'marknewlyn'}]}
-        resp = self.app.delete_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 200)
-
-        # 4.
-        expected = {
-            u'license_url': license_url,
-            u'licensors': [
-                {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
-                ],
-            }
-        resp = self.app.get(path, headers=headers)
-        self.assertEqual(resp.json, expected)
-
-    @db_connect
-    def test_licensors_request_wo_license(self, cursor):
-        """Submit a set of users to initial license acceptance.
-
-        1. Submit the license request, without a license.
-
-        """
-        # Set up a document_controls entry to make it appear as if we
-        # are working against a true piece of content.
-        cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
-        uuid_ = cursor.fetchone()[0]
-        cursor.connection.commit()
-
-        headers = self.gen_api_key_headers('some-trust')
-
-        licensors = [
-            {'uid': 'marknewlyn', 'has_accepted': True},
-            {'uid': 'charrose', 'has_accepted': True},
-            ]
-
-        # 1.
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {'licensors': licensors}
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
-
-    @db_connect
-    def test_license_request_w_license_change(self, cursor):
-        """Submit a license acceptance request to change the license.
-
-        1. Submit the license request, with an invalid license.
-
-        2. Submit the license request, with an invalid publication license.
-
-        3. Submit the license request, with a valid license.
-
-        """
-        # Set up a document_controls entry to make it appear as if we
-        # are working against a true piece of content.
-        cursor.execute("""\
-INSERT INTO document_controls (uuid, licenseid) VALUES (DEFAULT, 11) RETURNING uuid""")
-        uuid_ = cursor.fetchone()[0]
-        cursor.connection.commit()
-
-        headers = self.gen_api_key_headers('some-trust')
-
-        uids = [{'uid': 'marknewlyn'}, {'uid': 'charrose'}]
-
-        # 1.
-        license_url = 'http://example.org/licenses/mine/2.0/'
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {'license_url': license_url, 'licensors': uids}
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
-
-        # 2.
-        license_url = 'http://creativecommons.org/licenses/by/2.0/'
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {'license_url': license_url, 'licensors': uids}
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
-
-        # 3.
-        license_url = 'http://creativecommons.org/licenses/by/4.0/'
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {'license_url': license_url, 'licensors': uids}
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-    @db_connect
-    def test_roles_request(self, cursor):
-        """Submit a set of roles to be accepted.
-
-        1. Submit the roles request.
-
-        2. Verify the request entry.
-
-        3. Submit a deletion request.
-
-        4. Verify the request entry.
-
-        """
-        # Set up a document_controls entry to make it appear as if we
-        # are working against a true piece of content.
-        cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
-        uuid_ = cursor.fetchone()[0]
-        cursor.connection.commit()
-
-        api_key_header = self.gen_api_key_headers('some-trust')
-        headers = [('content-type', 'application/json',)]
-        headers.extend(api_key_header)
-
-        # 1.
-        path = "/contents/{}/roles".format(uuid_)
-        data = [
-            {'uid': 'charrose', 'role': 'Author', 'has_accepted': True},
-            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
-            {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
-            ]
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # *. Check for user info persistence. This is an upsert done when
-        #    a role is submitted.
-        cursor.execute("SELECT username, "
-                       "ARRAY[first_name IS NOT NULL, "
-                       "      last_name IS NOT NULL, "
-                       "      full_name IS NOT NULL] "
-                       "FROM users ORDER BY username")
-        users = {u: set(b) for u, b in cursor.fetchall()}
-        self.assertEqual(users.keys(), sorted([x['uid'] for x in data]))
-        for username, null_checks in users.items():
-            self.assertNotIn(None, null_checks,
-                             '{} has a null value'.format(username))
-
-        # 2.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': True},
-            {'uuid': str(uuid_), 'uid': 'marknewlyn',
-             'role': 'Author', 'has_accepted': True},
-            {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': True},
-            ]
-        resp = self.app.get(path, headers=api_key_header)
-        self.assertEqual(resp.json, expected)
-
-        # 3.
-        data = [
-            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
-            {'uid': 'marknewlyn', 'role': 'Publisher', 'has_accepted': True},
-            ]
-        resp = self.app.delete_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 200)
-
-        # 4.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': True},
-            {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': True},
-            ]
-        resp = self.app.get(path, headers=api_key_header)
-        self.assertEqual(resp.json, expected)
-
-    @db_connect
-    def test_acl_request(self, cursor):
-        """Submit a set of access control entries (ACE) to the ACL
-
-        1. Submit the acl request.
-
-        2. Verify the request entry.
-
-        3. Submit a deletion request.
-
-        4. Verify the request entry.
-
-        """
-        # Set up a document_controls entry to make it appear as if we
-        # are working against a true piece of content.
-        cursor.execute("""\
-INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
-        uuid_ = cursor.fetchone()[0]
-        cursor.connection.commit()
-
-        api_key_header = self.gen_api_key_headers('some-trust')
-        headers = [('content-type', 'application/json',)]
-        headers.extend(api_key_header)
-
-        # 1.
-        path = "/contents/{}/permissions".format(uuid_)
-        data = [
-            {'uid': 'ream', 'permission': 'publish'},
-            {'uid': 'rings', 'permission': 'publish'},
-            ]
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # 2.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
-            {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
-            ]
-        resp = self.app.get(path, headers=api_key_header)
-        self.assertEqual(resp.json, expected)
-
-        # 3.
-        data = [
-            {'uid': 'rings', 'permission': 'publish'},
-            ]
-        resp = self.app.delete_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 200)
-
-        # 4.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
-            ]
-        resp = self.app.get(path, headers=api_key_header)
-        self.assertEqual(resp.json, expected)
-
-    def test_create_identifier_on_licensors_request(self):
-        """Submit a set of users to initial license acceptance.
-        This tests whether a trusted publisher has the permission
-        to create an identifer where one previously didn't exist.
-
-        1. Submit the license request (as *untrusted* app user).
-
-        2. Submit the license request (as *trusted* app user).
-
-        3. Verify the request entry.
-
-        """
-        uuid_ = uuid.uuid4()
-
-        license_url = u"http://creativecommons.org/licenses/by/4.0/"
-        licensors = [
-            {'uid': 'marknewlyn', 'has_accepted': True},
-            {'uid': 'charrose', 'has_accepted': True},
-            ]
-
-        path = "/contents/{}/licensors".format(uuid_)
-        data = {
-            'license_url': license_url,
-            'licensors': licensors,
-            }
-
-        # 1.
-        headers = self.gen_api_key_headers('no-trust')
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
-
-        # 2.
-        headers = self.gen_api_key_headers('some-trust')
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # 3.
-        expected = {
-            u'license_url': license_url,
-            u'licensors': [
-                {u'uuid': unicode(uuid_), u'uid': u'charrose',
-                 u'has_accepted': True},
-                {u'uuid': unicode(uuid_), u'uid': u'marknewlyn',
-                 u'has_accepted': True},
-                ],
-            }
-        resp = self.app.get(path, headers=headers)
-        self.assertEqual(resp.json, expected)
-
-    def test_create_identifier_on_roles_request(self):
-        """Submit a set of roles to be accepted.
-        This tests whether a trusted publisher has the permission
-        to create an identifer where one previously didn't exist.
-
-        1. Submit the roles request.
-
-        2. Submit the license request (as *trusted* app user).
-
-        3. Verify the request entry.
-
-        """
-        uuid_ = uuid.uuid4()
-        base_headers = [('content-type', 'application/json',)]
-
-        path = "/contents/{}/roles".format(uuid_)
-        data = [
-            {'uid': 'charrose', 'role': 'Author'},
-            {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': False},
-            {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
-            ]
-
-        # 1.
-        headers = self.gen_api_key_headers('no-trust')
-        headers.extend(base_headers)
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
-
-        # 2.
-        headers = self.gen_api_key_headers('some-trust')
-        headers.extend(base_headers)
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # 3.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'charrose',
-             'role': 'Author', 'has_accepted': None},
-            {'uuid': str(uuid_), 'uid': 'marknewlyn',
-             'role': 'Author', 'has_accepted': False},
-            {'uuid': str(uuid_), 'uid': 'rings',
-             'role': 'Publisher', 'has_accepted': True},
-            ]
-        resp = self.app.get(path, headers=headers)
-        self.assertEqual(resp.json, expected)
-
-    def test_create_identifier_on_acl_request(self):
-        """Submit a set of access control entries (ACE) to the ACL
-        This tests whether a trusted publisher has the permission
-        to create an identifer where one previously didn't exist.
-
-        1. Submit the acl request.
-
-        2. Submit the license request (as *trusted* app user).
-
-        3. Verify the request entry.
-
-        """
-        uuid_ = uuid.uuid4()
-        base_headers = [('content-type', 'application/json',)]
-
-        path = "/contents/{}/permissions".format(uuid_)
-        data = [
-            {'uid': 'ream', 'permission': 'publish'},
-            {'uid': 'rings', 'permission': 'publish'},
-            ]
-
-        # 1.
-        headers = self.gen_api_key_headers('no-trust')
-        headers.extend(base_headers)
-        with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
-        exception = caught_exception.exception
-        self.assertTrue(exception.args[0].find("403 Forbidden") >= 0)
-
-        # 2.
-        headers = self.gen_api_key_headers('some-trust')
-        headers.extend(base_headers)
-        resp = self.app.post_json(path, data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # 3.
-        expected = [
-            {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
-            {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
-            ]
-        resp = self.app.get(path, headers=headers)
-        self.assertEqual(resp.json, expected)
-
-    def test_create_identifier_for_all_routes(self):
-        """Tests that creating an identifier result in non-404
-        on other routes. See also,
-        https://github.com/Connexions/cnx-publishing/issues/52
-        """
-        # POST a permission set
-        data = [{'uid': 'ream', 'permission': 'publish'}]
-        uuid_ = uuid.uuid4()
-        path = '/contents/{}/permissions'
-        headers = self.gen_api_key_headers('some-trust')
-        resp = self.app.post_json(path.format(uuid_), data, headers=headers)
-        self.assertEqual(resp.status_int, 202)
-
-        # Also, check that we still get 404 for non-existent controls.
-        other_uuid = uuid.uuid4()
-
-        # Check the response...
-        resp = self.app.get(path.format(uuid_))
-        data[0]['uuid'] = str(uuid_)
-        self.assertEqual(resp.json, data)
-        with self.assertRaises(AppError) as caught_exc:
-            self.app.get(path.format(other_uuid))
-        self.assertIn('404', caught_exc.exception.message)
-
-        # And check the other two routes at least result in 200 OK
-        path = '/contents/{}/licensors'
-        licensors_resp = self.app.get(path.format(uuid_))
-        self.assertEqual(licensors_resp.status_int, 200)
-        with self.assertRaises(AppError) as caught_exc:
-            self.app.get(path.format(other_uuid))
-        self.assertIn('404', caught_exc.exception.message)
-
-        path = '/contents/{}/roles'
-        roles_resp = self.app.get(path.format(uuid_))
-        self.assertEqual(roles_resp.status_int, 200)
-        with self.assertRaises(AppError) as caught_exc:
-            self.app.get(path.format(other_uuid))
-        self.assertIn('404', caught_exc.exception.message)
-
-        # And check the contents...
-        self.assertEqual(licensors_resp.json,
-                         {'license_url': None, 'licensors': []})
-        self.assertEqual(roles_resp.json, [])
 
 
 class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
@@ -1051,7 +387,7 @@ UPDATE role_acceptances SET (accepted) = ('t');
 UPDATE license_acceptances SET (accepted) = ('t');""")
 
         # Poke the publication into moderation.
-        from ..db import poke_publication_state
+        from cnxpublishing.db import poke_publication_state
         poke_publication_state(publication_id)
 
         # *. --
@@ -1377,6 +713,7 @@ GROUP BY user_id, accepted
         #   vetted by virtue of being added by a another vetted user.
 
         # Add this publisher to the ACL.
+        from cnxpublishing.utils import split_ident_hash
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 book = use_cases.REVISED_BOOK
@@ -1635,6 +972,7 @@ GROUP BY user_id, accepted
         api_key_headers = self.gen_api_key_headers('some-trust')
 
         # 1. --
+        from cnxpublishing.utils import split_ident_hash
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
@@ -1727,6 +1065,7 @@ GROUP BY user_id, accepted
         # 6. (manual)
         # Checks ``latest_modules`` by virtue of the ``tree_to_json``
         # plsql function.
+        from cnxpublishing.utils import join_ident_hash
         binder = use_cases.REVISED_BOOK
         document = use_cases.REVISED_BOOK[0][0]
         with self.db_connect() as db_conn:
@@ -1864,7 +1203,7 @@ WHERE portal_type = 'Collection'""")
         # Check that the epub file is stored in the database
         with open(epub_filepath, 'r') as f:
             epub_content = f.read()
-        with psycopg2.connect(self.db_conn_str) as db_conn:
+        with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute('SELECT epub FROM publications'
                                '  WHERE id = %s', (publication_id,))
@@ -1882,6 +1221,7 @@ WHERE portal_type = 'Collection'""")
         api_key_headers = self.gen_api_key_headers('some-trust')
 
         # Give publisher permission to publish
+        from cnxpublishing.utils import split_ident_hash
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],

@@ -8,25 +8,36 @@
 import unittest
 
 
-class UtilsTests(unittest.TestCase):
+class ParseArchiveUriTestCase(unittest.TestCase):
 
-    def test_parse_archive_uri(self):
+    @property
+    def target(self):
         from ..utils import parse_archive_uri
+        return parse_archive_uri
 
+    def test(self):
         faux_ident_hash = 'abc123@4'
-        ident_hash = parse_archive_uri('/contents/{}'.format(faux_ident_hash))
+        ident_hash = self.target('/contents/{}'.format(faux_ident_hash))
         self.assertEqual(ident_hash, faux_ident_hash)
 
-    def test_parse_user_uri(self):
-        from ..utils import parse_user_uri
 
+class ParseUserUriTestCase(unittest.TestCase):
+
+    @property
+    def target(self):
+        from ..utils import parse_user_uri
+        return parse_user_uri
+
+    def test_success(self):
         uid = 'typo'
-        user = parse_user_uri(uid, type_='cnx-id')
+        user = self.target(uid, type_='cnx-id')
         self.assertEqual(user, uid)
 
+    def test_invalid_type(self):
+        uid = 'typo'
         invalid_type = 'rice-id'
         with self.assertRaises(ValueError) as caught_exc:
-            parse_user_uri(uid, type_=invalid_type)
+            self.target(uid, type_=invalid_type)
         self.assertEqual(
             caught_exc.exception.args[0],
             "Can't parse a user uri of type '{}'.".format(invalid_type))

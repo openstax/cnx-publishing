@@ -18,7 +18,9 @@ include
 ##############
 build/
 dist/
+.eggs/
 
 # Coverage #
 ############
 .coverage
+htmlcov/

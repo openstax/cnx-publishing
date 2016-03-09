@@ -11,11 +11,9 @@ import os
 import subprocess
 import time
 
-import psycopg2
-
 from ..db import upsert_acl
 from .testing import config_uri
-from .test_views import BaseFunctionalViewTestCase
+from .views.base import BaseFunctionalViewTestCase
 
 
 class DocTestTestCase(BaseFunctionalViewTestCase):
@@ -39,7 +37,7 @@ class DocTestTestCase(BaseFunctionalViewTestCase):
         uuids = ['07509e07-3732-45d9-a102-dd9a4dad5456',
                  'de73751b-7a14-4e59-acd9-ba66478e4710']
         permissions = [('ream', 'publish')]
-        with psycopg2.connect(self.db_conn_str) as db_conn:
+        with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 for uuid_ in uuids:
                     cursor.execute(

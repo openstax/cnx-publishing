@@ -37,16 +37,6 @@ from .utils import (parse_archive_uri, parse_user_uri, join_ident_hash,
 from .publish import publish_model, republish_binders
 
 
-__all__ = (
-    'db_connect',
-    'initdb',
-    'add_publication',
-    'poke_publication_state', 'check_publication_state',
-    'add_pending_model',
-    'accept_publication_license',
-    )
-
-
 here = os.path.abspath(os.path.dirname(__file__))
 SQL_DIR = os.path.join(here, 'sql')
 SCHEMA_FILES = (
@@ -1414,3 +1404,36 @@ UPDATE role_acceptances SET notified = CURRENT_TIMESTAMP
 WHERE
   uuid = (SELECT uuid FROM pending_documents WHERE id = %s)
   AND user_id = ANY (%s)""", (document_id, roles.keys(),))
+
+
+__all__ = (
+    'accept_publication_license',
+    'accept_publication_role',
+    'acquire_subject_vocabulary',
+    'add_pending_model',
+    'add_pending_model_content',
+    'add_pending_resource',
+    'add_publication',
+    'check_publication_state',
+    'db_connect',
+    'initdb',
+    'is_publication_permissible',
+    'is_revision_publication',
+    'lookup_document_pointer',
+    'notify_users',
+    'obtain_licenses',
+    'poke_publication_state',
+    'publish_pending',
+    'remove_acl',
+    'remove_license_requests',
+    'remove_role_requests',
+    'set_publication_failure',
+    'upsert_acl',
+    'upsert_license_requests',
+    'upsert_pending_licensors',
+    'upsert_pending_roles',
+    'upsert_role_requests',
+    'upsert_users',
+    'validate_model',
+    'with_db_cursor',
+    )
