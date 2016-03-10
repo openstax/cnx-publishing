@@ -12,6 +12,7 @@ from pyramid.view import forbidden_view_config
 @forbidden_view_config()
 def forbidden(request):
     if request.path.startswith('/a/'):
-        path = request.route_path('login', _query={'redirect': '/a/'})
-        return httpexceptions.HTTPFound(location=path)
+        if not request.unauthenticated_userid:
+            path = request.route_path('login', _query={'redirect': '/a/'})
+            return httpexceptions.HTTPFound(location=path)
     return httpexceptions.HTTPForbidden()

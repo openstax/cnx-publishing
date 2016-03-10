@@ -13,7 +13,7 @@ from .api_keys import get_api_keys
 
 
 @view_config(route_name='admin-index', request_method='GET',
-             renderer="cnxpublishing:templates/index.html",
+             renderer="cnxpublishing.views:templates/index.html",
              permission='preview')
 def admin_index(request):  # pragma: no cover
     return {
@@ -29,17 +29,17 @@ def admin_index(request):  # pragma: no cover
 
 
 @view_config(route_name='admin-moderation', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.html",
+             renderer="cnxpublishing.views:templates/moderations.html",
              permission='moderate')
 @view_config(route_name='moderation-rss', request_method='GET',
-             renderer="cnxpublishing:templates/moderations.rss",
+             renderer="cnxpublishing.views:templates/moderations.rss",
              permission='view')
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}
 
 
 @view_config(route_name='admin-api-keys', request_method='GET',
-             renderer="cnxpublishing:templates/api-keys.html",
+             renderer="cnxpublishing.views:templates/api-keys.html",
              permission='administer')
 def admin_api_keys(request):  # pragma: no cover
     # Easter Egg that will invalidate the cache, just hit this page.

@@ -2,4 +2,4 @@ include *.txt *.rst
 recursive-include cnxpublishing/sql *.sql
 recursive-include cnxpublishing/sql/migrations *.py
 recursive-include cnxpublishing/tests/data *.*
-recursive-include cnxpublishing/templates *.*
+recursive-include cnxpublishing/views/templates *.*
