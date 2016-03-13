@@ -8,13 +8,23 @@
 """\
 Functions used to commit publication works to the archive.
 """
+import collections
 import hashlib
 
 import cnxepub
 import psycopg2
-from cnxepub import Document, Binder
+from cnxepub import (
+    Binder,
+    CompositeDocument,
+    Document,
+    )
 
-from .utils import parse_user_uri, join_ident_hash, split_ident_hash
+from .utils import (
+    issequence,
+    join_ident_hash,
+    parse_user_uri,
+    split_ident_hash,
+    )
 
 
 ATTRIBUTED_ROLE_KEYS = (
@@ -101,7 +111,9 @@ RETURNING nodeid
 
 
 def _model_to_portaltype(model):
-    if isinstance(model, Document):
+    if isinstance(model, CompositeDocument):
+        type_ = 'CompositeModule'
+    elif isinstance(model, Document):
         type_ = 'Module'
     elif isinstance(model, Binder):
         type_ = 'Collection'
@@ -319,6 +331,44 @@ def publish_model(cursor, model, publisher, message):
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
         tree = _insert_tree(cursor, tree)
+    return ident_hash
+
+
+def publish_composite_model(cursor, model, parent_model, publisher, message):
+    """Publishes the ``model`` and return its ident_hash."""
+    if not isinstance(model, CompositeDocument):
+        raise ValueError("This function only publishes CompositeDocument "
+                         "objects. '{}' was given.".format(type(model)))
+    if issequence(publisher) and len(publisher) > 1:
+        raise ValueError("Only one publisher is allowed. '{}' "
+                         "were given: {}"
+                         .format(len(publisher), publisher))
+    module_ident, ident_hash = _insert_metadata(cursor, model,
+                                                publisher, message)
+    for resource in model.resources:
+        _insert_resource_file(cursor, module_ident, resource)
+    html = str(cnxepub.DocumentContentFormatter(model))
+    file_arg = {
+        'module_ident': module_ident,
+        'parent_ident_hash': parent_model.ident_hash,
+        'media_type': 'text/html',
+        'data': psycopg2.Binary(html.encode('utf-8')),
+        }
+    cursor.execute("""\
+WITH file_insertion AS (
+  INSERT INTO files (file, media_type) VALUES (%(data)s, %(media_type)s)
+  RETURNING fileid)
+INSERT INTO collated_file_associations
+  (context, item, fileid)
+VALUES
+  ((SELECT module_ident FROM modules
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+   = %(parent_ident_hash)s),
+   %(module_ident)s,
+   (SELECT fileid FROM file_insertion))""", file_arg)
+
+    model.id, model.metadata['version'] = split_ident_hash(ident_hash)
+    model.set_uri('cnx-archive', ident_hash)
     return ident_hash
 
 
@@ -569,6 +619,7 @@ RETURNING nodeid"""
 __all__ = (
     'bump_version',
     'get_previous_publication',
+    'publish_composite_model',
     'publish_model',
     'rebuild_collection_tree',
     'republish_binders',
