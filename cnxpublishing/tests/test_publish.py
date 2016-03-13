@@ -30,6 +30,7 @@ from .testing import (
     db_connection_factory,
     db_connect,
     )
+from .test_db import BaseDatabaseIntegrationTestCase
 
 
 class PublishUtilityTestCase(unittest.TestCase):
@@ -583,3 +584,62 @@ class RepublishTestCase(unittest.TestCase):
                  }],
             }
         self.assertEqual(tree, expected_tree)
+
+
+class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.publish import publish_composite_model
+        return publish_composite_model
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Build some new metadata for the composite document.
+        metadata = [x.metadata.copy()
+                    for x in cnxepub.flatten_to_documents(binder)][0]
+        del metadata['cnx-archive-uri']
+        del metadata['version']
+        metadata['title'] = "Made up of other things"
+
+        publisher = [p['id'] for p in metadata['publishers']][0]
+        message = "Composite addition"
+
+        # Add some fake collation objects to the book.
+        content = '<p class="para">composite</p>'
+        composite_doc = cnxepub.CompositeDocument(None, content, metadata)
+
+        ident_hash = self.target(cursor, composite_doc, binder,
+                                 publisher, message)
+
+        # Ensure the model's identifiers has been set.
+        self.assertEqual(ident_hash, composite_doc.ident_hash)
+        self.assertEqual(ident_hash, composite_doc.get_uri('cnx-archive'))
+
+        # The only thing different in the module metadata insertion is
+        # the `portal_type` value
+        cursor.execute(
+            "SELECT portal_type "
+            "FROM modules "
+            "WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s",
+            (ident_hash,))
+        portal_type = cursor.fetchone()[0]
+        self.assertEqual(portal_type, 'CompositeModule')
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(content, persisted_content)
