@@ -522,7 +522,8 @@ class RepublishTestCase(unittest.TestCase):
         # * Ensure book one and two have been republished.
         # We can ensure this through checking for the existence of the
         # collection tree and the updated contents.
-        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_one.id,))
+        cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
+                       (book_one.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
@@ -553,7 +554,8 @@ class RepublishTestCase(unittest.TestCase):
                  }],
             }
         self.assertEqual(tree, expected_tree)
-        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_two.id,))
+        cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
+                       (book_two.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@1.2',

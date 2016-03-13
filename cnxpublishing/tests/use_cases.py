@@ -589,7 +589,7 @@ FROM modules""")
                        "shortId": document_short_id,
                        "title": "Document One"}]}]}]}
     cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+ SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version), FALSE)
 FROM modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
@@ -672,7 +672,7 @@ FROM modules ORDER BY major_version ASC""")
                   u"shortId": u"EeLmMXO1@2",
                   u"title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
     cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version))
+SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version), FALSE)
 FROM latest_modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])

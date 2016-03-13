@@ -494,7 +494,7 @@ def rebuild_collection_tree(cursor, ident_hash, history_map):
     new document ids
     """
     collection_tree_sql = """\
-WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, \
+WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest,
                  ident_hash, path) AS (
   SELECT
     tr.nodeid, tr.parent_id, tr.documentid,
@@ -508,15 +508,16 @@ WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, \
     SELECT module_ident
     FROM modules
     WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+    AND tr.is_collated = FALSE
 UNION ALL
   SELECT
-    c.*,
+    c.nodeid, c.parent_id, c.documentid, c.title, c.childorder, c.latest,
     (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
      FROM modules
      WHERE module_ident = c.documentid) AS ident_hash,
     path || ARRAY[c.nodeid]
   FROM trees AS c JOIN t ON (c.parent_id = t.nodeid)
-  WHERE not c.nodeid = ANY(t.path)
+  WHERE not c.nodeid = ANY(t.path) AND c.is_collated = FALSE
 )
 SELECT row_to_json(row) FROM (SELECT * FROM t) AS row"""
 
