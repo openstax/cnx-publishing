@@ -8,6 +8,8 @@
 """\
 Functions used to commit publication works to the archive.
 """
+import hashlib
+
 import cnxepub
 import psycopg2
 from cnxepub import Document, Binder
@@ -288,23 +290,31 @@ def publish_model(cursor, model, publisher, message):
     if isinstance(model, Document):
         for resource in model.resources:
             _insert_resource_file(cursor, module_ident, resource)
-        html = str(cnxepub.DocumentContentFormatter(model))
-        file_arg = {
+        html = str(cnxepub.DocumentContentFormatter(model)).encode('utf-8')
+        sha1 = hashlib.new('sha1', html).hexdigest()
+        cursor.execute("SELECT fileid FROM files WHERE sha1 = %s", (sha1,))
+        try:
+            fileid = cursor.fetchone()[0]
+        except TypeError:
+            file_args = {
+                'media_type': 'text/html',
+                'data': psycopg2.Binary(html),
+                }
+            cursor.execute("""\
+            insert into files (file, media_type)
+            VALUES (%(data)s, %(media_type)s)
+            returning fileid""", file_args)
+            fileid = cursor.fetchone()[0]
+        args = {
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
-            'media_type': 'text/html',
-            'data': psycopg2.Binary(html.encode('utf-8')),
+            'fileid': fileid,
             }
         cursor.execute("""\
-WITH file_insertion AS (
-  INSERT INTO files (file, media_type) VALUES (%(data)s, %(media_type)s)
-  RETURNING fileid)
-INSERT INTO module_files
-  (module_ident, fileid, filename)
-VALUES
-  (%(module_ident)s,
-   (SELECT fileid FROM file_insertion),
-   %(filename)s)""", file_arg)
+        INSERT INTO module_files
+          (module_ident, fileid, filename)
+        VALUES
+          (%(module_ident)s, %(fileid)s, %(filename)s)""", args)
 
     elif isinstance(model, Binder):
         tree = cnxepub.model_to_tree(model)
