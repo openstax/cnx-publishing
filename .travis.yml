@@ -6,6 +6,10 @@ python:
 addons:
   postgresql: "9.4"
 before_install:
+  - pip install pep8
+  - pep8 --exclude=tests *.py cnxpublishing/
+  - pep8 --max-line-length=200 cnxpublishing/tests
+
   - sudo apt-get update
   # remove zope.interface installed from aptitude
   - sudo apt-get purge python-zope.interface
@@ -46,10 +50,6 @@ before_script:
   - sudo -u postgres psql -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
   # Set up the database
   - sudo -u postgres createdb -O cnxarchive cnxarchive-testing
-  - pip install pep8
-  - pep8 --exclude=tests *.py cnxpublishing/
-  - pep8 --max-line-length=200 cnxpublishing/tests
-
   - git clone https://github.com/okbob/session_exec
   - cd session_exec
   - make USE_PGXS=1 -e && sudo make USE_PGXS=1 -e install
