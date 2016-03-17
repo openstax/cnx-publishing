@@ -643,3 +643,65 @@ WHERE
                        (binder.ident_hash, ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
         self.assertIn(content, persisted_content)
+
+
+class PublishCollatedDocumentTestCase(BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.publish import publish_collated_document
+        return publish_collated_document
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Modify the content of a document to mock the collation changes.
+        doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
+
+        # Add some fake collation objects to the book.
+        content = '<p class="para">collated</p>'
+        doc.content = content
+
+        self.target(cursor, doc, binder)
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, doc.ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(content, persisted_content)
+
+    @db_connect
+    def test_no_change_to_contents(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Modify the content of a document to mock the collation changes.
+        doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
+
+        self.target(cursor, doc, binder)
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, doc.ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(doc.content, persisted_content)
