@@ -734,7 +734,7 @@ WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s""",
 
 def _set_uri(model):
     """Set the system uri on the model."""
-    uri = "https://cnx.org/contents/{}".format(model.ident_hash)
+    uri = "https://archive.cnx.org/contents/{}".format(model.ident_hash)
     model.set_uri('cnx-archive', uri)
 
 
