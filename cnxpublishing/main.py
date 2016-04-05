@@ -55,6 +55,7 @@ def declare_api_routes(config):
               '/publications/{id}/license-acceptances/{uid}')
     add_route('publication-role-acceptance',
               '/publications/{id}/role-acceptances/{uid}')
+    add_route('cook-content', '/contents/{ident_hash}/cook-content')
 
     # Moderation routes
     add_route('moderation', '/moderations')

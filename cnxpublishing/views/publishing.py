@@ -5,6 +5,7 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+from cnxarchive.scripts import export_epub
 import cnxepub
 import psycopg2
 from pyramid import httpexceptions
@@ -12,6 +13,7 @@ from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from .. import config
+from ..collation import collate
 from ..db import (
     accept_publication_license,
     accept_publication_role,
@@ -19,6 +21,7 @@ from ..db import (
     check_publication_state,
     poke_publication_state,
     )
+from ..utils import split_ident_hash
 
 
 @view_config(route_name='publications', request_method='POST', renderer='json',
@@ -233,3 +236,34 @@ def post_accept_role(request):
     # Poke publication to change state.
     state = poke_publication_state(publication_id)
     return httpexceptions.HTTPFound(location=location)
+
+
+@view_config(route_name='cook-content', request_method='POST',
+             renderer='json', permission='publish')
+def cook_content(request):
+    """Invoke the cooking process"""
+    ident_hash = request.matchdict['ident_hash']
+    try:
+        binder = export_epub.factory(ident_hash)
+    except export_epub.NotFound:
+        raise httpexceptions.HTTPNotFound()
+    if not isinstance(binder, cnxepub.Binder):
+        raise httpexceptions.HTTPBadRequest(
+            '{} is not a book'.format(ident_hash))
+
+    settings = request.registry.settings
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            id, version = split_ident_hash(ident_hash)
+            if version:
+                cursor.execute("""\
+SELECT submitter, submitlog FROM modules
+WHERE uuid = %s and concat_ws('.', major_version, minor_version) = %s
+""", (id, version,))
+            else:
+                cursor.execute("""\
+SELECT submitter, submitlog FROM latest_modules
+WHERE uuid = %s
+""", (id,))
+            publisher, message = cursor.fetchone()
+    collate(binder, publisher, message)
