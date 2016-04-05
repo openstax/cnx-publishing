@@ -34,7 +34,6 @@ from .exceptions import (
     )
 from .utils import (parse_archive_uri, parse_user_uri, join_ident_hash,
                     split_ident_hash)
-from .publish import publish_model, republish_binders
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -949,6 +948,7 @@ WHERE id = %s""",
 
     all_models = []
 
+    from .publish import publish_model
     # Commit documents one at a time...
     type_ = cnxepub.Document.__name__
     cursor.execute("""\
@@ -995,6 +995,7 @@ WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
         all_models.append(binder)
 
     # Republish binders containing shared documents.
+    from .publish import republish_binders
     republished_ident_hashes = republish_binders(cursor, all_models)
 
     # Lastly, update the publication status.
