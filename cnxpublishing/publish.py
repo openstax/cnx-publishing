@@ -102,10 +102,10 @@ SELECT module_ident, ident_hash FROM module_insertion
 TREE_NODE_INSERT = """
 INSERT INTO trees
   (nodeid, parent_id, documentid,
-   title, childorder, latest)
+   title, childorder, latest, is_collated)
 VALUES
   (DEFAULT, %(parent_id)s, %(document_id)s,
-   %(title)s, %(child_order)s, %(is_latest)s)
+   %(title)s, %(child_order)s, %(is_latest)s, %(is_collated)s)
 RETURNING nodeid
 """
 
@@ -253,7 +253,7 @@ INSERT INTO module_files (module_ident, fileid, filename)
 VALUES (%s, %s, %s)""", args)
 
 
-def _insert_tree(cursor, tree, parent_id=None, index=0):
+def _insert_tree(cursor, tree, parent_id=None, index=0, is_collated=False):
     """Inserts a binder tree into the archive."""
     if isinstance(tree, dict):
         if tree['id'] == 'subcol':
@@ -280,14 +280,15 @@ def _insert_tree(cursor, tree, parent_id=None, index=0):
         cursor.execute(TREE_NODE_INSERT,
                        dict(document_id=document_id, parent_id=parent_id,
                             title=title, child_order=index,
-                            is_latest=is_latest))
+                            is_latest=is_latest, is_collated=is_collated))
         node_id = cursor.fetchone()[0]
         if 'contents' in tree:
-            _insert_tree(cursor, tree['contents'], parent_id=node_id)
+            _insert_tree(cursor, tree['contents'], parent_id=node_id,
+                         is_collated=is_collated)
     elif isinstance(tree, list):
         for tree_node in tree:
             _insert_tree(cursor, tree_node, parent_id=parent_id,
-                         index=tree.index(tree_node))
+                         index=tree.index(tree_node), is_collated=is_collated)
 
 
 def publish_model(cursor, model, publisher, message):
@@ -410,6 +411,16 @@ VALUES
    = %(module_ident_hash)s),
    %(fileid)s)"""
     cursor.execute(stmt, args)
+
+
+def publish_collated_tree(cursor, tree):
+    """Publish a given collated `tree` (containing newly added
+    `CompositeDocument` objects and number inforation)
+    alongside the original tree.
+
+    """
+    tree = _insert_tree(cursor, tree, is_collated=True)
+    return tree
 
 
 def republish_binders(cursor, models):
@@ -660,6 +671,7 @@ __all__ = (
     'bump_version',
     'get_previous_publication',
     'publish_collated_document',
+    'publish_collated_tree',
     'publish_composite_model',
     'publish_model',
     'rebuild_collection_tree',
