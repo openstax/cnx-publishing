@@ -9,6 +9,11 @@ import json
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
+import uuid
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 import cnxepub
 from pyramid import httpexceptions
@@ -17,6 +22,7 @@ from webob import Request
 from webtest.forms import Upload
 
 from .. import use_cases
+from ..testing import db_connect
 from .base import BaseFunctionalViewTestCase
 
 
@@ -1292,3 +1298,68 @@ WHERE username = %s""", (publisher,))
         # because all licenses and roles have been accepted.
         self.app_check_state(publication_id, 'Done/Success',
                              headers=api_key_headers)
+
+
+class CookContentTestCase(BaseFunctionalViewTestCase):
+    def app_post_cook_content(self, ident_hash, headers=None, status=None):
+        path = '/contents/{}/cook-content'.format(ident_hash)
+        return self.app.post(path, headers=headers, status=status)
+
+    @db_connect
+    def test_not_book(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        cursor.connection.commit()
+        api_key_headers = self.gen_api_key_headers('some-trust')
+        self.app_post_cook_content(binder[0][0].ident_hash,
+                                   headers=api_key_headers,
+                                   status=400)
+
+    def test_not_found(self):
+        random_ident_hash = '{}@1'.format(uuid.uuid4())
+        api_key_headers = self.gen_api_key_headers('some-trust')
+        self.app_post_cook_content(random_ident_hash,
+                                   headers=api_key_headers,
+                                   status=404)
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        cursor.connection.commit()
+        api_key_headers = self.gen_api_key_headers('some-trust')
+
+        # FIXME use collate with real ruleset when it is available
+
+        # Build some new metadata for the composite document.
+        metadata = [x.metadata.copy()
+                    for x in cnxepub.flatten_to_documents(binder)][0]
+        del metadata['cnx-archive-uri']
+        del metadata['version']
+        metadata['title'] = "Made up of other things"
+
+        # Add some fake collation objects to the book.
+        content = '<p>composite</p>'
+        composite_doc = cnxepub.CompositeDocument(None, content, metadata)
+        composite_section = cnxepub.TranslucentBinder(
+            nodes=[composite_doc],
+            metadata={'title': "Other things"})
+
+        collated_doc_content = '<p>collated</p>'
+
+        def collate(binder_model):
+            binder_model[0][0].content = collated_doc_content
+            binder_model.append(composite_section)
+
+        with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
+            mock_collate.side_effect = collate
+
+            self.app_post_cook_content(binder.ident_hash,
+                                       headers=api_key_headers)
+
+            self.assertEqual(1, mock_collate.call_count)
+
+        # Ensure the tree as been stamped.
+        cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
+                       (binder.id, binder.metadata['version'],))
+        collated_tree = cursor.fetchone()[0]
+        self.assertIn(composite_doc.ident_hash,
+                      cnxepub.flatten_tree_to_ident_hashes(collated_tree))
