@@ -30,6 +30,10 @@ before_install:
   - cd rhaptos.cnxmlutils && python setup.py install && cd ..
 
   # Installation for cnx-publishing
+  # Install cssselect2 (unreleased), required by cnx-easybake
+  - pip install git+https://github.com/Connexions/cssselect2.git#egg=cssselect2
+  # Install cnx-easybake
+  - pip install git+https://github.com/Connexions/cnx-easybake.git#egg=cnx-easybake
   # * Install cnx-epub
   - git clone https://github.com/Connexions/cnx-epub.git
   - cd cnx-epub && python setup.py install && cd ..
