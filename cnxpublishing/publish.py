@@ -8,13 +8,23 @@
 """\
 Functions used to commit publication works to the archive.
 """
+import collections
 import hashlib
 
 import cnxepub
 import psycopg2
-from cnxepub import Document, Binder
+from cnxepub import (
+    Binder,
+    CompositeDocument,
+    Document,
+    )
 
-from .utils import parse_user_uri, join_ident_hash, split_ident_hash
+from .utils import (
+    issequence,
+    join_ident_hash,
+    parse_user_uri,
+    split_ident_hash,
+    )
 
 
 ATTRIBUTED_ROLE_KEYS = (
@@ -92,16 +102,18 @@ SELECT module_ident, ident_hash FROM module_insertion
 TREE_NODE_INSERT = """
 INSERT INTO trees
   (nodeid, parent_id, documentid,
-   title, childorder, latest)
+   title, childorder, latest, is_collated)
 VALUES
   (DEFAULT, %(parent_id)s, %(document_id)s,
-   %(title)s, %(child_order)s, %(is_latest)s)
+   %(title)s, %(child_order)s, %(is_latest)s, %(is_collated)s)
 RETURNING nodeid
 """
 
 
 def _model_to_portaltype(model):
-    if isinstance(model, Document):
+    if isinstance(model, CompositeDocument):
+        type_ = 'CompositeModule'
+    elif isinstance(model, Document):
         type_ = 'Module'
     elif isinstance(model, Binder):
         type_ = 'Collection'
@@ -241,7 +253,7 @@ INSERT INTO module_files (module_ident, fileid, filename)
 VALUES (%s, %s, %s)""", args)
 
 
-def _insert_tree(cursor, tree, parent_id=None, index=0):
+def _insert_tree(cursor, tree, parent_id=None, index=0, is_collated=False):
     """Inserts a binder tree into the archive."""
     if isinstance(tree, dict):
         if tree['id'] == 'subcol':
@@ -268,14 +280,15 @@ def _insert_tree(cursor, tree, parent_id=None, index=0):
         cursor.execute(TREE_NODE_INSERT,
                        dict(document_id=document_id, parent_id=parent_id,
                             title=title, child_order=index,
-                            is_latest=is_latest))
+                            is_latest=is_latest, is_collated=is_collated))
         node_id = cursor.fetchone()[0]
         if 'contents' in tree:
-            _insert_tree(cursor, tree['contents'], parent_id=node_id)
+            _insert_tree(cursor, tree['contents'], parent_id=node_id,
+                         is_collated=is_collated)
     elif isinstance(tree, list):
         for tree_node in tree:
             _insert_tree(cursor, tree_node, parent_id=parent_id,
-                         index=tree.index(tree_node))
+                         index=tree.index(tree_node), is_collated=is_collated)
 
 
 def publish_model(cursor, model, publisher, message):
@@ -320,6 +333,94 @@ def publish_model(cursor, model, publisher, message):
         tree = cnxepub.model_to_tree(model)
         tree = _insert_tree(cursor, tree)
     return ident_hash
+
+
+def publish_composite_model(cursor, model, parent_model, publisher, message):
+    """Publishes the ``model`` and return its ident_hash."""
+    if not isinstance(model, CompositeDocument):
+        raise ValueError("This function only publishes CompositeDocument "
+                         "objects. '{}' was given.".format(type(model)))
+    if issequence(publisher) and len(publisher) > 1:
+        raise ValueError("Only one publisher is allowed. '{}' "
+                         "were given: {}"
+                         .format(len(publisher), publisher))
+    module_ident, ident_hash = _insert_metadata(cursor, model,
+                                                publisher, message)
+    for resource in model.resources:
+        _insert_resource_file(cursor, module_ident, resource)
+    html = str(cnxepub.DocumentContentFormatter(model))
+    file_arg = {
+        'module_ident': module_ident,
+        'parent_ident_hash': parent_model.ident_hash,
+        'media_type': 'text/html',
+        'data': psycopg2.Binary(html.encode('utf-8')),
+        }
+    cursor.execute("""\
+WITH file_insertion AS (
+  INSERT INTO files (file, media_type) VALUES (%(data)s, %(media_type)s)
+  RETURNING fileid)
+INSERT INTO collated_file_associations
+  (context, item, fileid)
+VALUES
+  ((SELECT module_ident FROM modules
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+   = %(parent_ident_hash)s),
+   %(module_ident)s,
+   (SELECT fileid FROM file_insertion))""", file_arg)
+
+    model.id, model.metadata['version'] = split_ident_hash(ident_hash)
+    model.set_uri('cnx-archive', ident_hash)
+    return ident_hash
+
+
+def publish_collated_document(cursor, model, parent_model):
+    """Publish a given `module`'s collated content in the context of
+    the `parent_model`. Note, the model's content is expected to already
+    have the collated content. This will just persist that content to
+    the archive.
+
+    """
+    html = str(cnxepub.DocumentContentFormatter(model)).encode('utf-8')
+    sha1 = hashlib.new('sha1', html).hexdigest()
+    cursor.execute("SELECT fileid FROM files WHERE sha1 = %s", (sha1,))
+    try:
+        fileid = cursor.fetchone()[0]
+    except TypeError:
+        file_args = {
+            'media_type': 'text/html',
+            'data': psycopg2.Binary(html),
+            }
+        cursor.execute("""\
+        INSERT INTO files (file, media_type)
+        VALUES (%(data)s, %(media_type)s)
+        RETURNING fileid""", file_args)
+        fileid = cursor.fetchone()[0]
+    args = {
+        'module_ident_hash': model.ident_hash,
+        'parent_ident_hash': parent_model.ident_hash,
+        'fileid': fileid,
+        }
+    stmt = """\
+INSERT INTO collated_file_associations (context, item, fileid)
+VALUES
+  ((SELECT module_ident FROM modules
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+   = %(parent_ident_hash)s),
+   (SELECT module_ident FROM modules
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+   = %(module_ident_hash)s),
+   %(fileid)s)"""
+    cursor.execute(stmt, args)
+
+
+def publish_collated_tree(cursor, tree):
+    """Publish a given collated `tree` (containing newly added
+    `CompositeDocument` objects and number inforation)
+    alongside the original tree.
+
+    """
+    tree = _insert_tree(cursor, tree, is_collated=True)
+    return tree
 
 
 def republish_binders(cursor, models):
@@ -494,7 +595,7 @@ def rebuild_collection_tree(cursor, ident_hash, history_map):
     new document ids
     """
     collection_tree_sql = """\
-WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, \
+WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest,
                  ident_hash, path) AS (
   SELECT
     tr.nodeid, tr.parent_id, tr.documentid,
@@ -508,15 +609,16 @@ WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest, \
     SELECT module_ident
     FROM modules
     WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+    AND tr.is_collated = FALSE
 UNION ALL
   SELECT
-    c.*,
+    c.nodeid, c.parent_id, c.documentid, c.title, c.childorder, c.latest,
     (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
      FROM modules
      WHERE module_ident = c.documentid) AS ident_hash,
     path || ARRAY[c.nodeid]
   FROM trees AS c JOIN t ON (c.parent_id = t.nodeid)
-  WHERE not c.nodeid = ANY(t.path)
+  WHERE not c.nodeid = ANY(t.path) AND c.is_collated = FALSE
 )
 SELECT row_to_json(row) FROM (SELECT * FROM t) AS row"""
 
@@ -568,6 +670,9 @@ RETURNING nodeid"""
 __all__ = (
     'bump_version',
     'get_previous_publication',
+    'publish_collated_document',
+    'publish_collated_tree',
+    'publish_composite_model',
     'publish_model',
     'rebuild_collection_tree',
     'republish_binders',

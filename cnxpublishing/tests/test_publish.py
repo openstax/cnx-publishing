@@ -30,6 +30,7 @@ from .testing import (
     db_connection_factory,
     db_connect,
     )
+from .test_db import BaseDatabaseIntegrationTestCase
 
 
 class PublishUtilityTestCase(unittest.TestCase):
@@ -522,7 +523,8 @@ class RepublishTestCase(unittest.TestCase):
         # * Ensure book one and two have been republished.
         # We can ensure this through checking for the existence of the
         # collection tree and the updated contents.
-        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_one.id,))
+        cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
+                       (book_one.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408@1.2',
@@ -553,7 +555,8 @@ class RepublishTestCase(unittest.TestCase):
                  }],
             }
         self.assertEqual(tree, expected_tree)
-        cursor.execute("SELECT tree_to_json(%s, '1.2')::json", (book_two.id,))
+        cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
+                       (book_two.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
             u'id': u'dbb28a6b-cad2-4863-986f-6059da93386b@1.2',
@@ -581,3 +584,166 @@ class RepublishTestCase(unittest.TestCase):
                  }],
             }
         self.assertEqual(tree, expected_tree)
+
+
+class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.publish import publish_composite_model
+        return publish_composite_model
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Build some new metadata for the composite document.
+        metadata = [x.metadata.copy()
+                    for x in cnxepub.flatten_to_documents(binder)][0]
+        del metadata['cnx-archive-uri']
+        del metadata['version']
+        metadata['title'] = "Made up of other things"
+
+        publisher = [p['id'] for p in metadata['publishers']][0]
+        message = "Composite addition"
+
+        # Add some fake collation objects to the book.
+        content = '<p class="para">composite</p>'
+        composite_doc = cnxepub.CompositeDocument(None, content, metadata)
+
+        ident_hash = self.target(cursor, composite_doc, binder,
+                                 publisher, message)
+
+        # Ensure the model's identifiers has been set.
+        self.assertEqual(ident_hash, composite_doc.ident_hash)
+        self.assertEqual(ident_hash, composite_doc.get_uri('cnx-archive'))
+
+        # The only thing different in the module metadata insertion is
+        # the `portal_type` value
+        cursor.execute(
+            "SELECT portal_type "
+            "FROM modules "
+            "WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s",
+            (ident_hash,))
+        portal_type = cursor.fetchone()[0]
+        self.assertEqual(portal_type, 'CompositeModule')
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(content, persisted_content)
+
+
+class PublishCollatedDocumentTestCase(BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.publish import publish_collated_document
+        return publish_collated_document
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Modify the content of a document to mock the collation changes.
+        doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
+
+        # Add some fake collation objects to the book.
+        content = '<p class="para">collated</p>'
+        doc.content = content
+
+        self.target(cursor, doc, binder)
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, doc.ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(content, persisted_content)
+
+    @db_connect
+    def test_no_change_to_contents(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Modify the content of a document to mock the collation changes.
+        doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
+
+        self.target(cursor, doc, binder)
+
+        # Ensure the file entry and association entry.
+        cursor.execute("""\
+SELECT f.file
+FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
+     modules AS m1, -- context
+     modules AS m2  -- item
+WHERE
+  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+   AND m1.module_ident = cfa.context)
+  AND
+  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+   AND m2.module_ident = cfa.item)""",
+                       (binder.ident_hash, doc.ident_hash,))
+        persisted_content = cursor.fetchone()[0][:]
+        self.assertIn(doc.content, persisted_content)
+
+
+class PublishCollatedTreeTestCase(BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.publish import publish_collated_tree
+        return publish_collated_tree
+
+    @db_connect
+    def test(self, cursor):
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Build some new metadata for the composite document.
+        metadata = [x.metadata.copy()
+                    for x in cnxepub.flatten_to_documents(binder)][0]
+        del metadata['cnx-archive-uri']
+        del metadata['version']
+        metadata['title'] = "Made up of other things"
+
+        publisher = [p['id'] for p in metadata['publishers']][0]
+        message = "Composite addition"
+
+        # Add some fake collation objects to the book.
+        content = '<p class="para">composite</p>'
+        composite_doc = cnxepub.CompositeDocument(None, content, metadata)
+
+        from cnxpublishing.publish import publish_composite_model
+        ident_hash = publish_composite_model(cursor, composite_doc, binder,
+                                             publisher, message)
+
+        # Shim the composite document into the binder.
+        binder.append(composite_doc)
+
+        tree = cnxepub.model_to_tree(binder)
+        self.target(cursor, tree)
+
+        cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
+                       (binder.id, binder.metadata['version'],))
+        collated_tree = cursor.fetchone()[0]
+        self.assertIn(composite_doc.ident_hash,
+                      cnxepub.flatten_tree_to_ident_hashes(collated_tree))

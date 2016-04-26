@@ -1510,7 +1510,7 @@ ORDER BY major_version ASC, minor_version ASC""")
         self.assertEqual(versions, expected_versions)
 
         # Check the shared binder's tree got updated.
-        cursor.execute("SELECT tree_to_json(%s, '1.2')::json",
+        cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
                        (shared_binder.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
@@ -1542,7 +1542,7 @@ ORDER BY major_version ASC, minor_version ASC""")
                  }],
             }
         self.assertEqual(tree, expected_tree)
-        cursor.execute("SELECT tree_to_json(%s, '2.1')::json",
+        cursor.execute("SELECT tree_to_json(%s, '2.1', FALSE)::json",
                        (binder.id,))
         tree = cursor.fetchone()[0]
         expected_tree = {
@@ -1622,7 +1622,7 @@ FROM modules WHERE name = %s""", (title,))
                  "title": "P Two"},
             ]}
         cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version))
+SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version), FALSE)
 FROM modules
 WHERE portal_type = 'Collection'""")
         tree = json.loads(cursor.fetchone()[0])

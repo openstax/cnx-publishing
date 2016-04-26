@@ -5,6 +5,7 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import collections
 try:
     from urllib.parse import urlparse
 except ImportError:
@@ -15,6 +16,12 @@ except ImportError:
     from urllib2 import unquote
 
 import cnxarchive.utils
+
+
+def issequence(t):
+    """Test if `t` is a Sequence"""
+    return isinstance(t, collections.Sequence) \
+        and not isinstance(t, basestring)
 
 
 def parse_archive_uri(uri):
@@ -50,6 +57,7 @@ join_ident_hash = cnxarchive.utils.join_ident_hash
 
 
 __all__ = (
+    'issequence',
     'join_ident_hash',
     'parse_archive_uri',
     'parse_user_uri',
