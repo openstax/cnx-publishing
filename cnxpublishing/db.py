@@ -557,10 +557,10 @@ def add_pending_model_content(cursor, publication_id, model):
         attach_info_to_exception(exc)
         set_publication_failure(cursor, exc)
 
-    if isinstance(model, cnxepub.Document):
-        for resource in model.resources:
-            add_pending_resource(cursor, resource)
+    for resource in getattr(model, 'resources', []):
+        add_pending_resource(cursor, resource)
 
+    if isinstance(model, cnxepub.Document):
         for reference in model.references:
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')

@@ -1250,6 +1250,42 @@ WHERE id = %s""", (publication_id,))
         stderr.seek(0)
         self.assertTrue(stderr.read().find("*** test exception ***") >= 0)
 
+    def test_add_pending_binder_w_resources(self):
+        """Add a pending binder with resources to the database"""
+        publication_id = self.make_publication()
+        book_three = deepcopy(use_cases.COMPLEX_BOOK_THREE)
+        book_three.resources = [
+            cnxepub.Resource(
+                use_cases.RESOURCE_ONE_FILENAME,
+                use_cases._read_file(use_cases.RESOURCE_ONE_FILEPATH, 'rb'),
+                'image/png',
+                filename='cover.png'),
+            cnxepub.Resource(
+                '6803daf6246832aa86504f1785fe34deb07c0eb6',
+                io.BytesIO('div { move-to: trash }\n'),
+                'text/css',
+                filename='ruleset.css')]
+
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                binder_ident_hash = add_pending_model(
+                    cursor, publication_id, book_three)
+                add_pending_model_content(cursor, publication_id, book_three)
+
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                # Check cover is in pending resources
+                cursor.execute("""
+SELECT 1 FROM pending_resources
+WHERE hash = '8d539366a39af1715bdf4154d0907d4a5360ba29'""")
+                self.assertEqual((1,), cursor.fetchone())
+                # Check ruleset is in pending resources
+                cursor.execute("""
+SELECT 1 FROM pending_resources
+WHERE hash = '6803daf6246832aa86504f1785fe34deb07c0eb6'""")
+                self.assertEqual((1,), cursor.fetchone())
+
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""
