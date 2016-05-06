@@ -46,7 +46,8 @@ CREATE TABLE pending_resources (
   "hash" TEXT UNIQUE,  -- SHA1 hash
   "md5" TEXT,  -- Legacy MD5 hash
   "media_type" TEXT NOT NULL,
-  "exists_in_archive" BOOLEAN DEFAULT 'f'
+  "exists_in_archive" BOOLEAN DEFAULT 'f',
+  "filename" TEXT
 );
 
 
