@@ -51,6 +51,15 @@ CREATE TABLE pending_resources (
 );
 
 
+CREATE TABLE pending_resource_associations (
+  "document_id" INTEGER NOT NULL,
+  "resource_id" INTEGER NOT NULL,
+  PRIMARY KEY ("document_id", "resource_id"),
+  FOREIGN KEY ("document_id") REFERENCES pending_documents ("id"),
+  FOREIGN KEY ("resource_id") REFERENCES pending_resources ("id")
+);
+
+
 CREATE TABLE license_acceptances (
   "uuid" UUID NOT NULL,  -- Document uuid, no constraint
   "user_id" TEXT NOT NULL,  -- User identifier, no constraint
