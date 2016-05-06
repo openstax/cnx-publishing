@@ -1286,6 +1286,17 @@ SELECT filename FROM pending_resources
 WHERE hash = '6803daf6246832aa86504f1785fe34deb07c0eb6'""")
                 self.assertEqual(('ruleset.css',), cursor.fetchone())
 
+                # Check that the resources are linked to the binder
+                cursor.execute("""
+SELECT filename FROM pending_resources r
+JOIN pending_resource_associations a ON a.resource_id = r.id
+JOIN pending_documents d ON a.document_id = d.id
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+ORDER BY filename""",
+                               (binder_ident_hash,))
+                self.assertEqual([('cover.png',), ('ruleset.css',)],
+                                 cursor.fetchall())
+
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""

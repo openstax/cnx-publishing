@@ -237,7 +237,7 @@ def _get_type_name(model):
         return 'Document'
 
 
-def add_pending_resource(cursor, resource):
+def add_pending_resource(cursor, resource, document=None):
     settings = get_current_registry().settings
     args = {
         'media_type': resource.media_type,
@@ -256,6 +256,25 @@ INSERT INTO pending_resources
   (data, hash, media_type, filename)
 VALUES (%(data)s, %(hash)s, %(media_type)s, %(filename)s)
 """, args)
+
+    if document:
+        # upsert document and resource into pending resource associations
+        cursor.execute("""\
+WITH document AS (
+    SELECT id FROM pending_documents
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(id)s
+), resource AS (
+    SELECT id FROM pending_resources
+    WHERE hash = %(hash)s
+)
+INSERT INTO pending_resource_associations
+    (document_id, resource_id)
+    SELECT document.id, resource.id
+    FROM document, resource
+    WHERE NOT EXISTS
+    (SELECT * FROM pending_resource_associations, document, resource
+     WHERE document_id = document.id AND resource_id = resource.id)
+""", {'id': document.ident_hash, 'hash': resource.hash})
     resource.id = resource.hash
 
 
@@ -559,7 +578,7 @@ def add_pending_model_content(cursor, publication_id, model):
         set_publication_failure(cursor, exc)
 
     for resource in getattr(model, 'resources', []):
-        add_pending_resource(cursor, resource)
+        add_pending_resource(cursor, resource, document=model)
 
     if isinstance(model, cnxepub.Document):
         for reference in model.references:
