@@ -54,6 +54,8 @@ WHERE
                     for x in cnxepub.flatten_to_documents(binder)][0]
         del metadata['cnx-archive-uri']
         del metadata['version']
+        metadata['created'] = None
+        metadata['revised'] = None
         metadata['title'] = "Made up of other things"
 
         # Add some fake collation objects to the book.
@@ -68,6 +70,7 @@ WHERE
         def collate(binder_model):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
+            return binder_model
 
         with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
             mock_collate.side_effect = collate

@@ -56,7 +56,7 @@ module_insertion AS (
   VALUES
     ({__uuid__}, {__major_version__}, {__minor_version__},
      DEFAULT, %(_portal_type)s, {__moduleid__},
-     %(title)s, %(created)s, CURRENT_TIMESTAMP, %(language)s,
+     %(title)s, {__created__}, DEFAULT, %(language)s,
      %(publisher)s, %(publication_message)s,
      (SELECT abstractid FROM abstract_insertion),
      (SELECT licenseid FROM license_lookup),
@@ -187,14 +187,17 @@ def _insert_metadata(cursor, model, publisher, message):
             '__major_version__': "%(_major_version)s",
             '__minor_version__': "%(_minor_version)s",
             '__moduleid__': moduleid is None and "DEFAULT" or "%(_moduleid)s",
+            '__created__': "%(created)s",
             })
     else:
+        created = model.metadata.get('created', None)
         # Format the statement for defaults.
         stmt = MODULE_INSERTION_TEMPLATE.format(**{
             '__uuid__': "DEFAULT",
             '__major_version__': "DEFAULT",
             '__minor_version__': "DEFAULT",
             '__moduleid__': "DEFAULT",
+            '__created__': created is None and "DEFAULT" or "%(created)s",
             })
 
     # Insert the metadata
