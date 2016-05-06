@@ -1277,14 +1277,14 @@ WHERE id = %s""", (publication_id,))
             with db_conn.cursor() as cursor:
                 # Check cover is in pending resources
                 cursor.execute("""
-SELECT 1 FROM pending_resources
+SELECT filename FROM pending_resources
 WHERE hash = '8d539366a39af1715bdf4154d0907d4a5360ba29'""")
-                self.assertEqual((1,), cursor.fetchone())
+                self.assertEqual(('cover.png',), cursor.fetchone())
                 # Check ruleset is in pending resources
                 cursor.execute("""
-SELECT 1 FROM pending_resources
+SELECT filename FROM pending_resources
 WHERE hash = '6803daf6246832aa86504f1785fe34deb07c0eb6'""")
-                self.assertEqual((1,), cursor.fetchone())
+                self.assertEqual(('ruleset.css',), cursor.fetchone())
 
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):

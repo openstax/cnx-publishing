@@ -242,6 +242,7 @@ def add_pending_resource(cursor, resource):
     args = {
         'media_type': resource.media_type,
         'hash': resource.hash,
+        'filename': resource.filename,
         }
     with resource.open() as data:
         if data.seek(0, 2) > int(settings['file-upload-limit']) * 1024 * 1024:
@@ -252,8 +253,8 @@ def add_pending_resource(cursor, resource):
 
     cursor.execute("""\
 INSERT INTO pending_resources
-  (data, hash, media_type)
-VALUES (%(data)s, %(hash)s, %(media_type)s)
+  (data, hash, media_type, filename)
+VALUES (%(data)s, %(hash)s, %(media_type)s, %(filename)s)
 """, args)
     resource.id = resource.hash
 
