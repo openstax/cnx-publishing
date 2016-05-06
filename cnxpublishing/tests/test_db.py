@@ -1676,6 +1676,54 @@ WHERE portal_type = 'Collection'""")
         self.assertEqual(expected_tree, tree)
 
     @db_connect
+    def test_publish_binder_w_resources(self, cursor):
+        """Ensure publication of binders with resources."""
+        binder = deepcopy(use_cases.COMPLEX_BOOK_THREE)
+        binder.resources = [
+            cnxepub.Resource(
+                use_cases.RESOURCE_ONE_FILENAME,
+                io.BytesIO(open(use_cases.RESOURCE_ONE_FILEPATH).read()),
+                'image/png',
+                'cover.png'),
+            cnxepub.Resource(
+                'ruleset.css',
+                io.BytesIO('div { move-to: trash }\n'),
+                'text/css',
+                'ruleset.css')]
+
+        title = binder.metadata['title']
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(binder):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, binder)
+
+        # * Fire the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was published with tree references to the existing
+        # pages, which we are calling document pointers.
+        cursor.execute("""\
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version)),
+       concat_ws('@', short_id(uuid), concat_ws('.', major_version, minor_version))
+FROM modules WHERE name = %s""", (title,))
+        binder_ident_hash, binder_short_id = cursor.fetchone()
+
+        cursor.execute("""\
+SELECT filename
+FROM module_files
+NATURAL JOIN files
+NATURAL JOIN modules
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+ORDER BY filename
+""", (binder_ident_hash,))
+        self.assertEqual([('cover.png',), ('ruleset.css',)],
+                         cursor.fetchall())
+
+    @db_connect
     def test_complex_republish(self, cursor):
         """Ensure republication of binders that share two or more documents."""
         # * Set up three collections in the archive. These are used

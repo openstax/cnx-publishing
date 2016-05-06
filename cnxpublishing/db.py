@@ -1011,6 +1011,20 @@ WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
         id, major_version, minor_version, metadata = row[1:5]
         tree = metadata['_tree']
         binder = _reassemble_binder(str(id), tree, metadata)
+        # Add the resources
+        cursor.execute("""\
+SELECT hash, data, media_type, filename
+FROM pending_resources r
+JOIN pending_resource_associations a ON a.resource_id = r.id
+JOIN pending_documents d ON a.document_id = d.id
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
+                       (binder.ident_hash,))
+        binder.resources = [
+            cnxepub.Resource(hash,
+                             io.BytesIO(data[:]),
+                             media_type,
+                             filename=filename)
+            for (hash, data, media_type, filename) in cursor.fetchall()]
         ident_hash = publish_model(cursor, binder, publisher, message)
         all_models.append(binder)
 

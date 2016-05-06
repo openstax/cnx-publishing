@@ -303,9 +303,11 @@ def publish_model(cursor, model, publisher, message):
                          .format(len(publishers), publishers))
     module_ident, ident_hash = _insert_metadata(cursor, model,
                                                 publisher, message)
+
+    for resource in getattr(model, 'resources', []):
+        _insert_resource_file(cursor, module_ident, resource)
+
     if isinstance(model, Document):
-        for resource in model.resources:
-            _insert_resource_file(cursor, module_ident, resource)
         html = str(cnxepub.DocumentContentFormatter(model)).encode('utf-8')
         sha1 = hashlib.new('sha1', html).hexdigest()
         cursor.execute("SELECT fileid FROM files WHERE sha1 = %s", (sha1,))
