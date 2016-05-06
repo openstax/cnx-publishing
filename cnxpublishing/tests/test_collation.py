@@ -54,6 +54,8 @@ WHERE
                     for x in cnxepub.flatten_to_documents(binder)][0]
         del metadata['cnx-archive-uri']
         del metadata['version']
+        metadata['created'] = None
+        metadata['revised'] = None
         metadata['title'] = "Made up of other things"
 
         # Add some fake collation objects to the book.
