@@ -68,6 +68,7 @@ WHERE
         def collate(binder_model):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
+            return binder_model
 
         with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
             mock_collate.side_effect = collate

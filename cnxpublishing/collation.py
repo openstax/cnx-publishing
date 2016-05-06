@@ -23,7 +23,7 @@ def collate(binder, publisher, message, cursor):
     persist those changes alongside the published content.
 
     """
-    collate_models(binder)
+    binder = collate_models(binder)
 
     def flatten_filter(model):
         return isinstance(model, cnxepub.CompositeDocument)
