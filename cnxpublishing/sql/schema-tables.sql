@@ -46,7 +46,17 @@ CREATE TABLE pending_resources (
   "hash" TEXT UNIQUE,  -- SHA1 hash
   "md5" TEXT,  -- Legacy MD5 hash
   "media_type" TEXT NOT NULL,
-  "exists_in_archive" BOOLEAN DEFAULT 'f'
+  "exists_in_archive" BOOLEAN DEFAULT 'f',
+  "filename" TEXT
+);
+
+
+CREATE TABLE pending_resource_associations (
+  "document_id" INTEGER NOT NULL,
+  "resource_id" INTEGER NOT NULL,
+  PRIMARY KEY ("document_id", "resource_id"),
+  FOREIGN KEY ("document_id") REFERENCES pending_documents ("id"),
+  FOREIGN KEY ("resource_id") REFERENCES pending_resources ("id")
 );
 
 

@@ -237,11 +237,12 @@ def _get_type_name(model):
         return 'Document'
 
 
-def add_pending_resource(cursor, resource):
+def add_pending_resource(cursor, resource, document=None):
     settings = get_current_registry().settings
     args = {
         'media_type': resource.media_type,
         'hash': resource.hash,
+        'filename': resource.filename,
         }
     with resource.open() as data:
         if data.seek(0, 2) > int(settings['file-upload-limit']) * 1024 * 1024:
@@ -252,9 +253,28 @@ def add_pending_resource(cursor, resource):
 
     cursor.execute("""\
 INSERT INTO pending_resources
-  (data, hash, media_type)
-VALUES (%(data)s, %(hash)s, %(media_type)s)
+  (data, hash, media_type, filename)
+VALUES (%(data)s, %(hash)s, %(media_type)s, %(filename)s)
 """, args)
+
+    if document:
+        # upsert document and resource into pending resource associations
+        cursor.execute("""\
+WITH document AS (
+    SELECT id FROM pending_documents
+    WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(id)s
+), resource AS (
+    SELECT id FROM pending_resources
+    WHERE hash = %(hash)s
+)
+INSERT INTO pending_resource_associations
+    (document_id, resource_id)
+    SELECT document.id, resource.id
+    FROM document, resource
+    WHERE NOT EXISTS
+    (SELECT * FROM pending_resource_associations, document, resource
+     WHERE document_id = document.id AND resource_id = resource.id)
+""", {'id': document.ident_hash, 'hash': resource.hash})
     resource.id = resource.hash
 
 
@@ -557,10 +577,10 @@ def add_pending_model_content(cursor, publication_id, model):
         attach_info_to_exception(exc)
         set_publication_failure(cursor, exc)
 
-    if isinstance(model, cnxepub.Document):
-        for resource in model.resources:
-            add_pending_resource(cursor, resource)
+    for resource in getattr(model, 'resources', []):
+        add_pending_resource(cursor, resource, document=model)
 
+    if isinstance(model, cnxepub.Document):
         for reference in model.references:
             if reference.is_bound:
                 reference.bind(reference.bound_model, '/resources/{}')
@@ -991,6 +1011,20 @@ WHERE type = %s AND publication_id = %s""", (type_, publication_id,))
         id, major_version, minor_version, metadata = row[1:5]
         tree = metadata['_tree']
         binder = _reassemble_binder(str(id), tree, metadata)
+        # Add the resources
+        cursor.execute("""\
+SELECT hash, data, media_type, filename
+FROM pending_resources r
+JOIN pending_resource_associations a ON a.resource_id = r.id
+JOIN pending_documents d ON a.document_id = d.id
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
+                       (binder.ident_hash,))
+        binder.resources = [
+            cnxepub.Resource(hash,
+                             io.BytesIO(data[:]),
+                             media_type,
+                             filename=filename)
+            for (hash, data, media_type, filename) in cursor.fetchall()]
         ident_hash = publish_model(cursor, binder, publisher, message)
         all_models.append(binder)
 

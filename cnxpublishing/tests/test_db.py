@@ -1250,6 +1250,53 @@ WHERE id = %s""", (publication_id,))
         stderr.seek(0)
         self.assertTrue(stderr.read().find("*** test exception ***") >= 0)
 
+    def test_add_pending_binder_w_resources(self):
+        """Add a pending binder with resources to the database"""
+        publication_id = self.make_publication()
+        book_three = deepcopy(use_cases.COMPLEX_BOOK_THREE)
+        book_three.resources = [
+            cnxepub.Resource(
+                use_cases.RESOURCE_ONE_FILENAME,
+                use_cases._read_file(use_cases.RESOURCE_ONE_FILEPATH, 'rb'),
+                'image/png',
+                filename='cover.png'),
+            cnxepub.Resource(
+                '6803daf6246832aa86504f1785fe34deb07c0eb6',
+                io.BytesIO('div { move-to: trash }\n'),
+                'text/css',
+                filename='ruleset.css')]
+
+        from ..db import add_pending_model, add_pending_model_content
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                binder_ident_hash = add_pending_model(
+                    cursor, publication_id, book_three)
+                add_pending_model_content(cursor, publication_id, book_three)
+
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                # Check cover is in pending resources
+                cursor.execute("""
+SELECT filename FROM pending_resources
+WHERE hash = '8d539366a39af1715bdf4154d0907d4a5360ba29'""")
+                self.assertEqual(('cover.png',), cursor.fetchone())
+                # Check ruleset is in pending resources
+                cursor.execute("""
+SELECT filename FROM pending_resources
+WHERE hash = '6803daf6246832aa86504f1785fe34deb07c0eb6'""")
+                self.assertEqual(('ruleset.css',), cursor.fetchone())
+
+                # Check that the resources are linked to the binder
+                cursor.execute("""
+SELECT filename FROM pending_resources r
+JOIN pending_resource_associations a ON a.resource_id = r.id
+JOIN pending_documents d ON a.document_id = d.id
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+ORDER BY filename""",
+                               (binder_ident_hash,))
+                self.assertEqual([('cover.png',), ('ruleset.css',)],
+                                 cursor.fetchall())
+
 
 class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     """Verify model validations"""
@@ -1627,6 +1674,54 @@ FROM modules
 WHERE portal_type = 'Collection'""")
         tree = json.loads(cursor.fetchone()[0])
         self.assertEqual(expected_tree, tree)
+
+    @db_connect
+    def test_publish_binder_w_resources(self, cursor):
+        """Ensure publication of binders with resources."""
+        binder = deepcopy(use_cases.COMPLEX_BOOK_THREE)
+        binder.resources = [
+            cnxepub.Resource(
+                use_cases.RESOURCE_ONE_FILENAME,
+                io.BytesIO(open(use_cases.RESOURCE_ONE_FILEPATH).read()),
+                'image/png',
+                'cover.png'),
+            cnxepub.Resource(
+                'ruleset.css',
+                io.BytesIO('div { move-to: trash }\n'),
+                'text/css',
+                'ruleset.css')]
+
+        title = binder.metadata['title']
+
+        # * Assemble the publication request.
+        publication_id = self.make_publication(publisher='ream')
+        for doc in cnxepub.flatten_to_documents(binder):
+            self.persist_model(publication_id, doc)
+        self.persist_model(publication_id, binder)
+
+        # * Fire the publication request.
+        from ..db import publish_pending
+        state = publish_pending(cursor, publication_id)
+        self.assertEqual(state, 'Done/Success')
+
+        # * Ensure the binder was published with tree references to the existing
+        # pages, which we are calling document pointers.
+        cursor.execute("""\
+SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version)),
+       concat_ws('@', short_id(uuid), concat_ws('.', major_version, minor_version))
+FROM modules WHERE name = %s""", (title,))
+        binder_ident_hash, binder_short_id = cursor.fetchone()
+
+        cursor.execute("""\
+SELECT filename
+FROM module_files
+NATURAL JOIN files
+NATURAL JOIN modules
+WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+ORDER BY filename
+""", (binder_ident_hash,))
+        self.assertEqual([('cover.png',), ('ruleset.css',)],
+                         cursor.fetchall())
 
     @db_connect
     def test_complex_republish(self, cursor):
