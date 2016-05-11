@@ -13,7 +13,7 @@ from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from .. import config
-from ..collation import collate
+from ..collation import collate, remove_collation
 from ..db import (
     accept_publication_license,
     accept_publication_role,
@@ -266,4 +266,5 @@ SELECT submitter, submitlog FROM latest_modules
 WHERE uuid = %s
 """, (id,))
             publisher, message = cursor.fetchone()
-    collate(binder, publisher, message)
+            remove_collation(binder.ident_hash, cursor=cursor)
+            collate(binder, publisher, message, cursor=cursor)
