@@ -10,6 +10,7 @@ Functions used to commit publication works to the archive.
 """
 import collections
 import hashlib
+import io
 
 import cnxepub
 import psycopg2
@@ -209,46 +210,62 @@ def _insert_metadata(cursor, model, publisher, message):
     return module_ident, ident_hash
 
 
+def _get_file_sha1(file):
+    """Return the SHA1 hash of the given a file-like object as ``file``.
+    This will seek the file back to 0 when it's finished.
+
+    """
+    bits = file.read()
+    file.seek(0)
+    h = hashlib.new('sha1', bits).hexdigest()
+    return h
+
+
+def _insert_file(cursor, file, media_type):
+    """Upsert the ``file`` and ``media_type`` into the files table.
+    Returns the ``fileid`` and ``sha1`` of the upserted file.
+
+    """
+    resource_hash = _get_file_sha1(file)
+    cursor.execute("SELECT fileid FROM files WHERE sha1 = %s",
+                   (resource_hash,))
+    try:
+        fileid = cursor.fetchone()[0]
+    except (IndexError, TypeError):
+        cursor.execute("INSERT INTO files (file, media_type) "
+                       "VALUES (%s, %s)"
+                       "RETURNING fileid",
+                       (psycopg2.Binary(file.read()), media_type,))
+        fileid = cursor.fetchone()[0]
+    return fileid, resource_hash
+
+
 def _insert_resource_file(cursor, module_ident, resource):
     """Insert a resource into the modules_files table. This will
     create a new file entry or associates an existing one.
     """
-    exists_in_archive = False
-    cursor.execute("SELECT fileid FROM files WHERE {} = %s LIMIT 1"
-                   .format(cnxepub.RESOURCE_HASH_TYPE),
-                   (resource.hash,))
-    try:
-        fileid = cursor.fetchone()[0]
-    except TypeError:  # NoneType
-        # Does not exist in archive
-        with resource.open() as file:
-            cursor.execute("""\
-INSERT INTO files (file, media_type) VALUES (%s, %s) RETURNING fileid""",
-                           (memoryview(file.read()), resource.media_type,))
-        fileid = cursor.fetchone()[0]
-    else:
-        exists_in_archive = True
+    with resource.open() as file:
+        fileid, _ = _insert_file(cursor, file, resource.media_type)
 
-    if exists_in_archive:
-        # Is this file legitimately used twice within the same content?
-        cursor.execute("""\
+    # Is this file legitimately used twice within the same content?
+    cursor.execute("""\
 select
   (fileid = %s) as is_same_file
 from module_files
 where module_ident = %s and filename = %s""",
-                       (fileid, module_ident, resource.filename,))
-        try:
-            is_same_file = cursor.fetchone()[0]
-        except TypeError:  # NoneType
-            is_same_file = None
-        if is_same_file:
-            # All is good, bail out.
-            return
-        elif is_same_file is not None:  # pragma: no cover
-            # This means the file is not the same, but a filename
-            #   conflict exists.
-            # FFF At this time, it is impossible to get to this logic.
-            raise Exception("filename conflict")
+                   (fileid, module_ident, resource.filename,))
+    try:
+        is_same_file = cursor.fetchone()[0]
+    except TypeError:  # NoneType
+        is_same_file = None
+    if is_same_file:
+        # All is good, bail out.
+        return
+    elif is_same_file is not None:  # pragma: no cover
+        # This means the file is not the same, but a filename
+        #   conflict exists.
+        # FFF At this time, it is impossible to get to this logic.
+        raise Exception("filename conflict")
 
     args = (module_ident, fileid, resource.filename,)
     cursor.execute("""\
@@ -354,24 +371,21 @@ def publish_composite_model(cursor, model, parent_model, publisher, message):
     for resource in model.resources:
         _insert_resource_file(cursor, module_ident, resource)
     html = str(cnxepub.DocumentContentFormatter(model))
+    fileid, _ = _insert_file(cursor, io.BytesIO(html.encode('utf-8')),
+                             'text/html')
     file_arg = {
         'module_ident': module_ident,
         'parent_ident_hash': parent_model.ident_hash,
-        'media_type': 'text/html',
-        'data': psycopg2.Binary(html.encode('utf-8')),
+        'fileid': fileid,
         }
     cursor.execute("""\
-WITH file_insertion AS (
-  INSERT INTO files (file, media_type) VALUES (%(data)s, %(media_type)s)
-  RETURNING fileid)
 INSERT INTO collated_file_associations
   (context, item, fileid)
 VALUES
   ((SELECT module_ident FROM modules
     WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
    = %(parent_ident_hash)s),
-   %(module_ident)s,
-   (SELECT fileid FROM file_insertion))""", file_arg)
+    %(module_ident)s, %(fileid)s)""", file_arg)
 
     model.id, model.metadata['version'] = split_ident_hash(ident_hash)
     model.set_uri('cnx-archive', ident_hash)
