@@ -51,7 +51,6 @@ setup(
     [paste.app_factory]
     main = cnxpublishing.main:main
     [console_scripts]
-    cnx-publishing-initdb = cnxpublishing.scripts.initdb:main
     cnx-publishing-post-publication = \
         cnxpublishing.scripts.post_publication:main
     [dbmigrator]
