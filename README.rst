@@ -37,25 +37,20 @@ Or::
 
     pip install .
 
-If you haven't done so already, you will need to initialize an archive
-database. This can be done using the following command::
+Initialize the database with the archive and publishing schema using the
+following command::
 
-    cnx-archive-initdb <your-config>.ini
-
-Then you'll need to add the publishing schema to an existing
-cnx-archive database::
-
-    cnx-publishing-initdb <your-config>.ini
-
-Here ``<your-config>.ini`` can be the ``development.ini`` in the project root.
-The settings in this config are the same as the development settings used
-by cnx-archive.
+    cnx-db init -d cnxarchive -U cnxarchive
 
 To run the project you can use the supplied script or configure it as a WSGI
 application in your webserver.
 ::
 
     pserve <your-config>.ini
+
+Here ``<your-config>.ini`` can be the ``development.ini`` in the project root.
+The settings in this config are the same as the development settings used
+by cnx-archive.
 
 If you're using **cnx-authoring** together with **cnx-publishing**, please make sure
 your development.ini use the **same openstax_accounts settings**.
