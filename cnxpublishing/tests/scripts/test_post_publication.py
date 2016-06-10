@@ -15,14 +15,12 @@ try:
 except ImportError:
     import mock
 
-from cnxarchive import config as archive_config
-from cnxarchive.database import (initdb as archive_initdb,
-                                 get_collated_content)
+from cnxarchive.database import get_collated_content
+from cnxdb.init import init_db
 import cnxepub
 import psycopg2
 
 from .. import testing, use_cases
-from ...db import initdb
 
 
 def check_module_state(module_ident):
@@ -56,11 +54,7 @@ class PostPublicationTestCase(unittest.TestCase):
         self.db_conn_str = settings[CONNECTION_STRING]
 
         # Initialize database
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        initdb(self.db_conn_str)
+        init_db(self.db_conn_str, True)
 
     def tearDown(self):
         # Terminate the post publication worker script.

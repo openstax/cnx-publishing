@@ -7,8 +7,7 @@
 # ###
 import unittest
 
-from cnxarchive import config as archive_config
-from cnxarchive.database import initdb as archive_initdb
+from cnxdb.init import init_db
 from pyramid import testing
 
 from .. import use_cases
@@ -30,12 +29,7 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from cnxpublishing.db import initdb
-        initdb(self.db_conn_str)
+        init_db(self.db_conn_str, True)
 
     def tearDown(self):
         with self.db_connect() as db_conn:

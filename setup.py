@@ -17,6 +17,7 @@ install_requires = (
     'pyramid_multiauth',
     )
 tests_require = [
+    'cnx-db',
     'webtest',
     ]
 extras_require = {

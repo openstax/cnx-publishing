@@ -12,8 +12,7 @@ import unittest
 import zipfile
 
 import cnxepub
-from cnxarchive import config as archive_config
-from cnxarchive.database import initdb as archive_initdb
+from cnxdb.init import init_db
 from webtest import TestApp
 from pyramid import testing
 
@@ -136,12 +135,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
         config = testing.setUp(settings=self.settings)
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from cnxpublishing.db import initdb
-        initdb(self.db_conn_str)
+        init_db(self.db_conn_str, True)
 
         # Assign API keys for testing
         self.set_up_api_keys()
