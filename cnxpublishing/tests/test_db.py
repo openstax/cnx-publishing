@@ -1077,7 +1077,7 @@ INSERT INTO modules
 VALUES
 (1, 'Module', 'referenced module',
  DEFAULT, DEFAULT, 1, 1,
- 0, 'admin', 'log', NULL, NULL, NULL,
+ 0, 'admin', 'log', DEFAULT, NULL, NULL,
  'en', '{admin}', NULL, '{admin}',
  DEFAULT, DEFAULT) RETURNING uuid || '@' || major_version""")
         doc_ident_hash = cursor.fetchone()[0]
@@ -1450,7 +1450,7 @@ VALUES
 (1, 'Module', 'm10000', %s, 'v1',
  '1', DEFAULT,
  DEFAULT, DEFAULT, 1, 1,
- 0, 'admin', 'log', NULL, NULL, NULL,
+ 0, 'admin', 'log', DEFAULT, NULL, NULL,
  'en', '{admin}', NULL, '{admin}',
  DEFAULT, DEFAULT),
 (2, 'Module', 'm10000', %s, 'v2',
