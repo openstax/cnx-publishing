@@ -51,6 +51,8 @@ setup(
     main = cnxpublishing.main:main
     [console_scripts]
     cnx-publishing-initdb = cnxpublishing.scripts.initdb:main
+    cnx-publishing-post-publication = \
+        cnxpublishing.scripts.post_publication:main
     [dbmigrator]
     migrations_directory = cnxpublishing.main:find_migrations_directory
     """,
