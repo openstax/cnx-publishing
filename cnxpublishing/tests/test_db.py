@@ -67,7 +67,8 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
-    def setUp(self):
+    @db_connect
+    def setUp(self, cursor):
         archive_settings = {
             archive_config.CONNECTION_STRING: self.db_conn_str,
             }
@@ -85,6 +86,16 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         # Initialize the authentication policy.
         from openstax_accounts.stub import main
         main(self.config)
+
+        # Insert modulestates
+        cursor.execute("""\
+            INSERT INTO modulestates (stateid, statename) VALUES
+                (0, 'unknown'),
+                (1, 'current'),
+                (4, 'obsolete'),
+                (5, 'post-publication'),
+                (6, 'processing'),
+                (7, 'errored');""")
 
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:

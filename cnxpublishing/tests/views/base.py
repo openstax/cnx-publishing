@@ -146,6 +146,18 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         # Assign API keys for testing
         self.set_up_api_keys()
 
+        # Insert modulestates
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    INSERT INTO modulestates (stateid, statename) VALUES
+                        (0, 'unknown'),
+                        (1, 'current'),
+                        (4, 'obsolete'),
+                        (5, 'post-publication'),
+                        (6, 'processing'),
+                        (7, 'errored');""")
+
     def tearDown(self):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
