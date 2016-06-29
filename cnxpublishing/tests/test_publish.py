@@ -527,6 +527,12 @@ class RepublishTestCase(unittest.TestCase):
         book_two = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
         book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
 
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+        cursor.connection.commit()
+
         # * Make a new publication of book three.
         book_three.metadata['version'] = '2.1'
         book_three[0].metadata['version'] = '2'
@@ -538,6 +544,12 @@ class RepublishTestCase(unittest.TestCase):
 
         # * Invoke the republish logic.
         self.call_target(cursor, [book_three])
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+        cursor.connection.commit()
 
         # * Ensure book one and two have been republished.
         # We can ensure this through checking for the existence of the

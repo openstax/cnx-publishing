@@ -1534,6 +1534,12 @@ class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
         binder = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
         cursor.connection.commit()
 
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+        cursor.connection.commit()
+
         # * Assemble the publication request.
         publication_id = self.make_publication(publisher='ream')
         for doc in cnxepub.flatten_to_documents(binder):
@@ -1745,6 +1751,12 @@ ORDER BY filename
         book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         book_two = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
         book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
         cursor.connection.commit()
 
         # * Make a new publication of book three.
