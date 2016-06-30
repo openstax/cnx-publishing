@@ -585,6 +585,41 @@ class RepublishTestCase(unittest.TestCase):
             }
         self.assertEqual(tree, expected_tree)
 
+    @db_connect
+    def test_republish_binder_tree_not_latest(self, cursor):
+        """Verify republishing of binders that has trees with latest flag set
+        to null in shared document situations.  Binders published by
+        cnx-publishing always have latest flag set to true at the time of
+        writing.  This is for existing binders in the database."""
+        # * Set up one book in archive.  One of the pages in this book will be
+        # updated causing this book to be republished.
+        book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # * Set the latest flag in trees for book one to null.
+        cursor.execute("""\
+UPDATE trees SET latest = NULL WHERE documentid = (
+    SELECT module_ident FROM modules
+        WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+""", (book_one.ident_hash,))
+
+        # * Make a new publication of page one
+        page_one = book_one[0][0]
+        page_one.metadata['version'] = '2'
+        from ..publish import publish_model
+        ident_hash = publish_model(cursor, page_one, 'tester', 'test pub')
+
+        # * Invoke the republish logic.
+        self.call_target(cursor, [page_one])
+
+        # * Ensure book one has been republished.
+        cursor.execute("""\
+SELECT 1 FROM trees WHERE documentid = (
+    SELECT module_ident FROM modules
+        WHERE uuid||'@'||concat_ws('.', major_version, minor_version) =
+              %s||'@1.2')
+""", (book_one.id,))
+        self.assertEqual((1,), cursor.fetchone())
+
 
 class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
 

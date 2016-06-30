@@ -676,7 +676,7 @@ RETURNING nodeid"""
         data = tree[nodeid]
         data['parent_id'] = parent_id
         if history_map.get(data['ident_hash']) is not None \
-           and data['latest']:
+           and (data['latest'] or parent_id is None):
             data['ident_hash'] = history_map[data['ident_hash']]
         new_nodeid = insert(data)
         for child_nodeid in children.get(nodeid, []):
