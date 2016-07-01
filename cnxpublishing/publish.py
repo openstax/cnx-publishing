@@ -182,13 +182,14 @@ def _insert_metadata(cursor, model, publisher, message):
             moduleid = None
         params['_moduleid'] = moduleid
 
+        created = model.metadata.get('created', None)
         # Format the statement to accept the identifiers.
         stmt = MODULE_INSERTION_TEMPLATE.format(**{
             '__uuid__': "%(_uuid)s::uuid",
             '__major_version__': "%(_major_version)s",
             '__minor_version__': "%(_minor_version)s",
             '__moduleid__': moduleid is None and "DEFAULT" or "%(_moduleid)s",
-            '__created__': "%(created)s",
+            '__created__': created is None and "DEFAULT" or "%(created)s",
             })
     else:
         created = model.metadata.get('created', None)
