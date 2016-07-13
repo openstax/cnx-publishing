@@ -39,7 +39,7 @@ before_install:
   - cd cnx-epub && python setup.py install && cd ..
 
   # * Install cnx-archive
-  - git clone https://github.com/Connexions/cnx-archive.git
+  - git clone -b post-publication https://github.com/Connexions/cnx-archive.git
   - cd cnx-archive && python setup.py install && cd ..
   # Install the coverage utility and coveralls reporting utility
   - pip install coverage

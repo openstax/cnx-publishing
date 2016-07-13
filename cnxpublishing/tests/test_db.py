@@ -67,7 +67,8 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
-    def setUp(self):
+    @db_connect
+    def setUp(self, cursor):
         archive_settings = {
             archive_config.CONNECTION_STRING: self.db_conn_str,
             }
@@ -85,6 +86,16 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         # Initialize the authentication policy.
         from openstax_accounts.stub import main
         main(self.config)
+
+        # Insert modulestates
+        cursor.execute("""\
+            INSERT INTO modulestates (stateid, statename) VALUES
+                (0, 'unknown'),
+                (1, 'current'),
+                (4, 'obsolete'),
+                (5, 'post-publication'),
+                (6, 'processing'),
+                (7, 'errored');""")
 
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
@@ -1077,7 +1088,7 @@ INSERT INTO modules
 VALUES
 (1, 'Module', 'referenced module',
  DEFAULT, DEFAULT, 1, 1,
- 0, 'admin', 'log', NULL, NULL, NULL,
+ 0, 'admin', 'log', DEFAULT, NULL, NULL,
  'en', '{admin}', NULL, '{admin}',
  DEFAULT, DEFAULT) RETURNING uuid || '@' || major_version""")
         doc_ident_hash = cursor.fetchone()[0]
@@ -1450,7 +1461,7 @@ VALUES
 (1, 'Module', 'm10000', %s, 'v1',
  '1', DEFAULT,
  DEFAULT, DEFAULT, 1, 1,
- 0, 'admin', 'log', NULL, NULL, NULL,
+ 0, 'admin', 'log', DEFAULT, NULL, NULL,
  'en', '{admin}', NULL, '{admin}',
  DEFAULT, DEFAULT),
 (2, 'Module', 'm10000', %s, 'v2',
@@ -1521,6 +1532,12 @@ class ArchiveIntegrationTestCase(BaseDatabaseIntegrationTestCase):
         shared_binder = shared_book_setup(self, cursor)
         # We will republish book two.
         binder = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
         cursor.connection.commit()
 
         # * Assemble the publication request.
@@ -1734,6 +1751,12 @@ ORDER BY filename
         book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         book_two = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
         book_three = use_cases.setup_COMPLEX_BOOK_THREE_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
         cursor.connection.commit()
 
         # * Make a new publication of book three.

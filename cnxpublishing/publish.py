@@ -454,7 +454,7 @@ def republish_binders(cursor, models):
                         "We were given: {}".format(models))
     for model in models:
         if isinstance(model, (cnxepub.Binder,)):
-            binders.add(split_ident_hash(model.ident_hash))
+            binders.add(split_ident_hash(model.ident_hash)[0])
             for doc in cnxepub.flatten_to_documents(model):
                 documents.add(split_ident_hash(doc.ident_hash))
         else:
@@ -494,7 +494,7 @@ WHERE t.parent_id IS NULL
     republished_ident_hashes = []
     # Republish the Collections set.
     for (uuid, version) in to_be_republished:
-        if (uuid, version,) in binders:
+        if uuid in binders:
             # This binder is already in the publication context,
             # don't try to publish it again.
             continue

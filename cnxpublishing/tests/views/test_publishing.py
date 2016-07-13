@@ -578,6 +578,13 @@ GROUP BY user_id, accepted
         # Insert the BOOK use-case in order to make a revision of it.
         self._setup_to_archive(use_cases.BOOK)
 
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+
         publisher = u'ream'
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
                                        u'públishing this book')
@@ -665,6 +672,13 @@ GROUP BY user_id, accepted
                                       "role attribution.".format(user_id)
                     self.assertTrue(has_accepted, failure_message)
 
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+
         # *. --
         # This is publication completion,
         # because all licenses and roles have been accepted.
@@ -709,6 +723,13 @@ GROUP BY user_id, accepted
         """
         # Insert the BOOK use-case in order to make a revision of it.
         self._setup_to_archive(use_cases.BOOK)
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid = 1 WHERE stateid = 5""")
 
         publisher = u'able'
         epub_filepath = self.make_epub(use_cases.REVISED_BOOK, publisher,
@@ -809,6 +830,13 @@ GROUP BY user_id, accepted
                     failure_message = "{} has not accepted " \
                                       "role attribution.".format(user_id)
                     self.assertTrue(has_accepted, failure_message)
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid = 1 WHERE stateid = 5""")
 
         # *. --
         # This is publication completion,
@@ -1061,6 +1089,13 @@ GROUP BY user_id, accepted
         resp = self.app_post_moderation(publication_id,
                                         {'is_accepted': True},
                                         headers=headers)
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid = 1 WHERE stateid = 5""")
 
         # *. --
         # This is publication completion,
