@@ -53,13 +53,7 @@ WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_collation(ident_hash, cursor=cursor)
-    try:
-        collate(binder, publisher, message, cursor=cursor)
-    except Exception as e:
-        logger.exception('ident_hash={} module_ident={} error={}'
-                         .format(ident_hash, module_ident, str(e)))
-        update_module_state(cursor, module_ident, 'errored')
-        return
+    collate(binder, publisher, message, cursor=cursor)
 
     logger.debug('Finished processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
@@ -93,7 +87,12 @@ RETURNING modules.module_ident,
             except TypeError:
                 # No more items to process
                 return
-            process(cursor, module_ident, ident_hash)
+            try:
+                process(cursor, module_ident, ident_hash)
+            except Exception as e:
+                logger.exception('ident_hash={} module_ident={} error={}'
+                                 .format(ident_hash, module_ident, str(e)))
+                update_module_state(cursor, module_ident, 'errored')
 
 
 def usage(argv):

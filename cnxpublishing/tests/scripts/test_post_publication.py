@@ -10,6 +10,10 @@ from contextlib import contextmanager
 import io
 from multiprocessing import Process
 import unittest
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from cnxarchive import config as archive_config
 from cnxarchive.database import (initdb as archive_initdb,
@@ -247,3 +251,47 @@ SELECT nodeid, is_collated FROM trees WHERE documentid = %s
         content = get_collated_content(
             revised[0][0].ident_hash, revised.ident_hash, cursor)
         self.assertIn('Ruleset applied', content[:])
+
+    @testing.db_connect
+    @mock.patch('cnxpublishing.scripts.post_publication.remove_collation')
+    def test_error_handling(self, cursor, mock_remove_collation):
+        from ...scripts import post_publication
+        from ...collation import remove_collation
+
+        # Fake remove_collation, the first time it's called, it will raise an
+        # exception, after that it'll call the normal remove_collation function
+        class FakeRemoveCollation(object):
+            # this is necessary inside a class because just a variable "count"
+            # cannot be accessed inside fake_remove_collation
+            count = 0
+
+        def fake_remove_collation(*args, **kwargs):
+            if FakeRemoveCollation.count == 0:
+                FakeRemoveCollation.count += 1
+                raise Exception('something failed during collation')
+            return remove_collation(*args, **kwargs)
+
+        mock_remove_collation.side_effect = fake_remove_collation
+
+        self.target()
+
+        binder1 = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        binder2 = use_cases.setup_COMPLEX_BOOK_TWO_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        cursor.execute("""\
+SELECT module_ident FROM modules
+    WHERE portal_type = 'Collection'
+    ORDER BY module_ident DESC LIMIT 2""")
+
+        ((module_ident1,), (module_ident2,)) = cursor.fetchall()
+
+        wait_for_module_state(module_ident1)
+        wait_for_module_state(module_ident2)
+
+        cursor.execute("""\
+SELECT stateid FROM modules
+    WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
+
+        # make sure one is marked as "errored" and the other one "current"
+        self.assertEqual([(1,), (7,)], sorted(cursor.fetchall()))
