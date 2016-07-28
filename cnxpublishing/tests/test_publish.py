@@ -626,6 +626,12 @@ class RepublishTestCase(unittest.TestCase):
         # updated causing this book to be republished.
         book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
 
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+        cursor.connection.commit()
+
         # * Set the latest flag in trees for book one to null.
         cursor.execute("""\
 UPDATE trees SET latest = NULL WHERE documentid = (
