@@ -31,3 +31,10 @@ CREATE TYPE role_types AS ENUM (
   'Publisher',
   'Translator'
 );
+
+
+CREATE TYPE post_publication_states AS ENUM (
+  'Done/Success',
+  'Failed/Error',
+  'Processing'
+)
