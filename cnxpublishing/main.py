@@ -77,6 +77,7 @@ def declare_browsable_routes(config):
     add_route('admin-index', '/a/')
     add_route('admin-moderation', '/a/moderation/')
     add_route('admin-api-keys', '/a/api-keys/')
+    add_route('admin-post-publications', '/a/post-publications/')
 
 
 def declare_routes(config):

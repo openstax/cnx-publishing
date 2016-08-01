@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Post Publication Logs</h1>
+  <table>
+    <tr>
+      <th>Timestamp</th>
+      <th>Ident Hash</th>
+      <th>Title</th>
+      <th>State</th>
+      <th>Message</th>
+    </tr>
+    {% for state in states %}
+      <tr>
+        <td>{{ state.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>
+          <a href="/contents/{{ state.ident_hash }}">{{ state.ident_hash }}</a>
+        </td>
+        <td>{{ state.title }}</td>
+        <td>{{ state.state }}</td>
+        <td><pre>{{ state.state_message }}</pre></td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
