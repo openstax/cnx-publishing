@@ -112,6 +112,11 @@ SELECT nodeid, is_collated FROM trees WHERE documentid = %s
             binder[0][0].ident_hash, binder.ident_hash, cursor)
         self.assertIn('there will be cake', content[:])
 
+        cursor.execute("""\
+SELECT state FROM post_publications
+    WHERE module_ident = %s ORDER BY timestamp DESC""", (module_ident,))
+        self.assertEqual('Done/Success', cursor.fetchone()[0])
+
     @testing.db_connect
     def test_revised_module_inserted(self, cursor):
         self.target()
@@ -252,6 +257,11 @@ SELECT nodeid, is_collated FROM trees WHERE documentid = %s
             revised[0][0].ident_hash, revised.ident_hash, cursor)
         self.assertIn('Ruleset applied', content[:])
 
+        cursor.execute("""\
+SELECT state FROM post_publications
+    WHERE module_ident = %s ORDER BY timestamp DESC""", (module_ident,))
+        self.assertEqual('Done/Success', cursor.fetchone()[0])
+
     @testing.db_connect
     @mock.patch('cnxpublishing.scripts.post_publication.remove_collation')
     def test_error_handling(self, cursor, mock_remove_collation):
@@ -295,3 +305,10 @@ SELECT stateid FROM modules
 
         # make sure one is marked as "errored" and the other one "current"
         self.assertEqual([(1,), (7,)], sorted(cursor.fetchall()))
+
+        cursor.execute("""\
+SELECT state FROM post_publications
+    WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
+        self.assertEqual(
+            ['Done/Success', 'Failed/Error', 'Processing', 'Processing'],
+            sorted([i[0] for i in cursor.fetchall()]))
