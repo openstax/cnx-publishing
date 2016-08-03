@@ -71,13 +71,6 @@ class PublishIntegrationTestCase(unittest.TestCase):
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)
 
-        # Insert modulestates
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                    INSERT INTO modulestates (stateid, statename)
-                        VALUES (1, 'current')""")
-
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
@@ -491,18 +484,6 @@ class RepublishTestCase(unittest.TestCase):
         from ..db import initdb
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)
-
-        # Insert modulestates
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                    INSERT INTO modulestates (stateid, statename) VALUES
-                        (0, 'unknown'),
-                        (1, 'current'),
-                        (4, 'obsolete'),
-                        (5, 'post-publication'),
-                        (6, 'processing'),
-                        (7, 'errored');""")
 
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:

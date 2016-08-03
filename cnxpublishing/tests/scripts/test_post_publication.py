@@ -58,16 +58,6 @@ class PostPublicationTestCase(unittest.TestCase):
         archive_initdb(archive_settings)
         initdb(self.db_conn_str)
 
-        # Insert modulestates
-        cursor.execute("""\
-            INSERT INTO modulestates (stateid, statename) VALUES
-                (0, 'unknown'),
-                (1, 'current'),
-                (4, 'obsolete'),
-                (5, 'post-publication'),
-                (6, 'processing'),
-                (7, 'errored');""")
-
     def tearDown(self):
         # Terminate the post publication worker script.
         if self.process.is_alive():
