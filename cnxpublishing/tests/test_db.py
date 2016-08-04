@@ -87,16 +87,6 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from openstax_accounts.stub import main
         main(self.config)
 
-        # Insert modulestates
-        cursor.execute("""\
-            INSERT INTO modulestates (stateid, statename) VALUES
-                (0, 'unknown'),
-                (1, 'current'),
-                (4, 'obsolete'),
-                (5, 'post-publication'),
-                (6, 'processing'),
-                (7, 'errored');""")
-
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:

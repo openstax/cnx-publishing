@@ -71,13 +71,6 @@ class PublishIntegrationTestCase(unittest.TestCase):
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)
 
-        # Insert modulestates
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                    INSERT INTO modulestates (stateid, statename)
-                        VALUES (1, 'current')""")
-
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
@@ -492,18 +485,6 @@ class RepublishTestCase(unittest.TestCase):
         initdb(self.db_conn_str)
         self.config = testing.setUp(settings=self.settings)
 
-        # Insert modulestates
-        with psycopg2.connect(self.db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                    INSERT INTO modulestates (stateid, statename) VALUES
-                        (0, 'unknown'),
-                        (1, 'current'),
-                        (4, 'obsolete'),
-                        (5, 'post-publication'),
-                        (6, 'processing'),
-                        (7, 'errored');""")
-
     def tearDown(self):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
@@ -625,6 +606,12 @@ class RepublishTestCase(unittest.TestCase):
         # * Set up one book in archive.  One of the pages in this book will be
         # updated causing this book to be republished.
         book_one = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+
+        # Post publication worker will change the collection stateid to
+        # "current" (1).
+        cursor.execute("""\
+            UPDATE modules SET stateid = 1 WHERE stateid = 5""")
+        cursor.connection.commit()
 
         # * Set the latest flag in trees for book one to null.
         cursor.execute("""\
