@@ -134,107 +134,89 @@ p.para {
 }
 
 /* copied from cnx-recipes books/rulesets/output/physics.css */
-body > div[data-type="page"]::after,
-body > div[data-type="composite-page"]::after {
-  pass: 20;
+body > div[data-type="page"]:pass(20)::after,
+body > div[data-type="composite-page"]:pass(20)::after {
   content: pending(page-link);
   move-to: eob-toc;
   container: li;
 }
-body > div[data-type='chapter'] > h1[data-type='document-title'] {
-  pass: 20;
+body > div[data-type='chapter'] > h1[data-type='document-title']:pass(20) {
   copy-to: eoc-toc;
 }
-body > div[data-type='chapter'] > div[data-type="page"],
-body > div[data-type='chapter'] > div[data-type="composite-page"] {
-  pass: 20;
+body > div[data-type='chapter'] > div[data-type="page"]:pass(20),
+body > div[data-type='chapter'] > div[data-type="composite-page"]:pass(20) {
   string-set: page-idi attr(id);
 }
-body > div[data-type='chapter'] > div[data-type="page"] > [data-type='document-title'],
-body > div[data-type='chapter'] > div[data-type="composite-page"] > [data-type='document-title'] {
-  pass: 20;
+body > div[data-type='chapter'] > div[data-type="page"] > [data-type='document-title']:pass(20),
+body > div[data-type='chapter'] > div[data-type="composite-page"] > [data-type='document-title']:pass(20) {
   copy-to: page-title;
 }
-body > div[data-type='chapter'] > div[data-type="page"]::after,
-body > div[data-type='chapter'] > div[data-type="composite-page"]::after {
-  pass: 20;
+body > div[data-type='chapter'] > div[data-type="page"]:pass(20)::after,
+body > div[data-type='chapter'] > div[data-type="composite-page"]:pass(20)::after {
   content: pending(page-title);
   attr-href: "#" string(page-id);
   container: a;
   move-to: page-link;
 }
-body > div[data-type='chapter'] > div[data-type="page"]::after,
-body > div[data-type='chapter'] > div[data-type="composite-page"]::after {
-  pass: 20;
+body > div[data-type='chapter'] > div[data-type="page"]:pass(20)::after,
+body > div[data-type='chapter'] > div[data-type="composite-page"]:pass(20)::after {
   content: pending(page-link);
   move-to: eoc-toc-pages;
   container: li;
 }
-body > div[data-type='chapter']::after {
-  pass: 20;
+body > div[data-type='chapter']:pass(20)::after {
   content: pending(eoc-toc-pages);
   container: ol;
   class: chapter;
   move-to: eoc-toc;
 }
-body > div[data-type='chapter']::after {
-  pass: 20;
+body > div[data-type='chapter']:pass(20)::after {
   content: pending(eoc-toc);
   container: li;
   move-to: eob-toc;
 }
-body > div[data-type="unit"] > h1[data-type='document-title'] {
-  pass: 20;
+body > div[data-type="unit"] > h1[data-type='document-title']:pass(20) {
   copy-to: eou-toc;
 }
-body > div[data-type="unit"] > div[data-type='chapter'] > h1[data-type='document-title'] {
-  pass: 20;
+body > div[data-type="unit"] > div[data-type='chapter'] > h1[data-type='document-title']:pass(20) {
   copy-to: eoc-toc;
 }
-body > div[data-type="unit"] > div[data-type='chapter'] > div[data-type="page"] > [data-type='document-title'],
-body > div[data-type="unit"] > div[data-type='chapter'] div[data-type="composite-page"] > [data-type='document-title'] {
-  pass: 20;
+body > div[data-type="unit"] > div[data-type='chapter'] > div[data-type="page"] > [data-type='document-title']:pass(20),
+body > div[data-type="unit"] > div[data-type='chapter'] div[data-type="composite-page"] > [data-type='document-title']:pass(20) {
   copy-to: page-title;
 }
-body > div[data-type="unit"] > div[data-type='chapter'] > div[data-type="page"]::after,
-body > div[data-type="unit"] > div[data-type='chapter'] div[data-type="composite-page"]::after {
-  pass: 20;
+body > div[data-type="unit"] > div[data-type='chapter'] > div[data-type="page"]:pass(20)::after,
+body > div[data-type="unit"] > div[data-type='chapter'] div[data-type="composite-page"]:pass(20)::after {
   content: pending(page-title);
   move-to: eoc-toc-pages;
   container: li;
 }
-body > div[data-type="unit"] > div[data-type='chapter']::after {
-  pass: 20;
+body > div[data-type="unit"] > div[data-type='chapter']:pass(20)::after {
   content: pending(eoc-toc-pages);
   container: ol;
   class: chapter;
   move-to: eoc-toc;
 }
-body > div[data-type="unit"] > div[data-type='chapter']::after {
-  pass: 20;
+body > div[data-type="unit"] > div[data-type='chapter']:pass(20)::after {
   content: pending(eoc-toc);
   container: li;
   move-to: eou-toc-chapters;
 }
-body > div[data-type="unit"]::after {
-  pass: 20;
+body > div[data-type="unit"]:pass(20)::after {
   content: pending(eou-toc-chapters);
   container: ol;
   class: unit;
   move-to: eou-toc;
 }
-body > div[data-type="unit"]::after {
-  pass: 20;
+body > div[data-type="unit"]:pass(20)::after {
   content: pending(eou-toc);
   container: li;
   move-to: eob-toc;
 }
-nav#toc {
-  pass: 30;
+nav#toc:pass(30) {
   content: '';
 }
-nav#toc::after {
-  pass: 30;
+nav#toc:pass(30)::after {
   content: pending(eob-toc);
   container: ol;
 }
