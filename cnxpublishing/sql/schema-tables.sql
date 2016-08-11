@@ -109,3 +109,12 @@ CREATE TABLE api_keys (
   -- See the documenation about available groups.
   "groups" TEXT[]
 );
+
+
+CREATE TABLE post_publications (
+  "module_ident" INTEGER NOT NULL,
+  "state" post_publication_states NOT NULL,
+  "state_message" TEXT,
+  "timestamp" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("module_ident") REFERENCES modules ("module_ident")
+);

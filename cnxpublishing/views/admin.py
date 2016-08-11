@@ -5,9 +5,11 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import psycopg2
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
+from .. import config
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
@@ -23,6 +25,9 @@ def admin_index(request):  # pragma: no cover
              },
             {'name': 'API Keys',
              'uri': request.route_url('admin-api-keys'),
+             },
+            {'name': 'Post Publication Logs',
+             'uri': request.route_url('admin-post-publications'),
              },
             ],
         }
@@ -49,3 +54,28 @@ def admin_api_keys(request):  # pragma: no cover
     cache.invalidate(lookup_api_key_info)
 
     return {'api_keys': get_api_keys(request)}
+
+
+@view_config(route_name='admin-post-publications', request_method='GET',
+             renderer='cnxpublishing.views:templates/post-publications.html',
+             permission='administer')
+def admin_post_publications(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+SELECT m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version),
+       m.name, p.timestamp, p.state, p.state_message
+  FROM post_publications p NATURAL LEFT JOIN modules m
+  ORDER BY p.timestamp DESC LIMIT 500""")
+            states = [
+                {'ident_hash': result[0],
+                 'title': result[1],
+                 'timestamp': result[2],
+                 'state': result[3],
+                 'state_message': result[4],
+                 } for result in cursor.fetchall()]
+
+    return {'states': states}

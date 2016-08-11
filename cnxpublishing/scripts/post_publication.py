@@ -10,6 +10,7 @@ import logging
 import os
 import select
 import sys
+import traceback
 
 from cnxarchive.scripts import export_epub
 import psycopg2
@@ -26,6 +27,14 @@ logger = logging.getLogger('post_publication')
 CHANNEL = 'post_publication'
 
 
+def set_post_publications_state(cursor, module_ident, state_name,
+                                state_message=''):
+    cursor.execute("""\
+INSERT INTO post_publications
+  (module_ident, state, state_message)
+  VALUES (%s, %s, %s)""", (module_ident, state_name, state_message))
+
+
 def update_module_state(cursor, module_ident, state_name):
     logger.debug('Setting module_ident={} state to "{}"'.format(
         module_ident, state_name))
@@ -39,12 +48,16 @@ SET stateid = (
 def process(cursor, module_ident, ident_hash):
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
+    set_post_publications_state(cursor, module_ident, 'Processing')
     try:
         binder = export_epub.factory(ident_hash)
     except export_epub.NotFound:
         logger.error('ident_hash={} module_ident={} not found'
                      .format(ident_hash, module_ident))
         update_module_state(cursor, module_ident, 'errored')
+        set_post_publications_state(
+            cursor, module_ident, 'Failed/Error',
+            'ident_hash={} not found'.format(ident_hash))
         return
 
     cursor.execute("""\
@@ -53,17 +66,12 @@ WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_collation(ident_hash, cursor=cursor)
-    try:
-        collate(binder, publisher, message, cursor=cursor)
-    except Exception as e:
-        logger.exception('ident_hash={} module_ident={} error={}'
-                         .format(ident_hash, module_ident, str(e)))
-        update_module_state(cursor, module_ident, 'errored')
-        return
+    collate(binder, publisher, message, cursor=cursor)
 
     logger.debug('Finished processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
     update_module_state(cursor, module_ident, 'current')
+    set_post_publications_state(cursor, module_ident, 'Done/Success')
 
 
 def post_publication(conn):
@@ -93,7 +101,15 @@ RETURNING modules.module_ident,
             except TypeError:
                 # No more items to process
                 return
-            process(cursor, module_ident, ident_hash)
+            try:
+                process(cursor, module_ident, ident_hash)
+            except Exception as e:
+                logger.exception('ident_hash={} module_ident={} error={}'
+                                 .format(ident_hash, module_ident, str(e)))
+                update_module_state(cursor, module_ident, 'errored')
+                set_post_publications_state(
+                    cursor, module_ident, 'Failed/Error',
+                    ''.join(traceback.format_exception(*sys.exc_info())))
 
 
 def usage(argv):
