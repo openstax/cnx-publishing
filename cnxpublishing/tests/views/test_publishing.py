@@ -1391,7 +1391,7 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
             metadata={'title': "Other things"})
         collated_doc_content = '<p>collated</p>'
 
-        def collate(binder_model):
+        def collate(binder_model, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
             return binder_model
@@ -1421,7 +1421,7 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
         publisher, message, composite_doc = self.make_one(binder, content)
         collated_doc_content = '<p>collated</p>'
 
-        def collate(binder_model):
+        def collate(binder_model, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_doc)
             return binder_model

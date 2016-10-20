@@ -13,14 +13,14 @@ import sys
 import traceback
 
 from cnxarchive.scripts import export_epub
+from cnxepub.formatters import exercise_callback_factory
 import psycopg2
 import psycopg2.extensions
-from pyramid.paster import bootstrap, get_appsettings
+from pyramid.paster import bootstrap
 from pyramid.threadlocal import get_current_registry
 
 from ..collation import remove_collation, collate
 from ..config import CONNECTION_STRING
-from ..utils import split_ident_hash
 
 
 logger = logging.getLogger('post_publication')
@@ -45,7 +45,7 @@ SET stateid = (
 ) WHERE module_ident = %s""", (state_name, module_ident))
 
 
-def process(cursor, module_ident, ident_hash):
+def process(cursor, module_ident, ident_hash, includes):
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
     set_post_publications_state(cursor, module_ident, 'Processing')
@@ -66,7 +66,7 @@ WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_collation(ident_hash, cursor=cursor)
-    collate(binder, publisher, message, cursor=cursor)
+    collate(binder, publisher, message, cursor=cursor, includes=includes)
 
     logger.debug('Finished processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
@@ -74,7 +74,7 @@ WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
     set_post_publications_state(cursor, module_ident, 'Done/Success')
 
 
-def post_publication(conn):
+def post_publication(conn, includes):
     while True:
         with conn.cursor() as cursor:
             # Pick one item that requires post publication and set its state to
@@ -102,7 +102,7 @@ RETURNING modules.module_ident,
                 # No more items to process
                 return
             try:
-                process(cursor, module_ident, ident_hash)
+                process(cursor, module_ident, ident_hash, includes)
             except Exception as e:
                 logger.exception('ident_hash={} module_ident={} error={}'
                                  .format(ident_hash, module_ident, str(e)))
@@ -129,6 +129,13 @@ def main(argv=sys.argv):
     settings = get_current_registry().settings
     connection_string = settings[CONNECTION_STRING]
 
+    exercise_url_template = settings.get('embeddables.exercise.url_template',
+                                         None)
+    exercise_match = settings.get('embeddables.exercise.match', None)
+    includes = None
+    if exercise_url_template and exercise_match:
+        includes = [exercise_callback_factory(exercise_match,
+                                              exercise_url_template)]
     # Code adapted from
     # http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications
     with psycopg2.connect(connection_string) as conn:
@@ -153,4 +160,4 @@ def main(argv=sys.argv):
                     logger.debug('Got NOTIFY: pid={} channel={} payload={}'
                                  .format(notify.pid, notify.channel,
                                          notify.payload))
-                    post_publication(conn)
+                    post_publication(conn, includes)

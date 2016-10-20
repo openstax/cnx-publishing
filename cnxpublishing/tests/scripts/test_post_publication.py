@@ -138,7 +138,6 @@ SELECT state FROM post_publications
                 'ruleset.css',
                 io.BytesIO("""\
 p.para {
-  pass: default;
   content: "Ruleset applied";
 }
 

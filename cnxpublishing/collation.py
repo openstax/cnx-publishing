@@ -19,12 +19,13 @@ from .utils import split_ident_hash
 
 
 @with_db_cursor
-def collate(binder, publisher, message, cursor):
+def collate(binder, publisher, message, cursor, includes=None):
     """Given a `Binder` as `binder`, collate the contents and
     persist those changes alongside the published content.
 
     """
-    binder = collate_models(binder)
+
+    binder = collate_models(binder, includes)
 
     def flatten_filter(model):
         return isinstance(model, cnxepub.CompositeDocument)
