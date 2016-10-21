@@ -25,7 +25,7 @@ def collate(binder, publisher, message, cursor, includes=None):
 
     """
 
-    binder = collate_models(binder, includes)
+    binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
 
     def flatten_filter(model):
         return isinstance(model, cnxepub.CompositeDocument)
