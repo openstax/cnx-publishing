@@ -67,7 +67,7 @@ WHERE
 
         collated_doc_content = '<p>collated</p>'
 
-        def collate(binder_model, includes=None):
+        def collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
             return binder_model
@@ -152,7 +152,7 @@ WHERE
 
         collated_doc_content = '<p>collated</p>'
 
-        def cnxepub_collate(binder_model, includes=None):
+        def cnxepub_collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
             return binder_model
