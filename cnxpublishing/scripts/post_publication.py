@@ -132,10 +132,12 @@ def main(argv=sys.argv):
     exercise_url_template = settings.get('embeddables.exercise.url_template',
                                          None)
     exercise_match = settings.get('embeddables.exercise.match', None)
+    exercise_token = settings.get('embeddables.exercise.token', None)
     includes = None
     if exercise_url_template and exercise_match:
         includes = [exercise_callback_factory(exercise_match,
-                                              exercise_url_template)]
+                                              exercise_url_template,
+                                              exercise_token)]
     # Code adapted from
     # http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications
     with psycopg2.connect(connection_string) as conn:
