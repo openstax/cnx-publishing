@@ -133,11 +133,14 @@ def main(argv=sys.argv):
                                          None)
     exercise_match = settings.get('embeddables.exercise.match', None)
     exercise_token = settings.get('embeddables.exercise.token', None)
+    mathml_url = settings.get('mathmlcloud.url', None)
+
     includes = None
     if exercise_url_template and exercise_match:
         includes = [exercise_callback_factory(exercise_match,
                                               exercise_url_template,
-                                              exercise_token)]
+                                              exercise_token,
+                                              mathml_url)]
     # Code adapted from
     # http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications
     with psycopg2.connect(connection_string) as conn:
