@@ -24,6 +24,7 @@ from webtest.forms import Upload
 from .. import use_cases
 from ..testing import db_connect
 from .base import BaseFunctionalViewTestCase
+from ...collation import collate
 
 
 class PublishViewsTestCase(unittest.TestCase):
@@ -1391,23 +1392,32 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
             metadata={'title': "Other things"})
         collated_doc_content = '<p>collated</p>'
 
-        def collate(binder_model, ruleset=None, includes=None):
+        def _collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_section)
             return binder_model
 
+        cursor.execute('LISTEN post_publication')
+        cursor.connection.commit()
+
+        self.app_post_collate_content(binder.ident_hash,
+                                      headers=api_key_headers)
+
+        cursor.connection.commit()
+        cursor.connection.poll()
+        self.assertEqual(1, len(cursor.connection.notifies))
+
         with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
-            mock_collate.side_effect = collate
+            mock_collate.side_effect = _collate
 
-            self.app_post_collate_content(binder.ident_hash,
-                                          headers=api_key_headers)
-
+            collate(binder, publisher, message, cursor=cursor)
             self.assertEqual(1, mock_collate.call_count)
 
         # Ensure the tree as been stamped.
         cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
                        (binder.id, binder.metadata['version'],))
         collated_tree = cursor.fetchone()[0]
+
         self.assertIn(composite_doc.ident_hash,
                       cnxepub.flatten_tree_to_ident_hashes(collated_tree))
 
@@ -1421,25 +1431,21 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
         publisher, message, composite_doc = self.make_one(binder, content)
         collated_doc_content = '<p>collated</p>'
 
-        def collate(binder_model, ruleset=None, includes=None):
+        def _collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
             binder_model.append(composite_doc)
             return binder_model
 
-        with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
-            mock_collate.side_effect = collate
+        cursor.execute('LISTEN post_publication')
+        cursor.connection.commit()
 
-            self.app_post_collate_content(binder.ident_hash,
-                                          headers=api_key_headers)
-            # Run it again to mimic a rerun behavior.
-            self.app_post_collate_content(binder.ident_hash,
-                                          headers=api_key_headers)
+        self.app_post_collate_content(binder.ident_hash,
+                                      headers=api_key_headers)
+        # Run it again to mimic a rerun behavior.
+        self.app_post_collate_content(binder.ident_hash,
+                                      headers=api_key_headers)
 
-            self.assertEqual(2, mock_collate.call_count)
-
-        # Ensure the tree as been stamped.
-        cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
-                       (binder.id, binder.metadata['version'],))
-        collated_tree = cursor.fetchone()[0]
-        self.assertIn(composite_doc.ident_hash,
-                      cnxepub.flatten_tree_to_ident_hashes(collated_tree))
+        cursor.connection.commit()
+        cursor.connection.poll()
+        cursor.connection.poll()
+        self.assertEqual(2, len(cursor.connection.notifies))
