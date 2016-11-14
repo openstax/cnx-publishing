@@ -13,7 +13,7 @@ from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from .. import config
-from ..collation import collate, remove_collation
+from ..collation import remove_collation
 from ..db import (
     accept_publication_license,
     accept_publication_role,
@@ -138,7 +138,7 @@ def post_accept_license(request):
             else:
                 denied.append(doc_acceptance['id'])
     except:
-        raise httpexception.BadRequest("Posted data is invalid.")
+        raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
@@ -221,7 +221,7 @@ def post_accept_role(request):
             else:
                 denied.append(doc_acceptance['id'])
     except:
-        raise httpexception.BadRequest("Posted data is invalid.")
+        raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
@@ -241,7 +241,7 @@ def post_accept_role(request):
 @view_config(route_name='collate-content', request_method='POST',
              renderer='json', permission='publish')
 def collate_content(request):
-    """Invoke the collation process"""
+    """Invoke the collation process - trigger post-publication"""
     ident_hash = request.matchdict['ident_hash']
     try:
         binder = export_epub.factory(ident_hash)
@@ -250,21 +250,18 @@ def collate_content(request):
     if not isinstance(binder, cnxepub.Binder):
         raise httpexceptions.HTTPBadRequest(
             '{} is not a book'.format(ident_hash))
-
     settings = request.registry.settings
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
+            remove_collation(binder.ident_hash, cursor=cursor)
             id, version = split_ident_hash(ident_hash)
             if version:
                 cursor.execute("""\
-SELECT submitter, submitlog FROM modules
-WHERE uuid = %s and concat_ws('.', major_version, minor_version) = %s
+UPDATE modules SET stateid = 5
+WHERE uuid = %s AND concat_ws('.', major_version, minor_version) = %s
 """, (id, version,))
             else:
                 cursor.execute("""\
-SELECT submitter, submitlog FROM latest_modules
-WHERE uuid = %s
+UPDATE modules SET stateid = 5 where module_ident in (select module_ident from
+latest_modules WHERE uuid = %s
 """, (id,))
-            publisher, message = cursor.fetchone()
-            remove_collation(binder.ident_hash, cursor=cursor)
-            collate(binder, publisher, message, cursor=cursor)

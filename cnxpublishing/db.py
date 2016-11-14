@@ -11,7 +11,6 @@ import sys
 import io
 import functools
 import json
-import uuid
 
 import cnxepub
 import psycopg2
@@ -1085,12 +1084,12 @@ WHERE
 
 
 def upsert_license_requests(cursor, uuid_, roles):
-    """Given a ``uuid`` and list of ``uids`` (user identifiers)
+    """Given a ``uuid`` and list of ``roles`` (user identifiers)
     create a license acceptance entry. If ``has_accepted`` is supplied,
     it will be used to assign an acceptance value to all listed ``uids``.
     """
     if not isinstance(roles, (list, set, tuple,)):
-        raise TypeError("``uids`` is an invalid type: {}".format(type(uids)))
+        raise TypeError("``roles`` is an invalid type: {}".format(type(roles)))
 
     acceptors = set([x['uid'] for x in roles])
 
@@ -1212,7 +1211,7 @@ def remove_role_requests(cursor, uuid_, roles):
     users' role acceptance entries.
     """
     if not isinstance(roles, (list, set, tuple,)):
-        raise TypeError("``roles`` is an invalid type: {}".format(type(uids)))
+        raise TypeError("``roles`` is an invalid type: {}".format(type(roles)))
 
     acceptors = set([(x['uid'], x['role'],) for x in roles])
 
