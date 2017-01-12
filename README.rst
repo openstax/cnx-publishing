@@ -14,8 +14,8 @@ Connexions Publishing Service
 .. image:: https://travis-ci.org/Connexions/cnx-publishing.svg
    :target: https://travis-ci.org/Connexions/cnx-publishing
 
-.. image:: https://coveralls.io/repos/Connexions/cnx-publishing/badge.png?branch=master
-  :target: https://coveralls.io/r/Connexions/cnx-publishing?branch=master
+.. image:: https://img.shields.io/codecov/c/github/Connexions/cnx-publishing.svg
+  :target: https://codecov.io/gh/Connexions/cnx-publishing
 
 Interface for:
 
@@ -23,7 +23,7 @@ Interface for:
 - Previewing publication requests
 - Submitting publications to the archive database
 - Accepting or denying role requests
-- Kicking off post-publication jobs 
+- Kicking off post-publication jobs
 - Moderating publications for first time publishers
 
 Getting started
