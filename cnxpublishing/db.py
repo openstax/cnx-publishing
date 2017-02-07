@@ -35,14 +35,6 @@ from .utils import (parse_archive_uri, parse_user_uri, join_ident_hash,
                     split_ident_hash)
 
 
-here = os.path.abspath(os.path.dirname(__file__))
-SQL_DIR = os.path.join(here, 'sql')
-SCHEMA_FILES = (
-    'schema-types.sql',
-    'schema-tables.sql',
-    'schema-indexes.sql',
-    'schema-triggers.sql',
-    )
 END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
                         'Failed/Error', 'Rejected',)
 # FIXME psycopg2 UUID adaptation doesn't seem to be registering
@@ -55,22 +47,6 @@ def db_connect(connection_string=None):
     if connection_string is None:
         connection_string = get_current_registry().settings[CONNECTION_STRING]
     return psycopg2.connect(connection_string)
-
-
-def initdb(connection_string):
-    """Initialize publishing in or along-side the archive database."""
-    with db_connect(connection_string) as db_conn:
-        with db_conn.cursor() as cursor:
-            for filename in SCHEMA_FILES:
-                schema_filepath = os.path.join(SQL_DIR, filename)
-                with open(schema_filepath, 'r') as fb:
-                    schema = fb.read()
-                    try:
-                        cursor.execute(schema)
-                    except psycopg2.Error as exc:
-                        print("File '{}' had issues executing."
-                              .format(schema_filepath), file=sys.stderr)
-                        raise
 
 
 def with_db_cursor(func):
@@ -1450,7 +1426,6 @@ __all__ = (
     'add_publication',
     'check_publication_state',
     'db_connect',
-    'initdb',
     'is_publication_permissible',
     'is_revision_publication',
     'lookup_document_pointer',

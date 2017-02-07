@@ -17,9 +17,8 @@ except ImportError:
 
 import cnxepub
 import psycopg2
-from cnxarchive import config as archive_config
-from cnxarchive.database import initdb as archive_initdb
 from cnxarchive.utils import join_ident_hash
+from cnxdb.init import init_db
 from webob import Request
 from pyramid import testing
 
@@ -63,12 +62,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
         cls.db_connect = staticmethod(db_connection_factory())
 
     def setUp(self):
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from ..db import initdb
-        initdb(self.db_conn_str)
+        init_db(self.db_conn_str, True)
         self.config = testing.setUp(settings=self.settings)
 
     def tearDown(self):
@@ -477,12 +471,7 @@ class RepublishTestCase(unittest.TestCase):
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
     def setUp(self):
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from ..db import initdb
-        initdb(self.db_conn_str)
+        init_db(self.db_conn_str, True)
         self.config = testing.setUp(settings=self.settings)
 
     def tearDown(self):

@@ -19,8 +19,7 @@ except ImportError:
 
 import psycopg2
 import cnxepub
-from cnxarchive import config as archive_config
-from cnxarchive.database import initdb as archive_initdb
+from cnxdb.init import init_db
 from pyramid import testing
 
 from ..utils import join_ident_hash, split_ident_hash
@@ -67,14 +66,8 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
 
-    @db_connect
-    def setUp(self, cursor):
-        archive_settings = {
-            archive_config.CONNECTION_STRING: self.db_conn_str,
-            }
-        archive_initdb(archive_settings)
-        from ..db import initdb
-        initdb(self.db_conn_str)
+    def setUp(self):
+        init_db(self.db_conn_str, True)
 
         # Declare a request, so that we can use the route generator methods.
         request = testing.DummyRequest()
