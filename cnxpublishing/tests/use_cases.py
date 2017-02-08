@@ -558,7 +558,7 @@ def check_BOOK_in_archive(test_case, cursor):
         names)
 
     cursor.execute("""\
-SELECT portal_type, uuid||'@'||concat_ws('.',major_version,minor_version)
+SELECT portal_type, ident_hash(uuid,major_version,minor_version)
 FROM modules""")
     items = dict(cursor.fetchall())
     document_ident_hash = items['Module']
@@ -566,7 +566,7 @@ FROM modules""")
 
     cursor.execute("""\
 SELECT portal_type,
-       short_id(uuid)||'@'||concat_ws('.', major_version, minor_version)
+       short_ident_hash(uuid, major_version, minor_version)
 FROM modules""")
     items = dict(cursor.fetchall())
     document_short_id = items['Module']
@@ -589,7 +589,7 @@ FROM modules""")
                        "shortId": document_short_id,
                        "title": "Document One"}]}]}]}
     cursor.execute("""\
- SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version), FALSE)
+ SELECT tree_to_json(uuid::text, module_version(major_version, minor_version), FALSE)
 FROM modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
@@ -606,7 +606,7 @@ WHERE portal_type = 'Collection'""")
                       .hexdigest()
     cursor.execute("""\
 SELECT f.file, f.media_type,
-       m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
+        ident_hash(m.uuid,m.major_version,m.minor_version)
 FROM files as f natural join module_files as mf, latest_modules as m
 WHERE
   mf.module_ident = m.module_ident
@@ -672,7 +672,7 @@ FROM modules ORDER BY major_version ASC""")
                   u"shortId": u"EeLmMXO1@2",
                   u"title": REVISED_BOOK[0].get_title_for_node(document)}]}]}
     cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version), FALSE)
+SELECT tree_to_json(uuid::text, module_version(major_version, minor_version), FALSE)
 FROM latest_modules
 WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
@@ -689,7 +689,7 @@ WHERE portal_type = 'Collection'""")
                       .hexdigest()
     cursor.execute("""\
 SELECT f.file, f.media_type,
-       m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version)
+        ident_hash(m.uuid,m.major_version,m.minor_version)
 FROM files as f natural join module_files as mf, latest_modules as m
 WHERE
   mf.module_ident = m.module_ident
@@ -723,7 +723,7 @@ def _is_published(ident_hash, cursor):
     cursor.execute("""\
 SELECT module_ident
 FROM modules
-WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s""",
+WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     try:
         ident = cursor.fetchone()[0]

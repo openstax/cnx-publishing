@@ -95,7 +95,7 @@ def get_accept_license(request):
 SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
-  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) \
+  ident_hash(pd.uuid, pd.major_version, pd.minor_version) \
     AS ident_hash,
   accepted AS is_accepted
 FROM
@@ -175,7 +175,7 @@ def get_accept_role(request):
 SELECT row_to_json(combined_rows) FROM (
 SELECT
   pd.uuid AS id,
-  pd.uuid||'@'||concat_ws('.', pd.major_version, pd.minor_version) \
+  ident_hash(pd.uuid, pd.major_version, pd.minor_version) \
     AS ident_hash,
   accepted AS is_accepted
 FROM
@@ -258,8 +258,8 @@ def collate_content(request):
             if version:
                 cursor.execute("""\
 UPDATE modules SET stateid = 5
-WHERE uuid = %s AND concat_ws('.', major_version, minor_version) = %s
-""", (id, version,))
+WHERE ident_hash(uuid, major_version, minor_version) = %s
+""", (ident_hash,))
             else:
                 cursor.execute("""\
 UPDATE modules SET stateid = 5 where module_ident in (select module_ident from

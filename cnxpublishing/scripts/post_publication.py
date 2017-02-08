@@ -62,7 +62,7 @@ def process(cursor, module_ident, ident_hash, includes):
 
     cursor.execute("""\
 SELECT submitter, submitlog FROM modules
-WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
+WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_collation(ident_hash, cursor=cursor)
@@ -95,7 +95,7 @@ FROM (
     ) m
 WHERE m.module_ident = modules.module_ident
 RETURNING modules.module_ident,
-          uuid || '@' || concat_ws('.', major_version, minor_version)""")
+          ident_hash(uuid, major_version, minor_version)""")
             try:
                 module_ident, ident_hash = cursor.fetchone()
             except TypeError:

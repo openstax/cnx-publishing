@@ -41,6 +41,9 @@ before_install:
   # * Install cnx-archive
   - git clone https://github.com/Connexions/cnx-archive.git
   - cd cnx-archive && python setup.py install && cd ..
+  # * Install cnx-db
+  - git clone https://github.com/Connexions/cnx-db.git
+  - cd cnx-db && python setup.py install && cd ..
   # Install the coverage utility and codecov reporting utility
   - pip install coverage
   - pip install codecov
