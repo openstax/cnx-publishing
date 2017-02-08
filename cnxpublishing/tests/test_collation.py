@@ -35,9 +35,9 @@ WHERE
   AND
   cfa.item = mitem.module_ident
   AND
-  mparent.uuid || '@' || concat_ws('.', mparent.major_version, mparent.minor_version) = %s
+  ident_hash(mparent.uuid, mparent.major_version, mparent.minor_version) = %s
   AND
-  mitem.uuid || '@' || concat_ws('.', mitem.major_version, mitem.minor_version) = %s""",
+  ident_hash(mitem.uuid, mitem.major_version, mitem.minor_version) = %s""",
                        (binder.ident_hash, doc.ident_hash,))
         file = cursor.fetchone()[0]
         return file[:]
@@ -119,9 +119,9 @@ WHERE
   AND
   cfa.item = mitem.module_ident
   AND
-  mparent.uuid || '@' || concat_ws('.', mparent.major_version, mparent.minor_version) = %s
+   ident_hash(mparent.uuid, mparent.major_version, mparent.minor_version) = %s
   AND
-  mitem.uuid || '@' || concat_ws('.', mitem.major_version, mitem.minor_version) = %s""",
+   ident_hash(mitem.uuid, mitem.major_version, mitem.minor_version) = %s""",
                        (binder.ident_hash, doc.ident_hash,))
         sha1 = cursor.fetchone()[0]
         return sha1
@@ -188,6 +188,7 @@ WHERE
         self.assertEqual(collated_tree, None)
 
         # Ensure the collated files relationship is removed.
-        cursor.execute("SELECT * FROM collated_file_associations AS cfa NATURAL JOIN modules AS m WHERE m.uuid = %s AND concat_ws('.', m.major_version, m.minor_version) = %s", (id, version,))
+        cursor.execute("SELECT * FROM collated_file_associations AS cfa NATURAL JOIN modules AS m "
+                       "WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (self.ident_hash,))
         with self.assertRaises(TypeError):
             rows = cursor.fetchone()[0]

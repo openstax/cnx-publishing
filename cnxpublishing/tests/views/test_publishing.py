@@ -1157,7 +1157,7 @@ FROM modules ORDER BY major_version ASC""")
                               u"shortId": u"EeLmMXO1@1",
                               u"title": use_cases.REVISED_BOOK[0].get_title_for_node(document)}]}]}
                 cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.', major_version, minor_version), FALSE)
+SELECT tree_to_json(uuid::text, module_version( major_version, minor_version), FALSE)
 FROM latest_modules
 WHERE portal_type = 'Collection'""")
                 tree = json.loads(cursor.fetchone()[0])

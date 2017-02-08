@@ -8,7 +8,6 @@
 """\
 Functions used to commit publication works to the archive.
 """
-import collections
 import hashlib
 import io
 
@@ -62,17 +61,17 @@ module_insertion AS (
      (SELECT abstractid FROM abstract_insertion),
      (SELECT licenseid FROM license_lookup),
      (SELECT module_ident FROM modules
-        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = \
+        WHERE ident_hash(uuid, major_version, minor_version) = \
               %(parent_ident_hash)s),
      (SELECT authors FROM modules
-        WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = \
+        WHERE ident_hash(uuid, major_version, minor_version) = \
               %(parent_ident_hash)s),
      %(authors)s, %(publishers)s, %(copyright_holders)s,
      DEFAULT, DEFAULT,
      DEFAULT, ' ',%(print_style)s)
   RETURNING
     module_ident,
-    uuid||'@'||concat_ws('.',major_version,minor_version) AS ident_hash),
+    ident_hash(uuid,major_version,minor_version)),
 subjects AS (
   INSERT INTO moduletags
     SELECT (SELECT module_ident FROM module_insertion),
@@ -284,7 +283,7 @@ def _insert_tree(cursor, tree, parent_id=None, index=0, is_collated=False):
             cursor.execute("""\
             SELECT module_ident, name
             FROM modules
-            WHERE uuid||'@'||concat_ws('.',major_version,minor_version) = %s
+            WHERE ident_hash(uuid,major_version,minor_version) = %s
             """, (tree['id'],))
             try:
                 document_id, document_title = cursor.fetchone()
@@ -384,7 +383,7 @@ INSERT INTO collated_file_associations
   (context, item, fileid)
 VALUES
   ((SELECT module_ident FROM modules
-    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+    WHERE ident_hash(uuid, major_version, minor_version)
    = %(parent_ident_hash)s),
     %(module_ident)s, %(fileid)s)""", file_arg)
 
@@ -424,10 +423,10 @@ def publish_collated_document(cursor, model, parent_model):
 INSERT INTO collated_file_associations (context, item, fileid)
 VALUES
   ((SELECT module_ident FROM modules
-    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+    WHERE ident_hash(uuid, major_version, minor_version)
    = %(parent_ident_hash)s),
    (SELECT module_ident FROM modules
-    WHERE uuid || '@' || concat_ws('.', major_version, minor_version)
+    WHERE ident_hash(uuid, major_version, minor_version)
    = %(module_ident_hash)s),
    %(fileid)s)"""
     cursor.execute(stmt, args)
@@ -476,13 +475,13 @@ WITH RECURSIVE t(nodeid, parent_id, documentid, path) AS (
   FROM trees tr
   WHERE tr.documentid = (
     SELECT module_ident FROM modules
-    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+    WHERE ident_hash(uuid, major_version, minor_version) = %s)
 UNION ALL
   SELECT c.nodeid, c.parent_id, c.documentid, path || ARRAY[c.nodeid]
   FROM trees c JOIN t ON (c.nodeid = t.parent_id)
   WHERE not c.nodeid = ANY(t.path)
 )
-SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM t JOIN latest_modules m ON (t.documentid = m.module_ident)
 WHERE t.parent_id IS NULL
 """,
@@ -514,19 +513,17 @@ def get_previous_publication(cursor, ident_hash):
     """Get the previous publication of the given
     publication as an ident-hash.
     """
-    uuid, version = split_ident_hash(ident_hash)
     cursor.execute("""\
 WITH contextual_module AS (
   SELECT uuid, module_ident
   FROM modules
-  WHERE uuid = %s AND concat_ws('.', major_version, minor_version) = %s)
-SELECT m.uuid||'@'||concat_ws('.', m.major_version, m.minor_version)
+  WHERE ident_hash(uuid, major_version, minor_version) = %s)
+SELECT ident_hash(m.uuid, m.major_version, m.minor_version)
 FROM modules AS m JOIN contextual_module AS context ON (m.uuid = context.uuid)
 WHERE
   m.module_ident < context.module_ident
 ORDER BY revised DESC
-LIMIT 1""",
-                   (uuid, version,))
+LIMIT 1""", (ident_hash,))
     try:
         previous_ident_hash = cursor.fetchone()[0]
     except TypeError:  # NoneType
@@ -570,7 +567,7 @@ def republish_collection(cursor, ident_hash, version):
 WITH previous AS (
   SELECT module_ident
   FROM modules
-  WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s),
+  WHERE ident_hash(uuid, major_version, minor_version) = %s),
 inserted AS (
   INSERT INTO modules
     (uuid, major_version, minor_version, revised,
@@ -592,7 +589,7 @@ inserted AS (
     stateid, doctype
   FROM modules AS m JOIN previous AS p ON (m.module_ident = p.module_ident)
   RETURNING
-    uuid||'@'||concat_ws('.', major_version, minor_version) AS ident_hash,
+    ident_hash(uuid, major_version, minor_version) AS ident_hash,
     module_ident),
 keywords AS (
   INSERT INTO modulekeywords (module_ident, keywordid)
@@ -620,7 +617,7 @@ WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest,
   SELECT
     tr.nodeid, tr.parent_id, tr.documentid,
     tr.title, tr.childorder, tr.latest,
-    (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+    (SELECT ident_hash(uuid, major_version, minor_version)
      FROM modules
      WHERE module_ident = tr.documentid) AS ident_hash,
     ARRAY[tr.nodeid]
@@ -628,12 +625,12 @@ WITH RECURSIVE t(nodeid, parent_id, documentid, title, childorder, latest,
   WHERE tr.documentid = (
     SELECT module_ident
     FROM modules
-    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+    WHERE ident_hash(uuid, major_version, minor_version) = %s)
     AND tr.is_collated = FALSE
 UNION ALL
   SELECT
     c.nodeid, c.parent_id, c.documentid, c.title, c.childorder, c.latest,
-    (SELECT uuid||'@'||concat_ws('.', major_version, minor_version)
+    (SELECT ident_hash(uuid, major_version, minor_version)
      FROM modules
      WHERE module_ident = c.documentid) AS ident_hash,
     path || ARRAY[c.nodeid]
@@ -651,7 +648,7 @@ VALUES
   (DEFAULT, %(parent_id)s,
    (SELECT module_ident
     FROM modules
-    WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = \
+    WHERE ident_hash(uuid, major_version, minor_version) = \
           %(ident_hash)s),
    %(title)s, %(childorder)s, %(latest)s)
 RETURNING nodeid"""

@@ -66,7 +66,7 @@ def admin_post_publications(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-SELECT m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version),
+SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
        m.name, p.timestamp, p.state, p.state_message
   FROM post_publications p NATURAL LEFT JOIN modules m
   ORDER BY p.timestamp DESC LIMIT 500""")

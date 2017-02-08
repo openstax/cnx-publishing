@@ -134,7 +134,7 @@ FROM
   modules AS m
   NATURAL JOIN abstracts AS a
   LEFT JOIN licenses AS l ON m.licenseid = l.licenseid
-WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
+WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s
 """, (ident_hash,))
                 module = cursor.fetchone()
 
@@ -319,7 +319,7 @@ WHERE mor.module_ident = %s
                 cursor.execute("""\
 SELECT m.name, uuid::text, m.major_version, m.minor_version
 FROM modules AS m
-WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
+WHERE ident_hash(m.uuid,m.major_version,m.minor_version) = %s
 """, (ident_hash,))
                 module = cursor.fetchone()
 
@@ -396,9 +396,9 @@ WHERE m.uuid||'@'||concat_ws('.',m.major_version,m.minor_version) = %s
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-SELECT m.name, pm.uuid || '@' || concat_ws('.', pm.major_version, pm.minor_version), m.parentauthors
+SELECT m.name, ident_hash(pm.uuid, pm.major_version, pm.minor_version), m.parentauthors
 FROM modules m JOIN modules pm ON m.parent = pm.module_ident
-WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
+WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s
 """, (derived_ident_hash,))
                 title, parent, parentauthors = cursor.fetchone()
 
@@ -409,12 +409,12 @@ WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("SELECT print_style FROM modules m"
-                               "    WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s", (ident_hash,))
+                               "    WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (ident_hash,))
                 print_style = cursor.fetchone()[0]
                 self.assertEqual(print_style, '* first print style* ')
 
                 cursor.execute("SELECT print_style FROM modules m"
-                               "    WHERE m.uuid || '@' || concat_ws('.', m.major_version, m.minor_version) = %s", (derived_ident_hash,))
+                               "    WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (derived_ident_hash,))
                 print_style = cursor.fetchone()[0]
                 self.assertEqual(print_style, '* second print style* ')
 
@@ -606,7 +606,7 @@ class RepublishTestCase(unittest.TestCase):
         cursor.execute("""\
 UPDATE trees SET latest = NULL WHERE documentid = (
     SELECT module_ident FROM modules
-        WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s)
+        WHERE ident_hash(uuid, major_version, minor_version) = %s)
 """, (book_one.ident_hash,))
 
         # * Make a new publication of page one
@@ -622,7 +622,7 @@ UPDATE trees SET latest = NULL WHERE documentid = (
         cursor.execute("""\
 SELECT 1 FROM trees WHERE documentid = (
     SELECT module_ident FROM modules
-        WHERE uuid||'@'||concat_ws('.', major_version, minor_version) =
+        WHERE ident_hash(uuid, major_version, minor_version) =
               %s||'@1.2')
 """, (book_one.id,))
         self.assertEqual((1,), cursor.fetchone())
@@ -665,7 +665,7 @@ class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
         cursor.execute(
             "SELECT portal_type "
             "FROM modules "
-            "WHERE uuid||'@'||concat_ws('.', major_version, minor_version) = %s",
+            "WHERE ident_hash(uuid, major_version, minor_version) = %s",
             (ident_hash,))
         portal_type = cursor.fetchone()[0]
         self.assertEqual(portal_type, 'CompositeModule')
@@ -677,10 +677,10 @@ FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
      modules AS m1, -- context
      modules AS m2  -- item
 WHERE
-  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+  (ident_hash(m1.uuid, m1.major_version, m1.minor_version) = %s
    AND m1.module_ident = cfa.context)
   AND
-  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+  (ident_hash(m2.uuid, m2.major_version, m2.minor_version) = %s
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
@@ -714,10 +714,10 @@ FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
      modules AS m1, -- context
      modules AS m2  -- item
 WHERE
-  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+  (ident_hash(m1.uuid, m1.major_version, m1.minor_version) = %s
    AND m1.module_ident = cfa.context)
   AND
-  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+  (ident_hash(m2.uuid, m2.major_version, m2.minor_version) = %s
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, doc.ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
@@ -739,10 +739,10 @@ FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
      modules AS m1, -- context
      modules AS m2  -- item
 WHERE
-  (m1.uuid||'@'||concat_ws('.', m1.major_version, m1.minor_version) = %s
+  (ident_hash(m1.uuid, m1.major_version, m1.minor_version) = %s
    AND m1.module_ident = cfa.context)
   AND
-  (m2.uuid||'@'||concat_ws('.', m2.major_version, m2.minor_version) = %s
+  (ident_hash(m2.uuid, m2.major_version, m2.minor_version) = %s
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, doc.ident_hash,))
         persisted_content = cursor.fetchone()[0][:]

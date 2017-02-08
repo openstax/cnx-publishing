@@ -237,7 +237,7 @@ VALUES (%(data)s, %(hash)s, %(media_type)s, %(filename)s)
         cursor.execute("""\
 WITH document AS (
     SELECT id FROM pending_documents
-    WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %(id)s
+    WHERE ident_hash(uuid, major_version, minor_version) = %(id)s
 ), resource AS (
     SELECT id FROM pending_resources
     WHERE hash = %(hash)s
@@ -456,7 +456,7 @@ INSERT INTO "pending_documents"
   ("publication_id", "uuid", "major_version", "minor_version", "type",
     "license_accepted", "roles_accepted", "metadata")
 VALUES (%s, %s, %s, %s, %s, 'f', 'f', %s)
-RETURNING "id", "uuid", concat_ws('.', "major_version", "minor_version")
+RETURNING "id", "uuid", module_version("major_version", "minor_version")
 """, args)
     pending_id, uuid_, version = cursor.fetchone()
     pending_ident_hash = join_ident_hash(uuid_, version)
@@ -529,8 +529,7 @@ def add_pending_model_content(cursor, publication_id, model):
     will appear in the end publication.
     """
     cursor.execute("""\
-        SELECT id, concat_ws('@', uuid,
-                             concat_ws('.', major_version, minor_version))
+        SELECT id, ident_hash(uuid, major_version, minor_version)
         FROM pending_documents
         WHERE publication_id = %s AND uuid = %s""",
                    (publication_id, model.id,))
@@ -597,7 +596,7 @@ def add_pending_model_content(cursor, publication_id, model):
         if document_pointers:
             uuids, major_vers, minor_vers = document_pointer_ident_hashes
             cursor.execute("""\
-SELECT dp.uuid, concat_ws('.', dp.maj_ver, dp.min_ver) AS version,
+SELECT dp.uuid, module_version(dp.maj_ver, dp.min_ver) AS version,
        dp.uuid = m.uuid AS exists,
        m.portal_type = 'Module' AS is_document
 FROM (SELECT unnest(%s::uuid[]), unnest(%s::integer[]), unnest(%s::integer[]))\
@@ -992,7 +991,7 @@ SELECT hash, data, media_type, filename
 FROM pending_resources r
 JOIN pending_resource_associations a ON a.resource_id = r.id
 JOIN pending_documents d ON a.document_id = d.id
-WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s""",
+WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                        (binder.ident_hash,))
         binder.resources = [
             cnxepub.Resource(hash,

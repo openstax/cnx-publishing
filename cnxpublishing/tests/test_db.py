@@ -759,7 +759,7 @@ SELECT "type", "license_accepted", "roles_accepted"
 FROM pending_documents
 WHERE
   publication_id = %s
-  AND uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+  AND ident_hash(uuid, major_version, minor_version) = %s
 """, (publication_id, document_ident_hash,))
                 record = cursor.fetchone()
         type_, is_license_accepted, are_roles_accepted = record
@@ -819,7 +819,7 @@ SELECT "type", "license_accepted", "roles_accepted"
 FROM pending_documents
 WHERE
   publication_id = %s
-  AND concat_ws('@', uuid, concat_ws('.', major_version, minor_version)) = %s
+  AND ident_hash(uuid, major_version, minor_version) = %s
 """, (publication_id, document_ident_hash,))
                 record = cursor.fetchone()
         type_, is_license_accepted, are_roles_accepted = record
@@ -880,7 +880,7 @@ SELECT "type", "license_accepted", "roles_accepted"
 FROM pending_documents
 WHERE
   publication_id = %s
-  AND concat_ws('@', uuid, concat_ws('.', major_version, minor_version)) = %s
+  AND ident_hash(uuid, major_version, minor_version) = %s
 """, (publication_id, document_ident_hash,))
                 record = cursor.fetchone()
         type_, is_license_accepted, are_roles_accepted = record
@@ -922,7 +922,7 @@ VALUES ((SELECT uuid from control_insert), 'ream', 'publish'::permission_type)
         # This doesn't seem like much, but we only need to check that
         # the entry was added.
         cursor.execute("""
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
         expected_ident_hash = cursor.fetchone()[0]
@@ -978,7 +978,7 @@ WHERE id = %s""", (publication_id,))
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
                 expected_ident_hash = cursor.fetchone()[0]
@@ -1026,7 +1026,7 @@ WHERE id = %s""", (publication_id,))
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
                 expected_ident_hash = cursor.fetchone()[0]
@@ -1118,7 +1118,7 @@ VALUES
         # This doesn't seem like much, but we only need to check that
         # the entry was added.
         cursor.execute("""
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
         expected_ident_hash = cursor.fetchone()[0]
@@ -1185,7 +1185,7 @@ WHERE id = %s""", (publication_id,))
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version)
 FROM pending_documents
 WHERE publication_id = %s""", (publication_id,))
                 expected_ident_hash = cursor.fetchone()[0]
@@ -1285,7 +1285,7 @@ WHERE hash = '6803daf6246832aa86504f1785fe34deb07c0eb6'""")
 SELECT filename FROM pending_resources r
 JOIN pending_resource_associations a ON a.resource_id = r.id
 JOIN pending_documents d ON a.document_id = d.id
-WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+WHERE ident_hash(uuid, major_version, minor_version) = %s
 ORDER BY filename""",
                                (binder_ident_hash,))
                 self.assertEqual([('cover.png',), ('ruleset.css',)],
@@ -1651,8 +1651,8 @@ ORDER BY major_version ASC, minor_version ASC""")
         # * Ensure the binder was published with tree references to the existing
         # pages, which we are calling document pointers.
         cursor.execute("""\
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version)),
-       concat_ws('@', short_id(uuid), concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version),
+       short_ident_hash(uuid, major_version, minor_version)
 FROM modules WHERE name = %s""", (title,))
         binder_ident_hash, binder_short_id = cursor.fetchone()
 
@@ -1669,7 +1669,7 @@ FROM modules WHERE name = %s""", (title,))
                  "title": "P Two"},
             ]}
         cursor.execute("""\
-SELECT tree_to_json(uuid::text, concat_ws('.',major_version, minor_version), FALSE)
+SELECT tree_to_json(uuid::text, module_version(major_version, minor_version), FALSE)
 FROM modules
 WHERE portal_type = 'Collection'""")
         tree = json.loads(cursor.fetchone()[0])
@@ -1707,8 +1707,8 @@ WHERE portal_type = 'Collection'""")
         # * Ensure the binder was published with tree references to the existing
         # pages, which we are calling document pointers.
         cursor.execute("""\
-SELECT concat_ws('@', uuid, concat_ws('.', major_version, minor_version)),
-       concat_ws('@', short_id(uuid), concat_ws('.', major_version, minor_version))
+SELECT ident_hash(uuid, major_version, minor_version),
+       short_ident_hash(uuid, major_version, minor_version)
 FROM modules WHERE name = %s""", (title,))
         binder_ident_hash, binder_short_id = cursor.fetchone()
 
@@ -1717,7 +1717,7 @@ SELECT filename
 FROM module_files
 NATURAL JOIN files
 NATURAL JOIN modules
-WHERE uuid || '@' || concat_ws('.', major_version, minor_version) = %s
+WHERE ident_hash(uuid, major_version, minor_version) = %s
 ORDER BY filename
 """, (binder_ident_hash,))
         self.assertEqual([('cover.png',), ('ruleset.css',)],
@@ -1772,7 +1772,7 @@ ORDER BY filename
 
         # Check the shared binders got a minor version bump.
         cursor.execute("""\
-SELECT uuid::text, array_agg(concat_ws('.', major_version, minor_version))
+SELECT uuid::text, array_agg(module_version(major_version, minor_version))
 FROM modules
 WHERE portal_type = 'Collection'
 GROUP BY uuid
