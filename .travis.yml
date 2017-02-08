@@ -38,8 +38,8 @@ before_install:
   - git clone https://github.com/Connexions/cnx-epub.git
   - cd cnx-epub && python setup.py install && cd ..
 
-  # * Install a specific branch of cnx-archive (TODO use master)
-  - git clone -b cnx-db https://github.com/Connexions/cnx-archive.git
+  # * Install cnx-archive
+  - git clone https://github.com/Connexions/cnx-archive.git
   - cd cnx-archive && python setup.py install && cd ..
   # Install the coverage utility and codecov reporting utility
   - pip install coverage
