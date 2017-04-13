@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import versioneer
 from setuptools import setup, find_packages
 
 
@@ -31,7 +32,7 @@ if not IS_PY3:
 
 setup(
     name='cnx-publishing',
-    version='0.6.0',
+    version=versioneer.get_version(),
     author='Connexions team',
     author_email='info@cnx.org',
     url="https://github.com/connexions/cnx-publishing",
@@ -47,6 +48,7 @@ setup(
         'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql', 'templates/*.*'],
         'cnxpublishing.tests': ['data/*.*'],
         },
+    cmdclass=versioneer.get_cmdclass(),
     entry_points="""\
     [paste.app_factory]
     main = cnxpublishing.main:main
