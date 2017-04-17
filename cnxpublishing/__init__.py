@@ -5,3 +5,7 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
