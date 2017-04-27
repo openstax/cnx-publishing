@@ -40,7 +40,7 @@ class PublishUtilityTestCase(unittest.TestCase):
         from ..publish import _model_to_portaltype as target
         document = cnxepub.Document.__new__(cnxepub.Document)
         self.assertEqual(target(document), 'Module')
-        binder = cnxepub.Binder.__new__(cnxepub.Binder)
+        binder = cnxepub.Binder('fooBinder') #  need init to set metadata
         self.assertEqual(target(binder), 'Collection')
         ugly = object()
         with self.assertRaises(ValueError):
