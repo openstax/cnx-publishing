@@ -27,7 +27,9 @@ def collate(binder, publisher, message, cursor, includes=None):
     binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
 
     def flatten_filter(model):
-        return isinstance(model, cnxepub.CompositeDocument)
+        return (isinstance(model, cnxepub.CompositeDocument) or
+                (isinstance(model, cnxepub.Binder) and
+                 model.metadata.get('type') == 'composite-chapter'))
 
     def only_documents_filter(model):
         return isinstance(model, cnxepub.Document) \
