@@ -10,6 +10,7 @@ install_requires = (
     'beaker',
     'cnx-archive',
     'cnx-epub',
+    'cnx-epub[collation]',
     'jinja2',
     'openstax-accounts>=1.0.0',
     'psycopg2',
