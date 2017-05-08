@@ -55,7 +55,9 @@ def declare_api_routes(config):
               '/publications/{id}/license-acceptances/{uid}')
     add_route('publication-role-acceptance',
               '/publications/{id}/role-acceptances/{uid}')
+    # TODO (8-May-12017) Remove because the term collate is being phased out.
     add_route('collate-content', '/contents/{ident_hash}/collate-content')
+    add_route('bake-content', '/contents/{ident_hash}/baked')
 
     # Moderation routes
     add_route('moderation', '/moderations')

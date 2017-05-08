@@ -19,7 +19,7 @@ import psycopg2.extensions
 from pyramid.paster import bootstrap
 from pyramid.threadlocal import get_current_registry
 
-from ..collation import remove_collation, collate
+from ..bake import remove_baked, bake
 from ..config import CONNECTION_STRING
 
 
@@ -65,8 +65,8 @@ SELECT submitter, submitlog FROM modules
 WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
-    remove_collation(ident_hash, cursor=cursor)
-    collate(binder, publisher, message, cursor=cursor, includes=includes)
+    remove_baked(ident_hash, cursor=cursor)
+    bake(binder, publisher, message, cursor=cursor, includes=includes)
 
     logger.debug('Finished processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))

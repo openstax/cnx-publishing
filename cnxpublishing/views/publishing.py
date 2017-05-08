@@ -13,7 +13,7 @@ from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from .. import config
-from ..collation import remove_collation
+from ..bake import remove_baked
 from ..db import (
     accept_publication_license,
     accept_publication_role,
@@ -240,8 +240,10 @@ def post_accept_role(request):
 
 @view_config(route_name='collate-content', request_method='POST',
              renderer='json', permission='publish')
-def collate_content(request):
-    """Invoke the collation process - trigger post-publication"""
+@view_config(route_name='bake-content', request_method='POST',
+             renderer='json', permission='publish')
+def bake_content(request):
+    """Invoke the baking process - trigger post-publication"""
     ident_hash = request.matchdict['ident_hash']
     try:
         binder = export_epub.factory(ident_hash)
@@ -253,7 +255,7 @@ def collate_content(request):
     settings = request.registry.settings
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            remove_collation(binder.ident_hash, cursor=cursor)
+            remove_baked(binder.ident_hash, cursor=cursor)
             id, version = split_ident_hash(ident_hash)
             if version:
                 cursor.execute("""\
