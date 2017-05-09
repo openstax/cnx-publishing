@@ -138,9 +138,10 @@ def main(argv=sys.argv):
     memcache_server = settings.get('memcache_server', None)
 
     includes = None
-    if memcache_server:
-        mc_client = memcache.Client([memcache_server], debug=0)
     if exercise_url_template and exercise_match:
+        mc_client = None
+        if memcache_server:
+            mc_client = memcache.Client([memcache_server], debug=0)
         includes = [exercise_callback_factory(exercise_match,
                                               exercise_url_template,
                                               mc_client,

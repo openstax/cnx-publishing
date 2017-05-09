@@ -12,6 +12,7 @@ install_requires = (
     'cnx-epub',
     'cnx-epub[collation]',
     'jinja2',
+    'memcache',
     'openstax-accounts>=1.0.0',
     'psycopg2',
     'pyramid>=1.5',
