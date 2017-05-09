@@ -24,7 +24,7 @@ from webtest.forms import Upload
 from .. import use_cases
 from ..testing import db_connect
 from .base import BaseFunctionalViewTestCase
-from ...collation import collate
+from ...bake import bake
 
 
 class PublishViewsTestCase(unittest.TestCase):
@@ -1336,9 +1336,13 @@ WHERE username = %s""", (publisher,))
                              headers=api_key_headers)
 
 
-class CollateContentTestCase(BaseFunctionalViewTestCase):
+class BakeContentTestCase(BaseFunctionalViewTestCase):
     def app_post_collate_content(self, ident_hash, headers=None, status=None):
         path = '/contents/{}/collate-content'.format(ident_hash)
+        return self.app.post(path, headers=headers, status=status)
+
+    def app_post_bake(self, ident_hash, headers=None, status=None):
+        path = '/contents/{}/baked'.format(ident_hash)
         return self.app.post(path, headers=headers, status=status)
 
     @db_connect
@@ -1346,16 +1350,16 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
         binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         cursor.connection.commit()
         api_key_headers = self.gen_api_key_headers('some-trust')
-        self.app_post_collate_content(binder[0][0].ident_hash,
-                                      headers=api_key_headers,
-                                      status=400)
+        self.app_post_bake(binder[0][0].ident_hash,
+                           headers=api_key_headers,
+                           status=400)
 
     def test_not_found(self):
         random_ident_hash = '{}@1'.format(uuid.uuid4())
         api_key_headers = self.gen_api_key_headers('some-trust')
-        self.app_post_collate_content(random_ident_hash,
-                                      headers=api_key_headers,
-                                      status=404)
+        self.app_post_bake(random_ident_hash,
+                           headers=api_key_headers,
+                           status=404)
 
     def make_one(self, binder, content):
         """Given a binder and content, make a composite document for that
@@ -1400,17 +1404,17 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
         cursor.execute('LISTEN post_publication')
         cursor.connection.commit()
 
-        self.app_post_collate_content(binder.ident_hash,
-                                      headers=api_key_headers)
+        self.app_post_bake(binder.ident_hash,
+                           headers=api_key_headers)
 
         cursor.connection.commit()
         cursor.connection.poll()
         self.assertEqual(1, len(cursor.connection.notifies))
 
-        with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
+        with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = _collate
 
-            collate(binder, publisher, message, cursor=cursor)
+            bake(binder, publisher, message, cursor=cursor)
             self.assertEqual(1, mock_collate.call_count)
 
         # Ensure the tree as been stamped.
@@ -1439,11 +1443,11 @@ class CollateContentTestCase(BaseFunctionalViewTestCase):
         cursor.execute('LISTEN post_publication')
         cursor.connection.commit()
 
-        self.app_post_collate_content(binder.ident_hash,
-                                      headers=api_key_headers)
+        self.app_post_bake(binder.ident_hash,
+                           headers=api_key_headers)
         # Run it again to mimic a rerun behavior.
-        self.app_post_collate_content(binder.ident_hash,
-                                      headers=api_key_headers)
+        self.app_post_bake(binder.ident_hash,
+                           headers=api_key_headers)
 
         cursor.connection.commit()
         cursor.connection.poll()

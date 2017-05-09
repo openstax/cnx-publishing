@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # ###
-# Copyright (c) 2016, Rice University
+# Copyright (c) 2016-2017, Rice University
 # This software is subject to the provisions of the GNU Affero General
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-"""Provides a means of collating a binder and persisting it to the archive."""
+"""Provides a means of baking a binder and persisting it to the archive."""
 import cnxepub
 from cnxepub.collation import collate as collate_models
 
@@ -18,12 +18,11 @@ from .publish import (
 
 
 @with_db_cursor
-def collate(binder, publisher, message, cursor, includes=None):
-    """Given a `Binder` as `binder`, collate the contents and
+def bake(binder, publisher, message, cursor, includes=None):
+    """Given a `Binder` as `binder`, bake the contents and
     persist those changes alongside the published content.
 
     """
-
     binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
 
     def flatten_filter(model):
@@ -48,9 +47,9 @@ def collate(binder, publisher, message, cursor, includes=None):
 
 
 @with_db_cursor
-def remove_collation(binder_ident_hash, cursor):
-    """Given a binder's ident_hash, remove the collated results."""
-    # Remove the collated tree.
+def remove_baked(binder_ident_hash, cursor):
+    """Given a binder's ident_hash, remove the baked results."""
+    # Remove the baked tree.
     cursor.execute("""\
     WITH RECURSIVE t(node, path, is_collated) AS (
     SELECT nodeid, ARRAY[nodeid], is_collated
@@ -67,7 +66,7 @@ UNION ALL
 delete from trees where nodeid in (select node FROM t)
     """, (binder_ident_hash,))
 
-    # Remove the collation associations and composite-modules entries.
+    # Remove the baked/collation associations and composite-modules entries.
     cursor.execute("""\
     DELETE FROM collated_file_associations AS cfa
     USING modules AS m
@@ -82,4 +81,4 @@ delete from trees where nodeid in (select node FROM t)
     #       this is not a major concern.
 
 
-__all__ = ('collate', 'remove_collation',)
+__all__ = ('bake', 'remove_baked',)

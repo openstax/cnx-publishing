@@ -256,10 +256,10 @@ SELECT state FROM post_publications
         self.assertEqual('Done/Success', cursor.fetchone()[0])
 
     @testing.db_connect
-    @mock.patch('cnxpublishing.scripts.post_publication.remove_collation')
+    @mock.patch('cnxpublishing.scripts.post_publication.remove_baked')
     def test_error_handling(self, cursor, mock_remove_collation):
         from ...scripts import post_publication
-        from ...collation import remove_collation
+        from ...bake import remove_baked
 
         # Fake remove_collation, the first time it's called, it will raise an
         # exception, after that it'll call the normal remove_collation function
@@ -272,7 +272,7 @@ SELECT state FROM post_publications
             if FakeRemoveCollation.count == 0:
                 FakeRemoveCollation.count += 1
                 raise Exception('something failed during collation')
-            return remove_collation(*args, **kwargs)
+            return remove_baked(*args, **kwargs)
 
         mock_remove_collation.side_effect = fake_remove_collation
 

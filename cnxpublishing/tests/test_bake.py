@@ -18,14 +18,14 @@ from .testing import db_connect
 from .test_db import BaseDatabaseIntegrationTestCase
 
 
-class AmendWithCollationTestCase(BaseDatabaseIntegrationTestCase):
+class AmendWithBakeTestCase(BaseDatabaseIntegrationTestCase):
 
     @property
     def target(self):
-        from cnxpublishing.collation import collate
-        return collate
+        from cnxpublishing.bake import bake
+        return bake
 
-    def _get_collated_file(self, cursor, doc, binder):
+    def _get_baked_file(self, cursor, doc, binder):
         cursor.execute("""\
 SELECT f.file
 FROM collated_file_associations AS cfa NATURAL JOIN files AS f,
@@ -65,15 +65,15 @@ WHERE
             nodes=[composite_doc],
             metadata={'title': "Other things"})
 
-        collated_doc_content = '<p>collated</p>'
+        baked_doc_content = '<p>collated</p>'
 
-        def collate(binder_model, ruleset=None, includes=None):
-            binder_model[0][0].content = collated_doc_content
+        def cnxepub_collate(binder_model, ruleset=None, includes=None):
+            binder_model[0][0].content = baked_doc_content
             binder_model.append(composite_section)
             return binder_model
 
-        with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
-            mock_collate.side_effect = collate
+        with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
+            mock_collate.side_effect = cnxepub_collate
             errors = self.target(binder, publisher, msg)
 
         # Ensure the output of the errors.
@@ -89,25 +89,25 @@ WHERE
         # Ensure the tree as been stamped.
         cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
                        (binder.id, binder.metadata['version'],))
-        collated_tree = cursor.fetchone()[0]
+        baked_tree = cursor.fetchone()[0]
         self.assertIn(composite_doc.ident_hash,
-                      cnxepub.flatten_tree_to_ident_hashes(collated_tree))
+                      cnxepub.flatten_tree_to_ident_hashes(baked_tree))
 
         # Ensure the changes to a document content were persisted.
         content_to_check = [
-            (binder[0][0], collated_doc_content,),
+            (binder[0][0], baked_doc_content,),
             (composite_doc, content,),
             ]
         for doc, content in content_to_check:
-            self.assertIn(content, self._get_collated_file(cursor, doc, binder))
+            self.assertIn(content, self._get_baked_file(cursor, doc, binder))
 
 
-class RemoveCollationTestCase(BaseDatabaseIntegrationTestCase):
+class RemoveBakedTestCase(BaseDatabaseIntegrationTestCase):
 
     @property
     def target(self):
-        from cnxpublishing.collation import remove_collation
-        return remove_collation
+        from cnxpublishing.bake import remove_baked
+        return remove_baked
 
     def _get_file_sha1(self, cursor, doc, binder):
         cursor.execute("""\
@@ -128,7 +128,7 @@ WHERE
 
     @db_connect
     def setUp(self, cursor):
-        super(RemoveCollationTestCase, self).setUp()
+        super(RemoveBakedTestCase, self).setUp()
         binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         cursor.connection.commit()
         publisher = 'ream'
@@ -150,21 +150,22 @@ WHERE
             nodes=[composite_doc],
             metadata={'title': "Other things"})
 
-        collated_doc_content = '<p>collated</p>'
+        baked_doc_content = '<p>collated</p>'
 
         def cnxepub_collate(binder_model, ruleset=None, includes=None):
-            binder_model[0][0].content = collated_doc_content
+            binder_model[0][0].content = baked_doc_content
             binder_model.append(composite_section)
             return binder_model
 
-        with mock.patch('cnxpublishing.collation.collate_models') as mock_collate:
+        with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = cnxepub_collate
-            from cnxpublishing.collation import collate
-            errors = collate(binder, publisher, msg, cursor=cursor)
+            from cnxpublishing.bake import bake
+            errors = bake(binder, publisher, msg, cursor=cursor)
+
         self.ident_hash = binder.ident_hash
         self.composite_ident_hash = composite_doc.ident_hash
-        self.collated_doc_sha1 = self._get_file_sha1(cursor,
-                                                     binder[0][0], binder)
+        self.baked_doc_sha1 = self._get_file_sha1(cursor,
+                                                  binder[0][0], binder)
         self.composite_doc_sha1 = self._get_file_sha1(cursor,
                                                       composite_doc, binder)
 
@@ -184,10 +185,10 @@ WHERE
         # Ensure the tree as been stamped.
         cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
                        (id, version,))
-        collated_tree = cursor.fetchone()[0]
-        self.assertEqual(collated_tree, None)
+        baked_tree = cursor.fetchone()[0]
+        self.assertEqual(baked_tree, None)
 
-        # Ensure the collated files relationship is removed.
+        # Ensure the collated/baked files relationship is removed.
         cursor.execute("SELECT * FROM collated_file_associations AS cfa NATURAL JOIN modules AS m "
                        "WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (self.ident_hash,))
         with self.assertRaises(TypeError):
