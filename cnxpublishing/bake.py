@@ -7,7 +7,10 @@
 # ###
 """Provides a means of baking a binder and persisting it to the archive."""
 import cnxepub
+import memcache
 from cnxepub.collation import collate as collate_models
+from cnxepub.formatters import exercise_callback_factory
+from pyramid.threadlocal import get_current_registry
 
 from .db import with_db_cursor
 from .publish import (
@@ -17,12 +20,39 @@ from .publish import (
     )
 
 
+def _formatter_callback_factory():  # pragma: no cover
+    """Returns a list of includes to be given to `cnxepub.collation.collate`.
+
+    """
+    includes = []
+    settings = get_current_registry().settings
+    exercise_url_template = settings.get(
+        'embeddables.exercise.url_template',
+        None)
+    exercise_match = settings.get('embeddables.exercise.match', None)
+    exercise_token = settings.get('embeddables.exercise.token', None)
+    mathml_url = settings.get('mathmlcloud.url', None)
+    memcache_server = settings.get('memcache_server', None)
+
+    if exercise_url_template and exercise_match:
+        mc_client = None
+        if memcache_server:
+            mc_client = memcache.Client([memcache_server], debug=0)
+        includes.append(exercise_callback_factory(exercise_match,
+                                                  exercise_url_template,
+                                                  mc_client,
+                                                  exercise_token,
+                                                  mathml_url))
+    return includes
+
+
 @with_db_cursor
-def bake(binder, publisher, message, cursor, includes=None):
+def bake(binder, publisher, message, cursor):
     """Given a `Binder` as `binder`, bake the contents and
     persist those changes alongside the published content.
 
     """
+    includes = _formatter_callback_factory()
     binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
 
     def flatten_filter(model):

@@ -7,7 +7,6 @@
 # ###
 from __future__ import print_function
 import logging
-import memcache
 import os
 import select
 import sys
@@ -46,7 +45,7 @@ SET stateid = (
 ) WHERE module_ident = %s""", (state_name, module_ident))
 
 
-def process(cursor, module_ident, ident_hash, includes):
+def process(cursor, module_ident, ident_hash):
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
     set_post_publications_state(cursor, module_ident, 'Processing')
@@ -67,7 +66,7 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_baked(ident_hash, cursor=cursor)
-    bake(binder, publisher, message, cursor=cursor, includes=includes)
+    bake(binder, publisher, message, cursor=cursor)
 
     logger.debug('Finished processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
@@ -75,7 +74,7 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
     set_post_publications_state(cursor, module_ident, 'Done/Success')
 
 
-def post_publication(conn, includes):
+def post_publication(conn):
     while True:
         with conn.cursor() as cursor:
             # Pick one item that requires post publication and set its state to
@@ -103,7 +102,7 @@ RETURNING modules.module_ident,
                 # No more items to process
                 return
             try:
-                process(cursor, module_ident, ident_hash, includes)
+                process(cursor, module_ident, ident_hash)
             except Exception as e:
                 logger.exception('ident_hash={} module_ident={} error={}'
                                  .format(ident_hash, module_ident, str(e)))
@@ -130,23 +129,6 @@ def main(argv=sys.argv):
     settings = get_current_registry().settings
     connection_string = settings[CONNECTION_STRING]
 
-    exercise_url_template = settings.get('embeddables.exercise.url_template',
-                                         None)
-    exercise_match = settings.get('embeddables.exercise.match', None)
-    exercise_token = settings.get('embeddables.exercise.token', None)
-    mathml_url = settings.get('mathmlcloud.url', None)
-    memcache_server = settings.get('memcache_server', None)
-
-    includes = None
-    if exercise_url_template and exercise_match:
-        mc_client = None
-        if memcache_server:
-            mc_client = memcache.Client([memcache_server], debug=0)
-        includes = [exercise_callback_factory(exercise_match,
-                                              exercise_url_template,
-                                              mc_client,
-                                              exercise_token,
-                                              mathml_url)]
     # Code adapted from
     # http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications
     with psycopg2.connect(connection_string) as conn:
@@ -171,4 +153,4 @@ def main(argv=sys.argv):
                     logger.debug('Got NOTIFY: pid={} channel={} payload={}'
                                  .format(notify.pid, notify.channel,
                                          notify.payload))
-                    post_publication(conn, includes)
+                    post_publication(conn)
