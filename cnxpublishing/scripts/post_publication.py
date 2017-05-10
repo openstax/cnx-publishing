@@ -7,6 +7,7 @@
 # ###
 from __future__ import print_function
 import logging
+import memcache
 import os
 import select
 import sys
@@ -134,11 +135,16 @@ def main(argv=sys.argv):
     exercise_match = settings.get('embeddables.exercise.match', None)
     exercise_token = settings.get('embeddables.exercise.token', None)
     mathml_url = settings.get('mathmlcloud.url', None)
+    memcache_server = settings.get('memcache_server', None)
 
     includes = None
     if exercise_url_template and exercise_match:
+        mc_client = None
+        if memcache_server:
+            mc_client = memcache.Client([memcache_server], debug=0)
         includes = [exercise_callback_factory(exercise_match,
                                               exercise_url_template,
+                                              mc_client,
                                               exercise_token,
                                               mathml_url)]
     # Code adapted from

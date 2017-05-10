@@ -17,6 +17,7 @@ install_requires = (
     'pyramid>=1.5',
     'pyramid_jinja2',
     'pyramid_multiauth',
+    'python-memcached',
     )
 tests_require = [
     'cnx-db',
