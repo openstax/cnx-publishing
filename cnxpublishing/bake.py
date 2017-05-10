@@ -6,8 +6,11 @@
 # See LICENCE.txt for details.
 # ###
 """Provides a means of baking a binder and persisting it to the archive."""
+from pyramid.threadlocal import get_current_registry
+
 import cnxepub
 from cnxepub.collation import collate as collate_models
+from cnxepub.formatters import exercise_callback_factory
 
 from .db import with_db_cursor
 from .publish import (
@@ -17,12 +20,34 @@ from .publish import (
     )
 
 
+def _formatter_callback_factory():
+    """Returns a list of includes to be given to `cnxepub.collation.collate`.
+
+    """
+    includes = []
+    settings = get_current_registry().settings
+    exercise_url_template = settings.get(
+        'embeddables.exercise.url_template',
+        None)
+    exercise_match = settings.get('embeddables.exercise.match', None)
+    exercise_token = settings.get('embeddables.exercise.token', None)
+    mathml_url = settings.get('mathmlcloud.url', None)
+
+    if exercise_url_template and exercise_match:
+        includes.append(exercise_callback_factory(exercise_match,
+                                                  exercise_url_template,
+                                                  exercise_token,
+                                                  mathml_url))
+    return includes
+
+
 @with_db_cursor
-def bake(binder, publisher, message, cursor, includes=None):
+def bake(binder, publisher, message, cursor):
     """Given a `Binder` as `binder`, bake the contents and
     persist those changes alongside the published content.
 
     """
+    includes = _formatter_callback_factory()
     binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
 
     def flatten_filter(model):
