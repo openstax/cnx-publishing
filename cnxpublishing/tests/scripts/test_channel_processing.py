@@ -5,51 +5,146 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-from copy import deepcopy
-from contextlib import contextmanager
-import io
-from multiprocessing import Process
+import json
+import time
 import unittest
+from multiprocessing import Process
 try:
     from unittest import mock
 except ImportError:
     import mock
 
-from cnxarchive.database import get_collated_content
-from cnxdb.init import init_db
-import cnxepub
 import psycopg2
+from pyramid import testing
+from pyramid.paster import bootstrap
 
-from .. import testing, use_cases
-
-
-def check_module_state(module_ident):
-    connect = testing.db_connection_factory()
-    with connect() as db_conn:
-        with db_conn.cursor() as cursor:
-            while True:
-                cursor.execute("""\
-SELECT module_ident, stateid FROM modules
-    WHERE portal_type = 'Collection'
-    ORDER BY module_ident DESC LIMIT 1""")
-                module_ident, stateid = cursor.fetchone()
-
-                if stateid in (1, 7):
-                    break
+from ..testing import (
+    config_uri,
+    db_connect,
+    integration_test_settings,
+)
 
 
-def wait_for_module_state(module_ident, timeout=10):
-    p = Process(target=check_module_state, args=((module_ident,)))
-    p.start()
-    p.join(timeout)
-    if p.is_alive():
-        p.terminate()
+@db_connect
+def subscriber(event, cursor):
+    data = json.dumps({'channel': event.channel,
+                       'payload': event.payload})
+    cursor.execute('INSERT INTO faux_channel_received (data) values (%s)',
+                   (data,))
 
 
-class PostPublicationTestCase(unittest.TestCase):
-    @testing.db_connect
+def error_subscriber(event):
+    raise Exception('forced exception for testing purposes')
+
+
+class ChannelProcessingTestCase(unittest.TestCase):
+
+    settings = None
+    db_conn_str = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+
+    @db_connect
     def setUp(self, cursor):
-        settings = testing.integration_test_settings()
+        self.config = testing.setUp(settings=self.settings)
+
+        cursor.execute('CREATE TABLE IF NOT EXISTS "faux_channel_received" '
+                       '("id" SERIAL PRIMARY KEY, "data" JSON)')
+
+    def tearDown(self):
+        # Terminate the post publication worker script.
+        if hasattr(self, 'process') and self.process.is_alive():
+            self.process.terminate()
+        if hasattr(self, 'subscribers'):
+            delattr(self, 'subscribers')
+        testing.tearDown()
+
+    @classmethod
+    def tearDownClass(cls):
+        with psycopg2.connect(cls.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+
+    @db_connect
+    def make_one(self, cursor, channel, payload):
+        """Create a Postgres notification"""
+        pl = json.dumps(payload)
+        cursor.execute("select pg_notify(%s, %s);", (channel, pl,))
+        cursor.connection.commit()
+        # Wait for the channel processor to process the notification.
+        time.sleep(1)
+
+    def add_subscriber(self, subscriber):
+        if not hasattr(self, 'subscribers'):
+            self.subscribers = []
+        self.subscribers.append(subscriber)
+
+    def test_usage(self):
+        self.target(args=())
+        self.process.join()
+        self.assertEqual(1, self.process.exitcode)
+
+    @mock.patch('cnxpublishing.scripts.channel_processing.bootstrap')
+    def target(self, mocked_bootstrap, args=(config_uri(),)):
+
+        def wrapped_bootstrap(config_uri, request=None, options=None):
+            bootstrap_info = bootstrap(config_uri, request, options)
+            registry = bootstrap_info['registry']
+            # Register the test subscriber
+            for subscriber in self.subscribers:
+                from cnxpublishing.events import PGNotifyEvent
+                registry.registerHandler(subscriber, (PGNotifyEvent,))
+            return bootstrap_info
+
+        mocked_bootstrap.side_effect = wrapped_bootstrap
+
+        from cnxpublishing.scripts.channel_processing import main
+        # Start the post publication worker script.
+        # (The post publication worker is in an infinite loop, this is a way to
+        # test it)
+        args = ('cnx-publishing-channel-processing',) + args
+        self.process = Process(target=main, args=(args,))
+        self.process.start()
+        # Wait for the process to fully start.
+        time.sleep(1)
+
+    @db_connect
+    def test(self, cursor):
+        self.add_subscriber(subscriber)
+        self.target()
+
+        payload = {'a': 25, 'b': 24, 'c': 23}
+        self.make_one('faux_channel', payload)
+
+        cursor.execute('SELECT data FROM faux_channel_received')
+        data = cursor.fetchone()[0]
+        assert data['payload'] == payload
+
+    def test_error_recovery(self):
+        self.add_subscriber(error_subscriber)
+        self.target()
+
+        payload = {'error': 0, 'bug': '*.*'}
+        self.make_one('faux_channel', payload)
+
+        # Unfortunately there isn't an easy way to test for the logging
+        # output from an exception. So the best we can do is check to see
+        # if the process continues running.
+        # You can see this in action if you configure the logger in the
+        # testing.ini file.
+
+        assert self.process.is_alive()
+
+
+class DeprecatedChannelProcessingTestCase(unittest.TestCase):
+    @db_connect
+    def setUp(self, cursor):
+        settings = integration_test_settings()
         from ...config import CONNECTION_STRING
         self.db_conn_str = settings[CONNECTION_STRING]
 
@@ -58,7 +153,7 @@ class PostPublicationTestCase(unittest.TestCase):
 
     def tearDown(self):
         # Terminate the post publication worker script.
-        if self.process.is_alive():
+        if hasattr(self, 'process') and self.process.is_alive():
             self.process.terminate()
 
         with psycopg2.connect(self.db_conn_str) as db_conn:
@@ -66,52 +161,17 @@ class PostPublicationTestCase(unittest.TestCase):
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
 
-    def target(self, args=(testing.config_uri(),)):
-        from ...scripts.post_publication import main
+    def target(self, args=(config_uri(),)):
+        from ...scripts.channel_processing import main
 
         # Start the post publication worker script.
         # (The post publication worker is in an infinite loop, this is a way to
         # test it)
-        args = ('cnx-publishing-post-publication',) + args
+        args = ('cnx-publishing-channel-processing',) + args
         self.process = Process(target=main, args=(args,))
         self.process.start()
 
-    def test_usage(self):
-        self.target(args=())
-        self.process.join()
-        self.assertEqual(1, self.process.exitcode)
-
-    @testing.db_connect
-    def test_new_module_inserted(self, cursor):
-        self.target()
-
-        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
-        cursor.connection.commit()
-
-        cursor.execute("""\
-SELECT module_ident FROM modules
-    WHERE portal_type = 'Collection'
-    ORDER BY module_ident DESC LIMIT 1""")
-        module_ident = cursor.fetchone()[0]
-
-        wait_for_module_state(module_ident)
-
-        cursor.execute("""\
-SELECT nodeid, is_collated FROM trees WHERE documentid = %s
-    ORDER BY nodeid""", (module_ident,))
-        is_collated = [i[1] for i in cursor.fetchall()]
-        self.assertEqual([False, True], is_collated)
-
-        content = get_collated_content(
-            binder[0][0].ident_hash, binder.ident_hash, cursor)
-        self.assertIn('there will be cake', content[:])
-
-        cursor.execute("""\
-SELECT state FROM post_publications
-    WHERE module_ident = %s ORDER BY timestamp DESC""", (module_ident,))
-        self.assertEqual('Done/Success', cursor.fetchone()[0])
-
-    @testing.db_connect
+    @db_connect
     def test_revised_module_inserted(self, cursor):
         self.target()
 
@@ -234,15 +294,15 @@ nav#toc:pass(30)::after {
 
         cursor.execute("""\
 SELECT module_ident FROM modules
-    WHERE portal_type = 'Collection'
-    ORDER BY module_ident DESC LIMIT 1""")
+WHERE portal_type = 'Collection'
+ORDER BY module_ident DESC LIMIT 1""")
         module_ident = cursor.fetchone()[0]
 
         wait_for_module_state(module_ident)
 
         cursor.execute("""\
 SELECT nodeid, is_collated FROM trees WHERE documentid = %s
-    ORDER BY nodeid""", (module_ident,))
+ORDER BY nodeid""", (module_ident,))
         is_collated = [i[1] for i in cursor.fetchall()]
         self.assertEqual([False, True], is_collated)
 
@@ -252,17 +312,17 @@ SELECT nodeid, is_collated FROM trees WHERE documentid = %s
 
         cursor.execute("""\
 SELECT state FROM post_publications
-    WHERE module_ident = %s ORDER BY timestamp DESC""", (module_ident,))
+WHERE module_ident = %s ORDER BY timestamp DESC""", (module_ident,))
         self.assertEqual('Done/Success', cursor.fetchone()[0])
 
-    @testing.db_connect
-    @mock.patch('cnxpublishing.scripts.post_publication.remove_baked')
+    @db_connect
+    @mock.patch('cnxpublishing.subscribers.remove_baked')
     def test_error_handling(self, cursor, mock_remove_collation):
-        from ...scripts import post_publication
+        from ...scripts import channel_processing
         from ...bake import remove_baked
 
-        # Fake remove_collation, the first time it's called, it will raise an
-        # exception, after that it'll call the normal remove_collation function
+        # Fake remove_baked, the first time it's called, it will raise an
+        # exception, after that it'll call the normal remove_baked function
         class FakeRemoveCollation(object):
             # this is necessary inside a class because just a variable "count"
             # cannot be accessed inside fake_remove_collation
@@ -284,8 +344,8 @@ SELECT state FROM post_publications
 
         cursor.execute("""\
 SELECT module_ident FROM modules
-    WHERE portal_type = 'Collection'
-    ORDER BY module_ident DESC LIMIT 2""")
+WHERE portal_type = 'Collection'
+ORDER BY module_ident DESC LIMIT 2""")
 
         ((module_ident1,), (module_ident2,)) = cursor.fetchall()
 
@@ -294,14 +354,14 @@ SELECT module_ident FROM modules
 
         cursor.execute("""\
 SELECT stateid FROM modules
-    WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
+WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
 
         # make sure one is marked as "errored" and the other one "current"
         self.assertEqual([(1,), (7,)], sorted(cursor.fetchall()))
 
         cursor.execute("""\
 SELECT state FROM post_publications
-    WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
+WHERE module_ident IN %s""", ((module_ident1, module_ident2),))
         self.assertEqual(
             ['Done/Success', 'Failed/Error', 'Processing', 'Processing'],
             sorted([i[0] for i in cursor.fetchall()]))

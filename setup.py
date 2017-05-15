@@ -55,8 +55,8 @@ setup(
     [paste.app_factory]
     main = cnxpublishing.main:main
     [console_scripts]
-    cnx-publishing-post-publication = \
-        cnxpublishing.scripts.post_publication:main
+    cnx-publishing-channel-processing = \
+        cnxpublishing.scripts.channel_processing:main
     [dbmigrator]
     migrations_directory = cnxpublishing.main:find_migrations_directory
     """,

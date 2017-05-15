@@ -2,7 +2,6 @@
 source = cnxpublishing
 omit =
     cnxpublishing/tests/*
-    cnxpublishing/scripts/*
 
 
 [report]
@@ -11,6 +10,5 @@ exclude_lines =
 
     if __name__ == .__main__.:
 omit =
-    cnxpublishing/scripts/*
     cnxpublishing/tests/*
     cnxpublishing/_version.py
