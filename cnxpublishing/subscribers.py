@@ -49,12 +49,22 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     publisher, message = cursor.fetchone()
     remove_baked(ident_hash, cursor=cursor)
-    bake(binder, publisher, message, cursor=cursor)
 
-    logger.debug('Finished processing module_ident={} ident_hash={}'.format(
-        module_ident, ident_hash))
-    update_module_state(cursor, module_ident, 'current')
-    set_post_publications_state(cursor, module_ident, 'Done/Success')
+    state = 'current'
+    pub_state = 'Done/Success'
+    try:
+        bake(binder, publisher, message, cursor=cursor)
+    except Exception as exc:
+        state = 'errored'
+        pub_state = 'Failed/Error'
+        # TODO rollback to pre-removal of the baked content??
+        logger.exception("Logging an uncaught exception during baking")
+    finally:
+        logger.debug('Finished processing module_ident={} ident_hash={} '
+                     'with a final state of \'{}\'.'.format(
+                         module_ident, ident_hash, state))
+        update_module_state(cursor, module_ident, state)
+        set_post_publications_state(cursor, module_ident, pub_state)
 
 
 __all__ = (

@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 import unittest
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from pyramid import testing
 
@@ -73,3 +77,32 @@ class PostPublicationProcessingTestCase(BaseDatabaseIntegrationTestCase):
                        "ORDER BY timestamp DESC",
                        (self.module_ident,))
         self.assertIn('Done/Success', [r[0] for r in cursor.fetchall()])
+
+    @db_connect
+    @mock.patch('cnxpublishing.subscribers.bake')
+    def test_error_handling(self, cursor, mock_bake):
+
+        def bake(*args, **kwargs):
+            raise Exception('something failed during baking')
+
+        mock_bake.side_effect = bake
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self._make_event()
+
+        self.target(event)
+
+        # Make sure it is marked as 'errored'.
+        cursor.execute("SELECT ms.statename "
+                       "FROM modules AS m NATURAL JOIN modulestates AS ms "
+                       "WHERE module_ident = %s",
+                       (self.module_ident,))
+        self.assertEqual(cursor.fetchone()[0], 'errored')
+
+        # Make sure the post_publication state is maked as 'Failed/Error'.
+        cursor.execute("SELECT state FROM post_publications "
+                       "WHERE module_ident = %s",
+                       (self.module_ident,))
+        self.assertIn('Failed/Error', [r[0] for r in cursor.fetchall()])
