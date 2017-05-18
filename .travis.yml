@@ -48,7 +48,7 @@ before_install:
   - pip install coverage
   - pip install codecov
 install:
-  - pip install .
+  - pip install ".[test]"
 before_script:
   # Set up postgres roles
   - sudo -u postgres psql -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
@@ -58,9 +58,10 @@ before_script:
   - cd session_exec
   - make USE_PGXS=1 -e && sudo make USE_PGXS=1 -e install
   - cd ..
+  - pip install -U pytest pytest-runner pytest-cov
 script:
-  # This is the same as `python setup.py test` with a coverage wrapper.
-  - coverage run --source=cnxpublishing setup.py test
+  # This is the same as `coverage run setup.py test`.
+  - pytest cnxpublishing
 after_success:
   # Report test coverage to codecov.io
   - codecov

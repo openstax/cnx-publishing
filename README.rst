@@ -65,9 +65,13 @@ be created using the following commands::
     psql -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
     createdb -O cnxarchive cnxarchive-testing
 
+Install the prerequisite testing package::
+
+  pip install pytest pytest-runner pytest-cov
+
 The tests can then be run using::
 
-    python setup.py test
+  python setup.py test
 
 Permissions
 -----------

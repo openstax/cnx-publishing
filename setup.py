@@ -21,6 +21,8 @@ install_requires = (
     )
 tests_require = [
     'cnx-db',
+    'pytest',
+    'pytest-runner',
     'webtest',
     ]
 extras_require = {
