@@ -67,6 +67,28 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
         set_post_publications_state(cursor, module_ident, pub_state)
 
 
+@subscriber(events.ChannelProcessingStartUpEvent)
+@with_db_cursor
+def post_publication_start_up(event, cursor):
+    # If you make changes to the payload, be sure to update the trigger
+    # code as well.
+    cursor.execute("""\
+SELECT pg_notify('post_publication',
+                 '{"module_ident": '||
+                 module_ident||
+                 ', "ident_hash": "'||
+                 ident_hash(uuid, major_version, minor_version)||
+                 '", "timestamp": "'||
+                 CURRENT_TIMESTAMP||
+                 '"}')
+FROM modules
+WHERE stateid = (
+    SELECT stateid
+    FROM modulestates
+    WHERE statename = 'post-publication');""")
+
+
 __all__ = (
     'post_publication_processing',
+    'post_publication_start_up',
 )

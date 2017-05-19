@@ -28,7 +28,10 @@ from pyramid.paster import bootstrap, setup_logging
 from pyramid.threadlocal import get_current_registry
 
 from cnxpublishing.config import CONNECTION_STRING
-from cnxpublishing.events import create_pg_notify_event
+from cnxpublishing.events import (
+    create_pg_notify_event,
+    ChannelProcessingStartUpEvent,
+)
 
 
 logger = logging.getLogger('channel_processing')
@@ -72,6 +75,8 @@ def processor():  # pragma: no cover
                 cursor.execute('LISTEN {}'.format(channel))
                 logger.debug('Waiting for notifications on channel "{}"'
                              .format(channel))
+
+        registry.notify(ChannelProcessingStartUpEvent())
 
         rlist = [conn]  # wait until ready for reading
         wlist = []  # wait until ready for writing

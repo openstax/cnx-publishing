@@ -2,6 +2,10 @@
 import json
 
 
+class ChannelProcessingStartUpEvent(object):
+    """An event triggered during channel processing process start up."""
+
+
 class PGNotifyEvent(object):
     """A base class for a Postgres Notification Event"""
 
@@ -70,6 +74,7 @@ def create_pg_notify_event(notif):
 
 __all__ = (
     'create_pg_notify_event',
+    'ChannelProcessingStartUpEvent',
     'PGNotifyEvent',
     'PostPublicationEvent',
 )

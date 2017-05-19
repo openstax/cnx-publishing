@@ -26,10 +26,18 @@ from ..testing import (
 
 
 @db_connect
+def start_up_subscriber(event, cursor):
+    data = json.dumps({'channel': None,
+                       'payload': '{"msg": "start up"}'})
+    cursor.execute('INSERT INTO notify_received (data) values (%s)',
+                   (data,))
+
+
+@db_connect
 def subscriber(event, cursor):
     data = json.dumps({'channel': event.channel,
                        'payload': event.payload})
-    cursor.execute('INSERT INTO faux_channel_received (data) values (%s)',
+    cursor.execute('INSERT INTO notify_received (data) values (%s)',
                    (data,))
 
 
@@ -52,15 +60,17 @@ class ChannelProcessingTestCase(unittest.TestCase):
     def setUp(self, cursor):
         self.config = testing.setUp(settings=self.settings)
 
-        cursor.execute('CREATE TABLE IF NOT EXISTS "faux_channel_received" '
+        cursor.execute('CREATE TABLE IF NOT EXISTS "notify_received" '
                        '("id" SERIAL PRIMARY KEY, "data" JSON)')
 
-    def tearDown(self):
+    @db_connect
+    def tearDown(self, cursor):
         # Terminate the post publication worker script.
         if hasattr(self, 'process') and self.process.is_alive():
             self.process.terminate()
         if hasattr(self, 'subscribers'):
             delattr(self, 'subscribers')
+        cursor.execute('DELETE FROM notify_received *')
         testing.tearDown()
 
     @classmethod
@@ -79,10 +89,13 @@ class ChannelProcessingTestCase(unittest.TestCase):
         # Wait for the channel processor to process the notification.
         time.sleep(1)
 
-    def add_subscriber(self, subscriber):
+    def add_subscriber(self, subscriber, event_cls=None):
         if not hasattr(self, 'subscribers'):
             self.subscribers = []
-        self.subscribers.append(subscriber)
+        if event_cls is None:
+            from cnxpublishing.events import PGNotifyEvent
+            event_cls = PGNotifyEvent
+        self.subscribers.append((subscriber, event_cls,))
 
     def test_usage(self):
         self.target(args=())
@@ -95,10 +108,22 @@ class ChannelProcessingTestCase(unittest.TestCase):
         def wrapped_bootstrap(config_uri, request=None, options=None):
             bootstrap_info = bootstrap(config_uri, request, options)
             registry = bootstrap_info['registry']
+            # Unregister handlers
+            from cnxpublishing import events
+            interfaces = [
+                events.ChannelProcessingStartUpEvent,
+                events.PostPublicationEvent,
+            ]
+            handlers = list(registry.registeredHandlers())
+            for handler in handlers:
+                for iface in handler.required:
+                    if iface.inherit in interfaces:
+                        registry.unregisterHandler(handler.handler,
+                                                   handler.required,
+                                                   handler.name)
             # Register the test subscriber
-            for subscriber in self.subscribers:
-                from cnxpublishing.events import PGNotifyEvent
-                registry.registerHandler(subscriber, (PGNotifyEvent,))
+            for subscriber, event_cls in self.subscribers:
+                registry.registerHandler(subscriber, (event_cls,))
             return bootstrap_info
 
         mocked_bootstrap.side_effect = wrapped_bootstrap
@@ -114,15 +139,29 @@ class ChannelProcessingTestCase(unittest.TestCase):
         time.sleep(1)
 
     @db_connect
-    def test(self, cursor):
+    def test_on_start_up(self, cursor):
+        from cnxpublishing.events import ChannelProcessingStartUpEvent
+        self.add_subscriber(start_up_subscriber,
+                            ChannelProcessingStartUpEvent)
+        self.target()
+
+        cursor.execute('SELECT data FROM notify_received')
+        data = cursor.fetchone()[0]
+        assert data['channel'] is None
+        assert data['payload'] == '{"msg": "start up"}'
+
+    @db_connect
+    def test_in_loop(self, cursor):
         self.add_subscriber(subscriber)
         self.target()
 
+        channel = 'faux_channel'
         payload = {'a': 25, 'b': 24, 'c': 23}
-        self.make_one('faux_channel', payload)
+        self.make_one(channel, payload)
 
-        cursor.execute('SELECT data FROM faux_channel_received')
+        cursor.execute('SELECT data FROM notify_received')
         data = cursor.fetchone()[0]
+        assert data['channel'] == channel
         assert data['payload'] == payload
 
     def test_error_recovery(self):
