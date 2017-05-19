@@ -59,12 +59,16 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
 
     settings = None
     db_conn_str = None
+    is_first_run = True
 
     @classmethod
     def setUpClass(cls):
         cls.settings = integration_test_settings()
         from ..config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        if cls.is_first_run:
+            BaseDatabaseIntegrationTestCase.is_first_run = False
+            cls._tear_down_database()
 
     def setUp(self):
         init_db(self.db_conn_str, True)
@@ -80,11 +84,15 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         main(self.config)
 
     def tearDown(self):
-        with psycopg2.connect(self.db_conn_str) as db_conn:
+        self._tear_down_database()
+        testing.tearDown()
+
+    @classmethod
+    def _tear_down_database(cls):
+        with psycopg2.connect(cls.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
-        testing.tearDown()
 
     def make_publication(self, publisher='nobody', message="no msg",
                          epub=None):
