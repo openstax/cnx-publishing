@@ -49,3 +49,33 @@ class PGNotifyFactoryTestCase(unittest.TestCase):
         self.assertEqual(event.module_ident, payload['module_ident'])
         self.assertEqual(event.ident_hash, payload['ident_hash'])
         self.assertEqual(event.timestamp, payload['timestamp'])
+
+    def test_null_notify_to_event(self):
+        payload = None  # null payload
+        channel = 'testing'
+        pid = 1234
+        notif = self._make_one(payload, channel, pid)
+
+        event = self.target(notif)
+
+        from cnxpublishing.events import PGNotifyEvent
+        self.assertEqual(type(event), PGNotifyEvent)
+        self.assertEqual(event.notification, notif)
+        self.assertEqual(event.channel, channel)
+        self.assertEqual(event.payload, {})
+        self.assertEqual(event.pid, pid)
+
+    def test_blank_notify_to_event(self):
+        payload = ''  # blank payload
+        channel = 'testing'
+        pid = 1234
+        notif = self._make_one(payload, channel, pid)
+
+        event = self.target(notif)
+
+        from cnxpublishing.events import PGNotifyEvent
+        self.assertEqual(type(event), PGNotifyEvent)
+        self.assertEqual(event.notification, notif)
+        self.assertEqual(event.channel, channel)
+        self.assertEqual(event.payload, {})
+        self.assertEqual(event.pid, pid)

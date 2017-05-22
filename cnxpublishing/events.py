@@ -13,7 +13,6 @@ class PGNotifyEvent(object):
         self._payload = None
         self.notification = notification
         self.channel = notification.channel
-        # It's assumed that all payloads will be in JSON format.
         self.payload = notification.payload
         self.pid = notification.pid
 
@@ -23,7 +22,15 @@ class PGNotifyEvent(object):
 
     @payload.setter
     def payload(self, value):
-        self._payload = json.loads(value)
+        # It's assumed that all payloads will be in JSON format.
+        try:
+            self._payload = json.loads(value)
+        except (ValueError, TypeError,) as exc:
+            if ('No JSON object' in exc.message or
+                    'expected string or buffer' in exc.message):
+                self._payload = {}
+            else:
+                raise
 
 
 class PostPublicationEvent(PGNotifyEvent):
