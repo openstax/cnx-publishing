@@ -124,8 +124,39 @@ class PostPublicationProcessingTestCase(BaseSubscriberTestCase):
         self.assertIn('Done/Success', [r[0] for r in cursor.fetchall()])
 
     @db_connect
+    def test_state_updated_midway(self, cursor):
+        from cnxarchive.scripts.export_epub import factory
+
+        class Patcher(object):
+            def __init__(self, module_ident):
+                self.module_ident = module_ident
+                self.captured_state = None
+
+            def __call__(self, *args, **kwargs):
+                cursor.execute("SELECT ms.statename "
+                               "FROM modules AS m "
+                               "NATURAL JOIN modulestates AS ms "
+                               "WHERE module_ident = %s",
+                               (self.module_ident,))
+                self.captured_state = cursor.fetchone()[0]
+                return factory(*args, **kwargs)
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self.make_event()
+
+        # Before we bake assert the state has changed.
+        patched = Patcher(self.module_ident)
+        patch_path = 'cnxarchive.scripts.export_epub.factory'
+        with mock.patch(patch_path, new=patched):
+            self.target(event)
+
+        self.assertEqual(patched.captured_state, 'processing')
+
+    @db_connect
     @mock.patch('cnxpublishing.subscribers.bake')
-    def test_error_handling(self, cursor, mock_bake):
+    def test_error_handling_of_unknown_error(self, cursor, mock_bake):
 
         def bake(*args, **kwargs):
             raise Exception('something failed during baking')

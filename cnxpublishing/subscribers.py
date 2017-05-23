@@ -26,8 +26,11 @@ def post_publication_processing(event, cursor):
     module_ident, ident_hash = event.module_ident, event.ident_hash
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
+    update_module_state(cursor, module_ident, 'processing')
     set_post_publications_state(cursor, module_ident, 'Processing')
-    # TODO commit state change
+    # Commit the state change before preceding.
+    cursor.connection.commit()
+
     try:
         binder = export_epub.factory(ident_hash)
     except export_epub.NotFound:  # pragma: no cover
