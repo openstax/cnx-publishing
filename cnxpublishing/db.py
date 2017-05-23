@@ -1415,6 +1415,24 @@ WHERE
   AND user_id = ANY (%s)""", (document_id, roles.keys(),))
 
 
+def set_post_publications_state(cursor, module_ident, state_name,
+                                state_message=''):  # pragma: no cover
+    """This sets the post-publication state in the database."""
+    cursor.execute("""\
+INSERT INTO post_publications
+  (module_ident, state, state_message)
+  VALUES (%s, %s, %s)""", (module_ident, state_name, state_message))
+
+
+def update_module_state(cursor, module_ident, state_name):  # pragma: no cover
+    """This updates the module's state in the database."""
+    cursor.execute("""\
+UPDATE modules
+SET stateid = (
+    SELECT stateid FROM modulestates WHERE statename = %s
+) WHERE module_ident = %s""", (state_name, module_ident))
+
+
 __all__ = (
     'accept_publication_license',
     'accept_publication_role',
@@ -1435,7 +1453,9 @@ __all__ = (
     'remove_acl',
     'remove_license_requests',
     'remove_role_requests',
+    'set_post_publications_state',
     'set_publication_failure',
+    'update_module_state',
     'upsert_acl',
     'upsert_license_requests',
     'upsert_pending_licensors',

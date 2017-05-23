@@ -46,7 +46,7 @@ loggers:
     level     : DEBUG
     handlers  : [console]
     propagate : 0
-  post_publication:
+  channel_processing:
     level     : DEBUG
     handlers  : [console]
     propagate : 0
