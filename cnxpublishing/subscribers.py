@@ -36,18 +36,22 @@ def post_publication_processing(event, cursor):
 
     try:
         binder = export_epub.factory(ident_hash)
-    except export_epub.NotFound:  # pragma: no cover
-        logger.error('ident_hash={} module_ident={} not found'
-                     .format(ident_hash, module_ident))
+    except:
+        logger.exception('Logging an uncaught exception during baking'
+                         'ident_hash={} module_ident={}'
+                         .format(ident_hash, module_ident))
         # FIXME If the top module entry doesn't exist, this is going to fail.
         try:
             update_module_state(cursor, module_ident, 'errored')
-        except psycopg2.Error:
+        except psycopg2.Error:  # pragma: no cover
             pass
-        set_post_publications_state(
-            cursor, module_ident, 'Failed/Error',
-            'ident_hash={} or a child node is not found'.format(ident_hash))
+        state_message = CONTACT_SITE_ADMIN_MESSAGE
+        set_post_publications_state(cursor, module_ident, 'Failed/Error',
+                                    state_message=state_message)
         return
+    finally:
+        logger.debug('Finished exporting module_ident={} ident_hash={}'
+                     .format(module_ident, ident_hash))
 
     cursor.execute("""\
 SELECT submitter, submitlog FROM modules
@@ -58,19 +62,20 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
 
     state = 'current'
     pub_state = 'Done/Success'
+    state_message = None
     try:
         bake(binder, publisher, message, cursor=cursor)
     except Exception as exc:
         state = 'errored'
         pub_state = 'Failed/Error'
+        state_message = CONTACT_SITE_ADMIN_MESSAGE
         # TODO rollback to pre-removal of the baked content??
-        logger.exception("Logging an uncaught exception during baking")
+        logger.exception('Logging an uncaught exception during baking')
     finally:
         logger.debug('Finished processing module_ident={} ident_hash={} '
-                     'with a final state of \'{}\'.'.format(
-                         module_ident, ident_hash, state))
+                     'with a final state of \'{}\'.'
+                     .format(module_ident, ident_hash, state))
         update_module_state(cursor, module_ident, state)
-        state_message = CONTACT_SITE_ADMIN_MESSAGE
         set_post_publications_state(cursor, module_ident, pub_state,
                                     state_message=state_message)
 

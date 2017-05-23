@@ -19,8 +19,8 @@ class BaseSubscriberTestCase(BaseDatabaseIntegrationTestCase):
     @db_connect
     def setUp(self, cursor):
         super(BaseSubscriberTestCase, self).setUp()
-        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
-        self.ident_hash = binder.ident_hash
+        self.binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        self.ident_hash = self.binder.ident_hash
         cursor.execute(
             "SELECT module_ident FROM modules "
             "WHERE ident_hash(uuid, major_version, minor_version) = %s",
@@ -183,4 +183,35 @@ class PostPublicationProcessingTestCase(BaseSubscriberTestCase):
                        (self.module_ident,))
         from cnxpublishing.subscribers import CONTACT_SITE_ADMIN_MESSAGE
         self.assertIn(('Failed/Error', CONTACT_SITE_ADMIN_MESSAGE,),
-                      [r  for r in cursor.fetchall()])
+                      [r for r in cursor.fetchall()])
+
+    @db_connect
+    @mock.patch('cnxarchive.scripts.export_epub.factory')
+    def test_error_handling_during_epub_export(self, cursor, mock_factory):
+
+        def factory(*args, **kwargs):
+            raise Exception('something went wrong during export')
+
+        mock_factory.side_effect = factory
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self.make_event()
+
+        self.target(event)
+
+        # Make sure it is marked as 'errored'.
+        cursor.execute("SELECT ms.statename "
+                       "FROM modules AS m NATURAL JOIN modulestates AS ms "
+                       "WHERE module_ident = %s",
+                       (self.module_ident,))
+        self.assertEqual(cursor.fetchone()[0], 'errored')
+
+        # Make sure the post_publication state is maked as 'Failed/Error'.
+        cursor.execute("SELECT state, state_message FROM post_publications "
+                       "WHERE module_ident = %s",
+                       (self.module_ident,))
+        from cnxpublishing.subscribers import CONTACT_SITE_ADMIN_MESSAGE
+        self.assertIn(('Failed/Error', CONTACT_SITE_ADMIN_MESSAGE,),
+                      [r for r in cursor.fetchall()])
