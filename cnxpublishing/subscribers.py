@@ -18,6 +18,9 @@ from .db import (
 
 logger = logging.getLogger('cnxpublishing')
 
+CONTACT_SITE_ADMIN_MESSAGE = ("A system's error occured, please contact the "
+                              "site administrator for assistance.")
+
 
 @subscriber(events.PostPublicationEvent)
 @with_db_cursor
@@ -67,7 +70,9 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                      'with a final state of \'{}\'.'.format(
                          module_ident, ident_hash, state))
         update_module_state(cursor, module_ident, state)
-        set_post_publications_state(cursor, module_ident, pub_state)
+        state_message = CONTACT_SITE_ADMIN_MESSAGE
+        set_post_publications_state(cursor, module_ident, pub_state,
+                                    state_message=state_message)
 
 
 @subscriber(events.ChannelProcessingStartUpEvent)

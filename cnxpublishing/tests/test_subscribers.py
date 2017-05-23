@@ -178,7 +178,9 @@ class PostPublicationProcessingTestCase(BaseSubscriberTestCase):
         self.assertEqual(cursor.fetchone()[0], 'errored')
 
         # Make sure the post_publication state is maked as 'Failed/Error'.
-        cursor.execute("SELECT state FROM post_publications "
+        cursor.execute("SELECT state, state_message FROM post_publications "
                        "WHERE module_ident = %s",
                        (self.module_ident,))
-        self.assertIn('Failed/Error', [r[0] for r in cursor.fetchall()])
+        from cnxpublishing.subscribers import CONTACT_SITE_ADMIN_MESSAGE
+        self.assertIn(('Failed/Error', CONTACT_SITE_ADMIN_MESSAGE,),
+                      [r  for r in cursor.fetchall()])
