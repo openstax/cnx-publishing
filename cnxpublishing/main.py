@@ -6,18 +6,6 @@
 # See LICENCE.txt for details.
 # ###
 import os
-import tempfile
-
-from beaker.cache import CacheManager
-from beaker.util import parse_cache_config_options
-from cnxarchive.utils import join_ident_hash
-from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
-from pyramid.config import Configurator
-from pyramid import security
-from pyramid.authorization import ACLAuthorizationPolicy
-from pyramid.httpexceptions import default_exceptionresponse_view
-from pyramid.session import SignedCookieSessionFactory
-from pyramid_multiauth import MultiAuthenticationPolicy
 
 
 __version__ = '0.1'
@@ -32,7 +20,7 @@ def find_migrations_directory():  # pragma: no cover
     return os.path.join(here, 'sql/migrations')
 
 
-def make_wsgi_app(global_config, **settings):
+def make_wsgi_app(global_config, **settings):  # pragma: no cover
     """Application factory"""
     from .config import configure
     return configure(settings).make_wsgi_app()
