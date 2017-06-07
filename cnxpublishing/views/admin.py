@@ -50,8 +50,8 @@ def admin_api_keys(request):  # pragma: no cover
     # Easter Egg that will invalidate the cache, just hit this page.
     # FIXME Move this logic into the C[R]UD views...
     from ..authnz import lookup_api_key_info
-    from ..main import cache
-    cache.invalidate(lookup_api_key_info)
+    from ..cache import cache_manager
+    cache_manager.invalidate(lookup_api_key_info)
 
     return {'api_keys': get_api_keys(request)}
 

@@ -16,13 +16,13 @@ from pyramid_multiauth import MultiAuthenticationPolicy
 from zope.interface import implementer
 
 from cnxpublishing.db import db_connect
-from cnxpublishing.main import cache
+from cnxpublishing.cache import cache_manager
 
 
 ALL_KEY_INFO_SQL_STMT = "SELECT id, key, name, groups FROM api_keys"
 
 
-@cache.cache(expire=60*60*24)  # cache for one day
+@cache_manager.cache(expire=60*60*24)  # cache for one day
 def lookup_api_key_info():
     """Given a dbapi cursor, lookup all the api keys and their information."""
     info = {}
