@@ -100,7 +100,7 @@ def declare_routes(config):
     declare_browsable_routes(config)
 
 
-def main(global_config, **settings):
+def make_wsgi_app(global_config, **settings):
     """Application factory"""
     config = Configurator(settings=settings, root_factory=RootFactory)
     declare_routes(config)

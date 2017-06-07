@@ -55,7 +55,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     entry_points="""\
     [paste.app_factory]
-    main = cnxpublishing.main:main
+    main = cnxpublishing.main:make_wsgi_app
     [console_scripts]
     cnx-publishing-channel-processing = \
         cnxpublishing.scripts.channel_processing:main
