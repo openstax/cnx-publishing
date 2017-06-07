@@ -220,9 +220,10 @@ def add_pending_resource(cursor, resource, document=None):
         'filename': resource.filename,
         }
     with resource.open() as data:
-        if data.seek(0, 2) > int(settings['file-upload-limit']) * 1024 * 1024:
+        upload_limit = settings['file_upload_limit'] * 1024 * 1024
+        if data.seek(0, 2) > upload_limit:
             raise ResourceFileExceededLimitError(
-                settings['file-upload-limit'], resource.filename)
+                settings['file_upload_limit'], resource.filename)
         data.seek(0)
         args['data'] = psycopg2.Binary(data.read())
 
