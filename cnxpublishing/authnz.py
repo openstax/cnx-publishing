@@ -8,9 +8,12 @@
 """\
 Authentication and authorization policies for the publication application.
 """
-from zope.interface import implementer
-from pyramid.interfaces import IAuthenticationPolicy
+from openstax_accounts.interfaces import IOpenstaxAccountsAuthenticationPolicy
 from pyramid import security
+from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.interfaces import IAuthenticationPolicy
+from pyramid_multiauth import MultiAuthenticationPolicy
+from zope.interface import implementer
 
 from cnxpublishing.db import db_connect
 from cnxpublishing.main import cache
@@ -85,6 +88,23 @@ class APIKeyAuthenticationPolicy(object):
 
     def forget(self, request):
         return []  # No need to forget when everything is already forgotten.
+
+
+def includeme(config):
+    """Configuration include fuction for this module"""
+    api_key_authn_policy = APIKeyAuthenticationPolicy()
+    config.include('openstax_accounts')
+    openstax_authn_policy = config.registry.getUtility(
+        IOpenstaxAccountsAuthenticationPolicy)
+
+    # Set up api & user authentication policies.
+    policies = [api_key_authn_policy, openstax_authn_policy]
+    authn_policy = MultiAuthenticationPolicy(policies)
+    config.set_authentication_policy(authn_policy)
+
+    # Set up the authorization policy.
+    authz_policy = ACLAuthorizationPolicy()
+    config.set_authorization_policy(authz_policy)
 
 
 __all__ = (
