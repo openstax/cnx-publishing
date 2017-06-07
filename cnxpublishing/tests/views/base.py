@@ -124,8 +124,8 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
     @staticmethod
     def make_app(settings):
-        from cnxpublishing.main import main
-        app = main({}, **settings)
+        from cnxpublishing.main import make_wsgi_app
+        app = make_wsgi_app({}, **settings)
         return app
 
     @property
