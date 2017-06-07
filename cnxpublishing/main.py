@@ -24,11 +24,6 @@ __version__ = '0.1'
 __name__ = 'cnxpublishing'
 
 
-# Provides a means of caching function results.
-# (This is reassigned with configuration in ``main()``.)
-cache = CacheManager()
-
-
 def find_migrations_directory():  # pragma: no cover
     """Finds and returns the location of the database migrations directory.
     This function is used from a setuptools entry-point for db-migrator.

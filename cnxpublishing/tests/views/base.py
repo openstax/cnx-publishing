@@ -112,7 +112,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def tear_down_api_keys(self):
         # Invalidate the api_key lookup cache
         from cnxpublishing import authnz
-        authnz.cache.invalidate(authnz.lookup_api_key_info)
+        authnz.cache_manager.invalidate(authnz.lookup_api_key_info)
 
     @classmethod
     def setUpClass(cls):
