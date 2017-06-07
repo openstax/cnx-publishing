@@ -73,8 +73,7 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         request = testing.DummyRequest()
         self.config = testing.setUp(settings=self.settings, request=request)
         # Register the routes for reverse generation of urls.
-        from ..main import declare_routes
-        declare_routes(self.config)
+        self.config.include('cnxpublishing.views')
 
         # Initialize the authentication policy.
         from openstax_accounts.stub import main
