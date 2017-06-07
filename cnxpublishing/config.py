@@ -56,9 +56,8 @@ class RootFactory(object):
 def configure(settings):
     # Check for required settings
     settings['session_key'] = settings.get('session_key', 'itsaseekreet')
-    # FIXME Rename to use `_` rather than `-`.
     # File uploads size limit in MB
-    settings['file-upload-limit'] = int(settings.get('file-upload-limit', 50))
+    settings['file_upload_limit'] = int(settings.get('file_upload_limit', 50))
     assert 'channel_processing.channels' in settings, (
         'missing {} setting'.format('channel_processing.channels'))
     assert CONNECTION_STRING in settings, (
