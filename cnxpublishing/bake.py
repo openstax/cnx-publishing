@@ -32,12 +32,16 @@ def _formatter_callback_factory():  # pragma: no cover
     exercise_match = settings.get('embeddables.exercise.match', None)
     exercise_token = settings.get('embeddables.exercise.token', None)
     mathml_url = settings.get('mathmlcloud.url', None)
-    memcache_server = settings.get('memcache_server', None)
+    memcache_servers = settings.get('memcache_servers')
+    if memcache_servers:
+        memcache_servers = memcache_servers.split()
+    else:
+        memcache_servers = None
 
     if exercise_url_template and exercise_match:
         mc_client = None
-        if memcache_server:
-            mc_client = memcache.Client([memcache_server], debug=0)
+        if memcache_servers:
+            mc_client = memcache.Client(memcache_servers, debug=0)
         includes.append(exercise_callback_factory(exercise_match,
                                                   exercise_url_template,
                                                   mc_client,
