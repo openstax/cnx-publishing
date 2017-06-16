@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""\
+Implementation of the Celery framework within a Pyramid application.
+
+Use the ``task`` decorator provided by this module where the celery
+documentation says to use ``@app.task``. It is used to register a function as
+a task without making the celery application a global object.
+
+"""
 from __future__ import absolute_import
 
 import celery
@@ -7,6 +15,11 @@ from pyramid.scripting import prepare
 
 
 class PyramidAwareTask(celery.Task):
+    """A Pyramid aware version of ``celery.task.Task``.
+    This sets up the pyramid application within the thread, thus allowing
+    ``pyramid.threadlocal`` functions to work as expected.
+
+    """
 
     def __call__(self, *args, **kwargs):
         # Prepare the pyramid environment.
@@ -18,6 +31,7 @@ class PyramidAwareTask(celery.Task):
 
 
 def task(**kwargs):
+    """A function task decorator used in place of ``@celery_app.task``."""
 
     def wrapper(wrapped):
 
