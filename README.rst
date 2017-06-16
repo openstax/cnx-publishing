@@ -25,9 +25,20 @@ Interface for:
 - Accepting or denying role requests
 - Kicking off post-publication jobs
 - Moderating publications for first time publishers
+- Post-publication operations
+
+System Requirements
+-------------------
+
+- PostgreSQL >= 9.4
+- RabbitMQ >= 3.6
+- Memcached
 
 Getting started
 ---------------
+
+Ensure the system requirements have been installed before installing
+the application code.
 
 Install using one of the following methods (run within the project root)::
 
@@ -467,6 +478,31 @@ create identifiers where one previously did not exist.
     [{u'permission': u'publish',
       u'uid': u'impicky',
       u'uuid': u'7a268e3a-1e3a-4f4d-aaab-5ecd046187c1'}]
+
+Channel Processing & Post-publication Operations
+------------------------------------------------
+
+The channel processing script is used to listen to for notifications coming
+from PostgreSQL. This script translates the notifications into events that
+are handled by this project's logic.
+
+The channel-processing process is invoked by running the following script::
+
+  cnx-publishing-channel-processing <your-config>.ini
+
+This process will listen for events and process them as they come in.
+
+(See the channel-processing docstring for implemenation details.)
+
+Queued Operations
+-----------------
+
+This application uses the `Celery framework <celeryproject.org>`_ to queue
+work to be done by a worker process. The worker process is run using::
+
+  PYRAMID_INI=<your-config.ini celery worker -A cnxpublishing
+
+(See the task module's docstring for Celery task implemenation.)
 
 License
 -------
