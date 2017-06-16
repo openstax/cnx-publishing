@@ -2,7 +2,7 @@
 source = cnxpublishing
 omit =
     cnxpublishing/tests/*
-
+    cnxpublishing/celery.py
 
 [report]
 exclude_lines =
@@ -12,3 +12,4 @@ exclude_lines =
 omit =
     cnxpublishing/tests/*
     cnxpublishing/_version.py
+    cnxpublishing/celery.py
