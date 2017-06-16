@@ -8,6 +8,7 @@ IS_PY3 = sys.version_info > (3,)
 
 install_requires = (
     'beaker',
+    'celery[sqlalchemy]',
     'cnx-archive',
     'cnx-epub',
     'cnx-epub[collation]',

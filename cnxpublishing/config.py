@@ -69,8 +69,9 @@ def configure(settings):
     config.include('.session')
     config.include('.cache')
     config.include('.authnz')
+    config.include('.tasks')
 
-    config.scan(ignore='cnxpublishing.tests')
+    config.scan(ignore=['cnxpublishing.tests', 'cnxpublishing.celery'])
     return config
 
 

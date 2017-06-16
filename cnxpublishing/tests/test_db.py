@@ -83,6 +83,8 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
         from openstax_accounts.stub import main
         main(self.config)
 
+        self.config.include('..tasks')
+
     def tearDown(self):
         self._tear_down_database()
         testing.tearDown()
