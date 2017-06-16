@@ -14,12 +14,17 @@ from .db import (
     update_module_state,
     with_db_cursor,
 )
+from .tasks import task
 
 
 logger = logging.getLogger('cnxpublishing')
 
-CONTACT_SITE_ADMIN_MESSAGE = ("A system's error occured, please contact the "
-                              "site administrator for assistance.")
+
+@with_db_cursor
+def track_baking_proc_state(result, module_ident, cursor):
+    cursor.execute('INSERT INTO document_baking_result_associations '
+                   '(module_ident, result_id) VALUES (%s, %s)',
+                   (module_ident, result.id))
 
 
 @subscriber(events.PostPublicationEvent)
@@ -30,10 +35,22 @@ def post_publication_processing(event, cursor):
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
     update_module_state(cursor, module_ident, 'processing')
-    set_post_publications_state(cursor, module_ident, 'Processing')
     # Commit the state change before preceding.
     cursor.connection.commit()
 
+    # Start of task
+    # FIXME Looking up the task isn't the most clear usage here.
+    task_name = 'cnxpublishing.subscribers.baking_processor'
+    baking_processor = get_current_registry().celery_app.tasks[task_name]
+    result = baking_processor.delay(module_ident, ident_hash)
+
+    # Save the mapping between a celery task and this event.
+    track_baking_proc_state(result, module_ident, cursor)
+
+
+@task()
+@with_db_cursor
+def baking_processor(module_ident, ident_hash, cursor=None):
     try:
         binder = export_epub.factory(ident_hash)
     except:
@@ -41,14 +58,8 @@ def post_publication_processing(event, cursor):
                          'ident_hash={} module_ident={}'
                          .format(ident_hash, module_ident))
         # FIXME If the top module entry doesn't exist, this is going to fail.
-        try:
-            update_module_state(cursor, module_ident, 'errored')
-        except psycopg2.Error:  # pragma: no cover
-            pass
-        state_message = CONTACT_SITE_ADMIN_MESSAGE
-        set_post_publications_state(cursor, module_ident, 'Failed/Error',
-                                    state_message=state_message)
-        return
+        update_module_state(cursor, module_ident, 'errored')
+        raise
     finally:
         logger.debug('Finished exporting module_ident={} ident_hash={}'
                      .format(module_ident, ident_hash))
@@ -61,23 +72,20 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
     remove_baked(ident_hash, cursor=cursor)
 
     state = 'current'
-    pub_state = 'Done/Success'
     state_message = None
     try:
         bake(binder, publisher, message, cursor=cursor)
     except Exception as exc:
         state = 'errored'
-        pub_state = 'Failed/Error'
-        state_message = CONTACT_SITE_ADMIN_MESSAGE
         # TODO rollback to pre-removal of the baked content??
         logger.exception('Logging an uncaught exception during baking')
+        update_module_state(cursor, module_ident, state)
+        raise
     finally:
         logger.debug('Finished processing module_ident={} ident_hash={} '
                      'with a final state of \'{}\'.'
                      .format(module_ident, ident_hash, state))
         update_module_state(cursor, module_ident, state)
-        set_post_publications_state(cursor, module_ident, pub_state,
-                                    state_message=state_message)
 
 
 @subscriber(events.ChannelProcessingStartUpEvent)

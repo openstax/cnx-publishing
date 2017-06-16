@@ -5,7 +5,10 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+from __future__ import absolute_import
+
 import psycopg2
+from celery.result import AsyncResult
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
@@ -63,19 +66,27 @@ def admin_post_publications(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
 
+    states = []
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-       m.name, p.timestamp, p.state, p.state_message
-  FROM post_publications p NATURAL LEFT JOIN modules m
-  ORDER BY p.timestamp DESC LIMIT 500""")
-            states = [
-                {'ident_hash': result[0],
-                 'title': result[1],
-                 'timestamp': result[2],
-                 'state': result[3],
-                 'state_message': result[4],
-                 } for result in cursor.fetchall()]
+       m.name, bpsa.created, bpsa.result_id::text
+FROM document_baking_result_associations AS bpsa
+     INNER JOIN modules AS m USING (module_ident)
+ORDER BY bpsa.created DESC LIMIT 100""")
+            for row in cursor.fetchall():
+                message = ''
+                result_id = row[-1]
+                result = AsyncResult(id=result_id)
+                if result.failed():  # pragma: no cover
+                    message = result.traceback
+                states.append({
+                    'ident_hash': row[0],
+                    'title': row[1],
+                    'created': row[2],
+                    'state': result.state,
+                    'state_message': message,
+                })
 
     return {'states': states}
