@@ -246,14 +246,17 @@ def bake_content(request):
     """Invoke the baking process - trigger post-publication"""
     settings = request.registry.settings
     ident_hash = request.matchdict['ident_hash']
+    id, version = split_ident_hash(ident_hash)
+    if not version:
+        raise httpexceptions.HTTPBadRequest('must specify the version')
+
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT bool(portal_type = 'Collection')
 FROM modules
-WHERE
-  ident_hash(uuid, major_version, minor_version) = %s""",
-                           (ident_hash,))
+WHERE ident_hash(uuid, major_version, minor_version) = %s
+""", (ident_hash,))
             try:
                 is_binder = cursor.fetchone()[0]
             except TypeError:
@@ -262,14 +265,7 @@ WHERE
                 raise httpexceptions.HTTPBadRequest(
                     '{} is not a book'.format(ident_hash))
 
-            id, version = split_ident_hash(ident_hash)
-            if version:
-                cursor.execute("""\
+            cursor.execute("""\
 UPDATE modules SET stateid = 5
 WHERE ident_hash(uuid, major_version, minor_version) = %s
 """, (ident_hash,))
-            else:
-                cursor.execute("""\
-UPDATE modules SET stateid = 5 where module_ident in (select module_ident from
-latest_modules WHERE uuid = %s
-""", (id,))
