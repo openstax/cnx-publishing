@@ -1337,13 +1337,15 @@ WHERE username = %s""", (publisher,))
 
 
 class BakeContentTestCase(BaseFunctionalViewTestCase):
-    def app_post_collate_content(self, ident_hash, headers=None, status=None):
+    def app_post_collate_content(self, ident_hash, headers=None, status=None,
+                                 **kwargs):
         path = '/contents/{}/collate-content'.format(ident_hash)
-        return self.app.post(path, headers=headers, status=status)
+        return self.app.post(path, headers=headers, status=status, **kwargs)
 
-    def app_post_bake(self, ident_hash, headers=None, status=None):
+    def app_post_bake(self, ident_hash, headers=None, status=None,
+                      **kwargs):
         path = '/contents/{}/baked'.format(ident_hash)
-        return self.app.post(path, headers=headers, status=status)
+        return self.app.post(path, headers=headers, status=status, **kwargs)
 
     @db_connect
     def test_not_book(self, cursor):
@@ -1453,3 +1455,21 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
         cursor.connection.poll()
         cursor.connection.poll()
         self.assertEqual(2, len(cursor.connection.notifies))
+
+    @db_connect
+    def test_missing_version(self, cursor):
+        api_key_headers = self.gen_api_key_headers('some-trust')
+        binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
+        cursor.connection.commit()
+
+        content = '<p class="para">composite</p>'
+        publisher, message, composite_doc = self.make_one(binder, content)
+        collated_doc_content = '<p>collated</p>'
+
+        ident_hash = binder.ident_hash
+        ident_hash = ident_hash.split('@')[0]
+
+        resp = self.app_post_bake(ident_hash, headers=api_key_headers,
+                                  expect_errors=True)
+        self.assertEquals(resp.status_int, 400)
+        self.assertIn('must specify the version', resp.body)
