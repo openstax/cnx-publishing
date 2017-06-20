@@ -244,18 +244,24 @@ def post_accept_role(request):
              renderer='json', permission='publish')
 def bake_content(request):
     """Invoke the baking process - trigger post-publication"""
-    ident_hash = request.matchdict['ident_hash']
-    try:
-        binder = export_epub.factory(ident_hash)
-    except export_epub.NotFound:
-        raise httpexceptions.HTTPNotFound()
-    if not isinstance(binder, cnxepub.Binder):
-        raise httpexceptions.HTTPBadRequest(
-            '{} is not a book'.format(ident_hash))
     settings = request.registry.settings
+    ident_hash = request.matchdict['ident_hash']
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            remove_baked(binder.ident_hash, cursor=cursor)
+            cursor.execute("""\
+SELECT bool(portal_type = 'Collection')
+FROM modules
+WHERE
+  ident_hash(uuid, major_version, minor_version) = %s""",
+                           (ident_hash,))
+            try:
+                is_binder = cursor.fetchone()[0]
+            except TypeError:
+                raise httpexceptions.HTTPNotFound()
+            if not is_binder:
+                raise httpexceptions.HTTPBadRequest(
+                    '{} is not a book'.format(ident_hash))
+
             id, version = split_ident_hash(ident_hash)
             if version:
                 cursor.execute("""\
