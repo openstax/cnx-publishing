@@ -1473,3 +1473,12 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
                                   expect_errors=True)
         self.assertEquals(resp.status_int, 400)
         self.assertIn('must specify the version', resp.body)
+
+    @db_connect
+    def test_bad_ident_hash(self, cursor):
+        api_key_headers = self.gen_api_key_headers('some-trust')
+        ident_hash = 'f00ba7@1.1'
+
+        resp = self.app_post_bake(ident_hash, headers=api_key_headers,
+                                  expect_errors=True)
+        self.assertEquals(resp.status_int, 404)

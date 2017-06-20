@@ -5,9 +5,10 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-from cnxarchive.scripts import export_epub
 import cnxepub
 import psycopg2
+from cnxarchive.scripts import export_epub
+from cnxarchive.utils.ident_hash import IdentHashError
 from pyramid import httpexceptions
 from pyramid.settings import asbool
 from pyramid.view import view_config
@@ -246,7 +247,11 @@ def bake_content(request):
     """Invoke the baking process - trigger post-publication"""
     settings = request.registry.settings
     ident_hash = request.matchdict['ident_hash']
-    id, version = split_ident_hash(ident_hash)
+    try:
+        id, version = split_ident_hash(ident_hash)
+    except IdentHashError:
+        raise httpexceptions.HTTPNotFound()
+
     if not version:
         raise httpexceptions.HTTPBadRequest('must specify the version')
 
