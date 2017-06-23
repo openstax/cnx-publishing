@@ -5,6 +5,31 @@
 
    - feature message
 
+0.8.0
+-----
+
+- Raise not found on an invalid ident-hash
+- Require a specific version on rebake request
+- Remove needless epub building on rebake request
+- Add rough documentation for channel processing and the celery worker
+- Use a celery task for the baking process
+- Include celery in the app
+- Rewrite subscriber tests using pytest methods
+- Assign the most recent version at interp-time
+- Clear database on first test run
+- Add channel_processing.channels config setting to dev config
+- Use memcache the same way as archive
+- Remove unused imports
+- Move the cache manager to its own module
+- Rename file-upload-limit setting to file_upload_limit
+- Move configuration to the config module and sub includemes
+- Rename the main function to be more specific
+- Rewrite post-publication as a general purpose channel processing utility
+- Make bake function application aware
+- Use memcache server for exercises and math conversion
+- Rename collate terminology to baking terminology
+
+
 0.7.0
 -----
 
