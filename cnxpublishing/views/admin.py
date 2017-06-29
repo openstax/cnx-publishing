@@ -14,9 +14,15 @@ from celery.result import AsyncResult
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
+from cnxarchive.utils.ident_hash import IdentHashError
 from .. import config
 from .moderation import get_moderation
 from .api_keys import get_api_keys
+
+SORT_MAP = {"bpsa.created DESC": "newSort",
+            "bpsa.created ASC": "oldSort",
+            "STATE": "stateSort",
+            "m.name": "nameSort"}
 
 
 @view_config(route_name='admin-index', request_method='GET',
@@ -36,6 +42,9 @@ def admin_index(request):  # pragma: no cover
              },
             {'name': 'Message Banners',
              'uri': request.route_url('admin-add-site-messages'),
+             },
+            {'name': 'Content Status',
+             'uri': request.route_url('admin-content-status'),
              },
             ],
         }
@@ -271,3 +280,122 @@ def admin_edit_site_message_POST(request):
     args = admin_edit_site_message(request)
     args['response'] = "Message successfully Updated"
     return args
+
+
+def get_baking_statuses_sql(request):
+    args = {}
+
+    num_entries = request.GET.get('number', 100)
+    page = request.GET.get('page', 1)
+    start_entry = (int(page) - 1) * int(num_entries)
+    sort = request.GET.get('sort', 'bpsa.created DESC')
+    args[SORT_MAP[sort]] = "selected"
+    if sort == "STATE":
+        sort = 'bpsa.created DESC'
+    ident_hash_filter = request.GET.get('ident_hash', None)
+    author_filter = request.GET.get('author', None)
+
+    sql_filters = "WHERE"
+    if ident_hash_filter is not None:
+        args['ident_hash'] = ident_hash_filter
+        sql_filters += (" ident_hash(m.uuid, m.major_version, m.minor_version)"
+                        "='{}' AND ".format(ident_hash_filter))
+    if author_filter is not None:
+        sql_filters += "%(author)s=ANY(m.authors) "
+        args["author"] = author_filter
+
+    if sql_filters.endswith("AND "):
+        sql_filters = sql_filters[:-4]
+    if sql_filters == "WHERE":
+        sql_filters = ""
+
+    statement = """SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
+                       m.name, m.authors, bpsa.created, bpsa.result_id::text
+                FROM document_baking_result_associations AS bpsa
+                     INNER JOIN modules AS m USING (module_ident)
+                {}
+                ORDER BY {}
+                LIMIT %(num_entries)s OFFSET %(start_entry)s
+                """.format(sql_filters, sort)
+    args.update({'sort': sort,
+                 'start_entry': start_entry,
+                 'num_entries': num_entries,
+                 'page': page})
+    return statement, args
+
+
+@view_config(route_name='admin-content-status', request_method='GET',
+             renderer='cnxpublishing.views:templates/content-status.html',
+             permission='administer')
+def admin_content_status(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+
+    statement, args = get_baking_statuses_sql(request)
+    states = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute(statement, vars=args)
+            for row in cursor.fetchall():
+                message = ''
+                result_id = row[-1]
+                result = AsyncResult(id=result_id)
+                if result.failed():  # pragma: no cover
+                    message = result.traceback
+                states.append({
+                    'ident_hash': row[0],
+                    'title': row[1].decode('utf-8'),
+                    'authors': row[2],
+                    'created': row[3],
+                    'state': result.state,
+                    'state_message': message,
+                })
+    status_filters = request.GET.get('exculde_statuses', '').split(",")
+    all_statuses = set(["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"])
+    for f in (all_statuses - set(status_filters)):
+        args[f] = "checked"
+    final_states = []
+    for state in states:
+        if not(state['state'] in status_filters):
+            final_states.append(state)
+    sort = request.GET.get('sort', 'bpsa.created DESC')
+
+    if sort == "STATE":
+        sorted(final_states, key=lambda x: x['state'])
+
+    args.update({'states': final_states})
+    return args
+
+@view_config(route_name='admin-content-status-single', request_method='GET',
+             renderer='json',
+             permission='administer')
+def admin_content_status_single(request):
+    ident_hash = request.matchdict['ident_hash']
+
+    settings = request.registry.settings
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
+                               m.name, m.authors, bpsa.created, bpsa.result_id::text
+                        FROM document_baking_result_associations AS bpsa
+                             INNER JOIN modules AS m USING (module_ident)
+                        WHERE ident_hash(m.uuid, m.major_version, m.minor_version)=%s;
+                            """, vars=(ident_hash,))
+            modules = cursor.fetchall()
+            if len(modules) != 1:
+                raise httpexceptions.HTTPBadRequest(
+                    '{} is not a book'.format(ident_hash))
+            row = modules[0]
+            message = ''
+            result_id = row[-1]
+            result = AsyncResult(id=result_id)
+            if result.failed():  # pragma: no cover
+                message = result.traceback
+            return {
+                'ident_hash': row[0],
+                'title': row[1].decode('utf-8'),
+                'authors': row[2],
+                'created': str(row[3]),
+                'state': result.state,
+                'state_message': message,
+            }
