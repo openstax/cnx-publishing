@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Content Status</h1>
+
+  <p><b>Created:</b> {{created}}</p>
+  <p><b>Ident_hash:</b> {{ident_hash}}</p>
+  <p><b>Title:</b> {{title}}</p>
+  <p><b>Authors:</b> {{authors}}</p>
+  <p><b>State:</b> {{state}}</p>
+  <p><b>Message:</b><br><pre>{{state_message}}</pre></p>
+
+{% endblock %}

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Conent Status</h1>
+  <h1>Content Status</h1>
   <!-- should js go somewhere else? -->
   <script>
     function returnSubmit(e) {
       if (e.keyCode === 13) filterResults()
     }
 
-    function filterResults() {
+    function filterResults(sort="") {
       var link = "/a/content-status/?";
 
       var pageNum = document.getElementById('pageNum').value;
@@ -18,9 +18,19 @@
       var ident_hash = document.getElementById('ident_hash_filter').value;
       if (ident_hash != '') link += "ident_hash=" + ident_hash + "&";
 
-      var sort_element = document.getElementById('sort_order')
-      var sort = sort_element.options[sort_element.selectedIndex].value;
-      link += "sort=" + sort + "&";
+      // var sort_element = document.getElementById('sort_order')
+      // var sort = sort_element.options[sort_element.selectedIndex].value;
+      // link += "sort=" + sort + "&";
+      if (sort != "") {
+        // document.write(sort)
+        // document.write(window.location.href)
+        // document.write(window.location.href.includes("sort=bpsa.created%20DESC"))
+        if (window.location.href.includes("sort=" + sort + "%20ASC")) {
+              link += "sort=" + sort + " DESC&";
+        } else {
+          link += "sort=" + sort + " ASC&";
+        }
+      }
 
       var author_filter = document.getElementById('author_filter').value;
       if (author_filter != '') link += "author=" + author_filter + "&";
@@ -41,7 +51,7 @@
     }
   </script>
 
-  Filters:<br>
+  <b>Filters:</b><br>
   Status: <br>
     <label><input type="checkbox" class="status_filter" {{PENDING}} value="PENDING"> PENDING</label>&emsp;&emsp;&emsp;
     <label><input type="checkbox" class="status_filter" {{STARTED}} value="STARTED"> STARTED</label>&emsp;&emsp;&emsp;
@@ -51,40 +61,31 @@
   <br><br>Author:
     <textarea rows=1 cols=25 id="author_filter" onkeydown="returnSubmit(event)">{{author}}</textarea><br>
     </div>
-  <br>ident_hash:
+  ident_hash:
     <textarea rows=1 cols=50 id="ident_hash_filter" onkeydown="returnSubmit(event)">{{ident_hash}}</textarea><br>
   Entries Per Page:  <textarea rows=1 cols=5 id="numEntries">{{num_entries}}</textarea><br>
   Page:  <textarea rows=1 cols=5 id="pageNum">{{page}}</textarea><br>
-  <select id="sort_order">
-    <option value="bpsa.created DESC" {{newSort}}>newest first</option>
-    <option value="bpsa.created ASC" {{oldSort}}>oldest first</option>
-    <option value="STATE" {{stateSort}}>state</option>
-    <option value="m.name" {{nameSort}}>title</option>
-  </select>
   <br><br>
   <button type="button" onclick="filterResults()">Filter</button><br>
   <br><br><br>
 
   <table>
     <tr>
-      <th>Created</th>
+      <th onclick='filterResults("bpsa.created")'>* Created</th>
       <th>Ident_hash</th>
-      <th>Title</th>
-      <th>Author</th>
-      <th>State</th>
+      <th onclick='filterResults("m.name")'>* Title</th>
+      <th>Authors</th>
+      <th onclick='filterResults("STATE")'>* State</th>
       <th>Message</th>
     </tr>
     {% for state in states %}
       <tr>
         <td>{{ state.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>
-          <!-- make this a link to another view page with more info? -->
-          <a href="/a/content-status/{{ state.ident_hash }}">{{ state.ident_hash }}</a>
-        </td>
+        <td>{{ state.ident_hash }}</td>
         <td>{{ state.title }}</td>
         <td>{{ state.authors }}</td>
-        <td>{{ state.state }}</td>
-        <td><pre>{{ state.state_message }}</pre></td>
+        <td><a href="/a/content-status/{{ state.ident_hash }}">{{ state.state }}</a></td>
+        <td>{{ state.state_message }}</td>
       </tr>
     {% endfor %}
   </table>
