@@ -19,11 +19,6 @@ from .. import config
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
-SORT_MAP = {"bpsa.created DESC": "newSort",
-            "bpsa.created ASC": "oldSort",
-            "STATE": "stateSort",
-            "m.name": "nameSort"}
-
 
 @view_config(route_name='admin-index', request_method='GET',
              renderer="cnxpublishing.views:templates/index.html",
@@ -287,10 +282,19 @@ def get_baking_statuses_sql(request):
 
     num_entries = request.GET.get('number', 100)
     page = request.GET.get('page', 1)
-    start_entry = (int(page) - 1) * int(num_entries)
+    try:
+        start_entry = (int(page) - 1) * int(num_entries)
+    except ValueError:
+        raise httpexceptions.HTTPBadRequest(
+            'invalid page({}) or entries per page({})'.
+            format(page, num_entries))
     sort = request.GET.get('sort', 'bpsa.created DESC')
-    args[SORT_MAP[sort]] = "selected"
-    if sort == "STATE":
+    if (len(sort.split(" ")) != 2 or
+            sort.split(" ")[0] not in ['bpsa.created', 'STATE', 'm.name'] or
+            sort.split(" ")[1] not in ['ASC', 'DESC']):
+        raise httpexceptions.HTTPBadRequest(
+            'invalid sort: {}'.format(sort))
+    if sort == "STATE ASC" or sort == "STATE DESC":
         sort = 'bpsa.created DESC'
     ident_hash_filter = request.GET.get('ident_hash', None)
     author_filter = request.GET.get('author', None)
@@ -341,7 +345,8 @@ def admin_content_status(request):
                 result_id = row[-1]
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
-                    message = result.traceback
+                    # message = result.traceback
+                    message = result.traceback.split("\n")[-2]
                 states.append({
                     'ident_hash': row[0],
                     'title': row[1].decode('utf-8'),
@@ -360,14 +365,17 @@ def admin_content_status(request):
             final_states.append(state)
     sort = request.GET.get('sort', 'bpsa.created DESC')
 
-    if sort == "STATE":
+    if sort == "STATE ASC":
         sorted(final_states, key=lambda x: x['state'])
+    if sort == "STATE DESC":
+        sorted(final_states, key=lambda x: x['state'], reverse=True)
 
     args.update({'states': final_states})
     return args
 
+
 @view_config(route_name='admin-content-status-single', request_method='GET',
-             renderer='json',
+             renderer='templates/content-status-single.html',
              permission='administer')
 def admin_content_status_single(request):
     ident_hash = request.matchdict['ident_hash']
@@ -375,12 +383,13 @@ def admin_content_status_single(request):
     settings = request.registry.settings
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute("""SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-                               m.name, m.authors, bpsa.created, bpsa.result_id::text
-                        FROM document_baking_result_associations AS bpsa
-                             INNER JOIN modules AS m USING (module_ident)
-                        WHERE ident_hash(m.uuid, m.major_version, m.minor_version)=%s;
-                            """, vars=(ident_hash,))
+            cursor.execute("""
+                SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
+                       m.name, m.authors, bpsa.created, bpsa.result_id::text
+                FROM document_baking_result_associations AS bpsa
+                     INNER JOIN modules AS m USING (module_ident)
+                WHERE ident_hash(m.uuid, m.major_version, m.minor_version)=%s;
+                    """, vars=(ident_hash,))
             modules = cursor.fetchall()
             if len(modules) != 1:
                 raise httpexceptions.HTTPBadRequest(
