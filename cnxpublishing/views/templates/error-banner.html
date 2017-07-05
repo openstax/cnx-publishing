@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Create an error banner</h1>
+
+<form id="banner_form" method="GET">
+  Message:
+  <input type="text" name="message" required><br>
+  <br><br>
+
+  Priority
+  <select name="priority">
+    <option value="1">Very Low Priority</option>
+    <option value="2">Somewhat Low priority</option>
+    <option value="3">Somewhat High Priotiry</option>
+    <option value="4">Very High Priority</option>
+  </select>
+  <br><br>
+
+  Start date:
+  <input type="date" name="start_date" value="2001-03-03 -- today">
+  <input type="time" name="start_time">
+  <br><br>
+  End Date:
+  <input type="date" name="end_date" value="today + 5 hrs?">
+  <input type="time" name="end_time">
+  <br><br>
+
+  <input type="submit" value="Submit">
+</form>
+
+<div id = response></div>
+
+{% endblock %}
