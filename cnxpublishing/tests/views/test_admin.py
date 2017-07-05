@@ -287,6 +287,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'page': 1,
             'num_entries': 100,
             'sort': 'bpsa.created DESC',
+            'sort_created': 'fa fa-angle-down',
             'states': content['states']
         }, content)
         self.assertEqual(len(content['states']), 2)
@@ -313,6 +314,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'num_entries': 2,
             'author': 'charrose',
             'sort': 'STATE ASC',
+            'sort_state': 'fa fa-angle-up',
             'states': content['states']
         }, content)
         self.assertEqual(len(content['states']), 2)
