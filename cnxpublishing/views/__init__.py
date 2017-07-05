@@ -45,6 +45,7 @@ def declare_browsable_routes(config):
     add_route('admin-moderation', '/a/moderation/')
     add_route('admin-api-keys', '/a/api-keys/')
     add_route('admin-post-publications', '/a/post-publications/')
+    add_route('admin-add-error-banner', '/a/error-banner/')
 
 
 def includeme(config):
