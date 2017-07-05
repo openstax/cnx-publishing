@@ -387,14 +387,14 @@ def admin_content_status(request):
         if not(state['state'] in status_filters):
             final_states.append(state)
     sort = request.GET.get('sort', 'bpsa.created DESC')
-
+    args['sort'] = sort
     if sort == "STATE ASC":
-        sorted(final_states, key=lambda x: x['state'])
+        final_states = sorted(final_states, key=lambda x: x['state'])
     if sort == "STATE DESC":
-        sorted(final_states, key=lambda x: x['state'], reverse=True)
+        final_states = sorted(final_states,
+                              key=lambda x: x['state'], reverse=True)
 
     args.update({'states': final_states})
-    print(args)
     return args
 
 
@@ -415,7 +415,7 @@ def admin_content_status_single(request):
                 WHERE ident_hash(m.uuid, m.major_version, m.minor_version)=%s;
                     """, vars=(ident_hash,))
             modules = cursor.fetchall()
-            if len(modules) != 1:
+            if len(modules) == 0:
                 raise httpexceptions.HTTPBadRequest(
                     '{} is not a book'.format(ident_hash))
             row = modules[0]
