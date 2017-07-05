@@ -19,6 +19,18 @@ from .. import config
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
+STATE_ICONS = {
+    "SUCCESS": {'class': 'fa fa-check-square',
+                'style': 'font-size:20px;color:limeGreen'},
+    "STARTED": {'class': 'fa fa-exclamation-triangle',
+                'style': 'font-size:20px;color:gold'},
+    "PENDING": {'class': 'fa fa-exclamation-triangle',
+                'style': 'font-size:20px;color:gold'},
+    "RETRY": {'class': 'a fa-close',
+              'style': 'font-size:20px;color:red'},
+    "FAILURE": {'class': 'fa fa-close',
+                'style': 'font-size:20px;color:red'}}
+
 
 @view_config(route_name='admin-index', request_method='GET',
              renderer="cnxpublishing.views:templates/index.html",
@@ -328,6 +340,15 @@ def get_baking_statuses_sql(request):
     return statement, args
 
 
+def format_autors(authors):
+    if len(authors) == 0:
+        return ""
+    return_str = ""
+    for author in authors:
+        return_str += author.decode('utf-8') + ", "
+    return return_str[:-2]
+
+
 @view_config(route_name='admin-content-status', request_method='GET',
              renderer='cnxpublishing.views:templates/content-status.html',
              permission='administer')
@@ -350,10 +371,12 @@ def admin_content_status(request):
                 states.append({
                     'ident_hash': row[0],
                     'title': row[1].decode('utf-8'),
-                    'authors': row[2],
+                    'authors': format_autors(row[2]),
                     'created': row[3],
                     'state': result.state,
                     'state_message': message,
+                    'state_icon': STATE_ICONS[result.state]['class'],
+                    'state_icon_style': STATE_ICONS[result.state]['style']
                 })
     status_filters = request.GET.get('exculde_statuses', '').split(",")
     all_statuses = set(["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"])
@@ -371,6 +394,7 @@ def admin_content_status(request):
         sorted(final_states, key=lambda x: x['state'], reverse=True)
 
     args.update({'states': final_states})
+    print(args)
     return args
 
 
@@ -403,7 +427,7 @@ def admin_content_status_single(request):
             return {
                 'ident_hash': row[0],
                 'title': row[1].decode('utf-8'),
-                'authors': row[2],
+                'authors': format_autors(row[2]),
                 'created': str(row[3]),
                 'state': result.state,
                 'state_message': message,

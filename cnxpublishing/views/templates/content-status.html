@@ -53,14 +53,28 @@
 
   <b>Filters:</b><br>
   Status: <br>
-    <label><input type="checkbox" class="status_filter" {{PENDING}} value="PENDING"> PENDING</label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{STARTED}} value="STARTED"> STARTED</label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{RETRY}} value="RETRY"> RETRY</label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{FAILURE}} value="FAILURE"> FAILURE</label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{SUCCESS}} value="SUCCESS"> SUCCESS</label>
+    <label><input type="checkbox" class="status_filter" {{PENDING}} value="PENDING">
+      PENDING
+      (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+    </label>&emsp;&emsp;&emsp;
+    <label><input type="checkbox" class="status_filter" {{STARTED}} value="STARTED">
+      STARTED
+      (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+    </label>&emsp;&emsp;&emsp;
+    <label><input type="checkbox" class="status_filter" {{RETRY}} value="RETRY">
+      RETRY
+      (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+    </label>&emsp;&emsp;&emsp;
+    <label><input type="checkbox" class="status_filter" {{FAILURE}} value="FAILURE">
+      FAILURE
+      (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+    </label>&emsp;&emsp;&emsp;
+    <label><input type="checkbox" class="status_filter" {{SUCCESS}} value="SUCCESS">
+      SUCCESS
+      (<i class="fa fa-check-square" style="font-size:20px;color:limeGreen"></i>)
+    </label>
   <br><br>Author:
     <textarea rows=1 cols=25 id="author_filter" onkeydown="returnSubmit(event)">{{author}}</textarea><br>
-    </div>
   ident_hash:
     <textarea rows=1 cols=50 id="ident_hash_filter" onkeydown="returnSubmit(event)">{{ident_hash}}</textarea><br>
   Entries Per Page:  <textarea rows=1 cols=5 id="numEntries">{{num_entries}}</textarea><br>
@@ -84,7 +98,10 @@
         <td>{{ state.ident_hash }}</td>
         <td>{{ state.title }}</td>
         <td>{{ state.authors }}</td>
-        <td><a href="/a/content-status/{{ state.ident_hash }}">{{ state.state }}</a></td>
+        <td>
+          <i class="{{state.state_icon}}" style="{{state.state_icon_style}}"></i>
+          <a href="/a/content-status/{{ state.ident_hash }}">{{ state.state }}</a>
+        </td>
         <td>{{ state.state_message }}</td>
       </tr>
     {% endfor %}
