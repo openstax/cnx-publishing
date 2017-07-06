@@ -1,25 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>Content Status</h1>
-
-  <script>
-    function sortBooks(col) {
-      var new_link = "";
-      var current_url = window.location.href;
-      if (current_url.includes("sort=")) {
-        new_sort = current_url.includes("sort=" + col + "%20ASC")
-              ? "sort=" + col + " DESC"
-              : "sort=" + col + " ASC";
-        new_link = current_url.replace(/sort=[^&]*/, new_sort);
-      } else if (current_url.includes("/?")) { // no sort filter
-        new_link = current_url + "&sort=" + col + " ASC";
-      } else {  // no filters of any kind
-        new_link = current_url + "?sort=" + col + " ASC";
-      }
-      window.location.href = new_link;
-    }
-  </script>
-
   <form action="/a/content-status/" method="get">
     <b>Filters:</b><br>
     Status: <br>
@@ -78,4 +59,21 @@
       </tr>
     {% endfor %}
   </table>
+{% endblock %}
+{% block script %}
+  function sortBooks(col) {
+    var new_link = "";
+    var current_url = window.location.href;
+    if (current_url.includes("sort=")) {
+      new_sort = current_url.includes("sort=" + col + "%20ASC")
+            ? "sort=" + col + " DESC"
+            : "sort=" + col + " ASC";
+      new_link = current_url.replace(/sort=[^&]*/, new_sort);
+    } else if (current_url.includes("/?")) { // no sort filter
+      new_link = current_url + "&sort=" + col + " ASC";
+    } else {  // no filters of any kind
+      new_link = current_url + "?sort=" + col + " ASC";
+    }
+    window.location.href = new_link;
+  }
 {% endblock %}
