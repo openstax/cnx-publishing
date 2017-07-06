@@ -2,6 +2,24 @@
 {% block content %}
   <h1>Content Status</h1>
 
+  <script>
+    function sortBooks(col) {
+      var new_link = "";
+      var current_url = window.location.href;
+      if (current_url.includes("sort=")) {
+        new_sort = current_url.includes("sort=" + col + "%20ASC")
+              ? "sort=" + col + " DESC"
+              : "sort=" + col + " ASC";
+        new_link = current_url.replace(/sort=[^&]*/, new_sort);
+      } else if (current_url.includes("/?")) { // no sort filter
+        new_link = current_url + "&sort=" + col + " ASC";
+      } else {  // no filters of any kind
+        new_link = current_url + "?sort=" + col + " ASC";
+      }
+      window.location.href = new_link;
+    }
+  </script>
+
   <form action="/a/content-status/" method="get">
     <b>Filters:</b><br>
     Status: <br>
@@ -31,13 +49,6 @@
       <input type="text" name="ident_hash" value={{ident_hash}}><br>
     Entries Per Page:  <input type="number" min="1" name="number" value={{num_entries}}><br>
     Page:  <input type="number" min="1" name="page" value={{page}}><br>
-    Sort Order?
-    <select name="sort">
-      <option value="bpsa.created DESC" {{newSort}}>newest first</option>
-      <option value="bpsa.created ASC" {{oldSort}}>oldest first</option>
-      <option value="STATE" {{stateSort}}>state</option>
-      <option value="m.name" {{nameSort}}>title</option>
-    </select>
     <br><br>
     <input type="submit" value="Filter"><br>
   </form>
@@ -46,11 +57,11 @@
 
   <table>
     <tr>
-      <th>Created</th>
+      <th onclick='sortBooks("bpsa.created")'>Created<i class="{{sort_created}}"></i></th>
       <th>Ident_hash</th>
-      <th>Title</th>
+      <th onclick='sortBooks("m.name")'>Title<i class="{{sort_name}}"></i></th>
       <th>Authors</th>
-      <th>State</th>
+      <th onclick='sortBooks("STATE")'>State<i class="{{sort_state}}"></i></th>
       <th>Message</th>
     </tr>
     {% for state in states %}
