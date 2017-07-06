@@ -1,95 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>Content Status</h1>
-  <!-- should js go somewhere else? -->
-  <script>
-    function returnSubmit(e) {
-      if (e.keyCode === 13) filterResults()
-    }
 
-    function filterResults(sort="") {
-      var link = "/a/content-status/?";
+  <form action="/a/content-status/" method="get">
+    <b>Filters:</b><br>
+    Status: <br>
+      <label><input type="checkbox" name="status_filter[]" {{PENDING}} value="PENDING">
+        PENDING
+        (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="status_filter[]" {{STARTED}} value="STARTED">
+        STARTED
+        (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="status_filter[]" {{RETRY}} value="RETRY">
+        RETRY
+        (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="status_filter[]" {{FAILURE}} value="FAILURE">
+        FAILURE
+        (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="status_filter[]" {{SUCCESS}} value="SUCCESS">
+        SUCCESS
+        (<i class="fa fa-check-square" style="font-size:20px;color:limeGreen"></i>)
+      </label>
+    <br><br>Author:
+      <input type="text" name="author" value={{author}}><br>
+    ident_hash:
+      <input type="text" name="ident_hash" value={{ident_hash}}><br>
+    Entries Per Page:  <input type="number" min="1" name="number" value={{num_entries}}><br>
+    Page:  <input type="number" min="1" name="page" value={{page}}><br>
+    Sort Order?
+    <select name="sort">
+      <option value="bpsa.created DESC" {{newSort}}>newest first</option>
+      <option value="bpsa.created ASC" {{oldSort}}>oldest first</option>
+      <option value="STATE" {{stateSort}}>state</option>
+      <option value="m.name" {{nameSort}}>title</option>
+    </select>
+    <br><br>
+    <input type="submit" value="Filter"><br>
+  </form>
 
-      var pageNum = document.getElementById('pageNum').value;
-      var numEntries = document.getElementById('numEntries').value;
-      if (pageNum != '') link += "page=" + pageNum + "&";
-      if (numEntries != '') link += "number=" + numEntries + "&";
-
-      var ident_hash = document.getElementById('ident_hash_filter').value;
-      if (ident_hash != '') link += "ident_hash=" + ident_hash + "&";
-
-      // var sort_element = document.getElementById('sort_order')
-      // var sort = sort_element.options[sort_element.selectedIndex].value;
-      // link += "sort=" + sort + "&";
-      if (sort != "") {
-        // document.write(sort)
-        // document.write(window.location.href)
-        // document.write(window.location.href.includes("sort=bpsa.created%20DESC"))
-        if (window.location.href.includes("sort=" + sort + "%20ASC")) {
-              link += "sort=" + sort + " DESC&";
-        } else {
-          link += "sort=" + sort + " ASC&";
-        }
-      }
-
-      var author_filter = document.getElementById('author_filter').value;
-      if (author_filter != '') link += "author=" + author_filter + "&";
-
-      var authors = document.getElementById("author_filter")
-      for(var i = 0; i < authors.length; i++) {
-        if (authors[i].value != '') link += "author" + i + "=" + authors[i].value + "&";
-      }
-
-      var statuses = document.getElementsByClassName("status_filter")
-      var excluded = []
-      for(var i = 0; i < statuses.length; i++) {
-        if (! statuses[i].checked) excluded.push(statuses[i].value);
-      }
-      if (excluded.length > 0) link += "exculde_statuses=" + excluded.join(",")
-
-      window.location.href = link;
-    }
-  </script>
-
-  <b>Filters:</b><br>
-  Status: <br>
-    <label><input type="checkbox" class="status_filter" {{PENDING}} value="PENDING">
-      PENDING
-      (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
-    </label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{STARTED}} value="STARTED">
-      STARTED
-      (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
-    </label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{RETRY}} value="RETRY">
-      RETRY
-      (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
-    </label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{FAILURE}} value="FAILURE">
-      FAILURE
-      (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
-    </label>&emsp;&emsp;&emsp;
-    <label><input type="checkbox" class="status_filter" {{SUCCESS}} value="SUCCESS">
-      SUCCESS
-      (<i class="fa fa-check-square" style="font-size:20px;color:limeGreen"></i>)
-    </label>
-  <br><br>Author:
-    <textarea rows=1 cols=25 id="author_filter" onkeydown="returnSubmit(event)">{{author}}</textarea><br>
-  ident_hash:
-    <textarea rows=1 cols=50 id="ident_hash_filter" onkeydown="returnSubmit(event)">{{ident_hash}}</textarea><br>
-  Entries Per Page:  <textarea rows=1 cols=5 id="numEntries">{{num_entries}}</textarea><br>
-  Page:  <textarea rows=1 cols=5 id="pageNum">{{page}}</textarea><br>
-  <br><br>
-  <button type="button" onclick="filterResults()">Filter</button><br>
   <br><br><br>
 
   <table>
     <tr>
-      <th onclick='filterResults("bpsa.created")'>Created<i class="{{sort_created}}"></i></th>
+      <th>Created</th>
       <th>Ident_hash</th>
-      <th onclick='filterResults("m.name")'>Title<i class="{{sort_name}}"></i></th>
+      <th>Title</th>
       <th>Authors</th>
-      <th onclick='filterResults("STATE")'>State<i class="{{sort_state}}"></i></th>
+      <th>State</th>
       <th>Message</th>
     </tr>
     {% for state in states %}

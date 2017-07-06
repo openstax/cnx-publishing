@@ -31,12 +31,10 @@ STATE_ICONS = {
     "FAILURE": {'class': 'fa fa-close',
                 'style': 'font-size:20px;color:red'}}
 SORTS_DICT = {
-    "bpsa.created": 'created',
-    "m.name": 'name',
-    "STATE": 'state'}
-ARROW_MATCH = {
-    "ASC": 'fa fa-angle-up',
-    "DESC": 'fa fa-angle-down'}
+    "bpsa.created DESC": 'newSort',
+    "bpsa.created ASC": 'oldSort',
+    "m.name": 'nameSort',
+    "STATE": 'stateSort'}
 
 
 @view_config(route_name='admin-index', request_method='GET',
@@ -308,22 +306,22 @@ def get_baking_statuses_sql(request):
             'invalid page({}) or entries per page({})'.
             format(page, num_entries))
     sort = request.GET.get('sort', 'bpsa.created DESC')
-    if (len(sort.split(" ")) != 2 or
-            sort.split(" ")[0] not in SORTS_DICT.keys() or
-            sort.split(" ")[1] not in ARROW_MATCH.keys()):
+    if sort not in SORTS_DICT.keys():
         raise httpexceptions.HTTPBadRequest(
-            'invalid sort: {}'.format(sort))
-    if sort == "STATE ASC" or sort == "STATE DESC":
+            'invalid sort({})'.format(sort))
+    args[SORTS_DICT[sort]] = 'selected'
+    if sort == "STATE":
         sort = 'bpsa.created DESC'
-    ident_hash_filter = request.GET.get('ident_hash', None)
-    author_filter = request.GET.get('author', None)
+    ident_hash_filter = request.GET.get('ident_hash', '')
+    author_filter = request.GET.get('author', '')
 
     sql_filters = "WHERE"
-    if ident_hash_filter is not None:
+    if ident_hash_filter != '':
         args['ident_hash'] = ident_hash_filter
         sql_filters += (" ident_hash(m.uuid, m.major_version, m.minor_version)"
-                        "='{}' AND ".format(ident_hash_filter))
-    if author_filter is not None:
+                        "=%(ident_hash)s AND ")
+    if author_filter != '':
+        author_filter = author_filter.decode('utf-8')
         sql_filters += "%(author)s=ANY(m.authors) "
         args["author"] = author_filter
 
@@ -362,7 +360,6 @@ def format_autors(authors):
 def admin_content_status(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
-
     statement, args = get_baking_statuses_sql(request)
     states = []
     with psycopg2.connect(db_conn_str) as db_conn:
@@ -373,7 +370,6 @@ def admin_content_status(request):
                 result_id = row[-1]
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
-                    # message = result.traceback
                     message = result.traceback.split("\n")[-2]
                 states.append({
                     'ident_hash': row[0],
@@ -385,23 +381,18 @@ def admin_content_status(request):
                     'state_icon': STATE_ICONS[result.state]['class'],
                     'state_icon_style': STATE_ICONS[result.state]['style']
                 })
-    status_filters = request.GET.get('exculde_statuses', '').split(",")
-    all_statuses = set(["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"])
-    for f in (all_statuses - set(status_filters)):
+    status_filters = request.GET.get('status_filter', [])
+    if status_filters == []:
+        status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
+    for f in (status_filters):
         args[f] = "checked"
     final_states = []
     for state in states:
-        if not(state['state'] in status_filters):
+        if state['state'] in status_filters:
             final_states.append(state)
     sort = request.GET.get('sort', 'bpsa.created DESC')
-    sort_match = SORTS_DICT[sort.split(' ')[0]]
-    args['sort_' + sort_match] = ARROW_MATCH[sort.split(' ')[1]]
-    args['sort'] = sort
-    if sort == "STATE ASC":
+    if sort == "STATE":
         final_states = sorted(final_states, key=lambda x: x['state'])
-    if sort == "STATE DESC":
-        final_states = sorted(final_states,
-                              key=lambda x: x['state'], reverse=True)
 
     args.update({'states': final_states})
     return args

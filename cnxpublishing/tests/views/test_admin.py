@@ -274,7 +274,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
     def test_admin_content_status_no_filters(self):
         request = testing.DummyRequest()
-
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
@@ -287,7 +286,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'page': 1,
             'num_entries': 100,
             'sort': 'bpsa.created DESC',
-            'sort_created': 'fa fa-angle-down',
+            'newSort': 'selected',
             'states': content['states']
         }, content)
         self.assertEqual(len(content['states']), 2)
@@ -300,9 +299,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         request.GET = {'page': 1,
                        'number': 2,
-                       'sort': 'STATE ASC',
+                       'sort': 'STATE',
                        'author': 'charrose',
-                       'exculde_statuses': 'SUCCESS,STARTED'}
+                       'status_filter': ['FAILURE', 'RETRY', 'PENDING']}
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
@@ -313,8 +312,8 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'page': 1,
             'num_entries': 2,
             'author': 'charrose',
-            'sort': 'STATE ASC',
-            'sort_state': 'fa fa-angle-up',
+            'sort': 'bpsa.created DESC',
+            'stateSort': 'selected',
             'states': content['states']
         }, content)
         self.assertEqual(len(content['states']), 2)
