@@ -112,7 +112,6 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        # self.config.include('cnxpublishing.tasks')
         init_db(self.db_conn_str, True)
 
     def tearDown(self):
