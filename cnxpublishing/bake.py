@@ -51,13 +51,13 @@ def _formatter_callback_factory():  # pragma: no cover
 
 
 @with_db_cursor
-def bake(binder, publisher, message, cursor):
+def bake(binder, recipe, publisher, message, cursor):
     """Given a `Binder` as `binder`, bake the contents and
     persist those changes alongside the published content.
 
     """
     includes = _formatter_callback_factory()
-    binder = collate_models(binder, ruleset="ruleset.css", includes=includes)
+    binder = collate_models(binder, ruleset=recipe, includes=includes)
 
     def flatten_filter(model):
         return (isinstance(model, cnxepub.CompositeDocument) or
