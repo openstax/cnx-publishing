@@ -6,6 +6,7 @@
 # See LICENCE.txt for details.
 # ###
 import unittest
+from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
@@ -112,13 +113,53 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
-        init_db(self.db_conn_str, True)
+        # init_db(self.db_conn_str, True)
 
     def tearDown(self):
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("DROP SCHEMA public CASCADE")
-                cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
-    def test_error_banner(self):
+    def test_error_banner_get(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_post_error_banner
+        defaults = admin_post_error_banner(request)
+        self.assertEqual(set(defaults.keys()),
+                         set(['start_date', 'start_time',
+                              'end_date', 'end_time']))
+
+    def test_error_banner_post(self):
+        request = testing.DummyRequest()
+        request.POST = {
+            'message': 'test message',
+            'priority': 1,
+            'start_date': '2017-01-01',
+            'start_time': '00:01',
+            'end_date': '2017-01-02',
+            'end_time': '00:02',
+        }
+        from ...views.admin import admin_post_error_banner_POST
+        results = admin_post_error_banner_POST(request)
+
+        # assert the error message has been added to the table
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""SELECT message, priority, starts, ends
+                                  from service_state_messages
+                                  WHERE message='test message';""")
+                result = cursor.fetchone()
+                self.assertEqual('test message', result[0])
+                self.assertEqual(1, result[1])
+                self.assertTrue(datetime.strftime(
+                    result[2], "%Y-%m-%d %H:%M") == '2017-01-01 00:01')
+                self.assertTrue(datetime.strftime(
+                    result[3], "%Y-%m-%d %H:%M") == '2017-01-02 00:02')
+                cursor.execute("""DELETE from service_state_messages
+                                  WHERE message='test message';""")
+
+        # Assert the correct variables were passed to the template
+        self.assertEqual('test message', results['message'])
+        self.assertEqual(1, results['priority'])
+        self.assertTrue(datetime.strftime(
+            results['starts'], "%Y-%m-%d %H:%M") == '2017-01-01 00:01')
+        self.assertTrue(datetime.strftime(
+            results['ends'], "%Y-%m-%d %H:%M") == '2017-01-02 00:02')
