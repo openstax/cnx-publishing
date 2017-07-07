@@ -1415,8 +1415,8 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
 
         with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = _collate
-
-            bake(binder, publisher, message, cursor=cursor)
+            fake_recipe = 'div::after {cotents: "test"}'
+            bake(binder, publisher, fake_recipe, message, cursor=cursor)
             self.assertEqual(1, mock_collate.call_count)
 
         # Ensure the tree as been stamped.

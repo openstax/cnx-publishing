@@ -72,9 +72,11 @@ WHERE
             binder_model.append(composite_section)
             return binder_model
 
+        fake_recipe = 'div::after { content: "test" }'
+
         with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = cnxepub_collate
-            errors = self.target(binder, publisher, msg)
+            errors = self.target(binder, fake_recipe, publisher, msg)
 
         # Ensure the output of the errors.
         self.assertEqual(errors, [])
@@ -160,7 +162,8 @@ WHERE
         with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = cnxepub_collate
             from cnxpublishing.bake import bake
-            errors = bake(binder, publisher, msg, cursor=cursor)
+            fake_recipe = 'div::after { content: "test" }'
+            errors = bake(binder, fake_recipe, publisher, msg, cursor=cursor)
 
         self.ident_hash = binder.ident_hash
         self.composite_ident_hash = composite_doc.ident_hash

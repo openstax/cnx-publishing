@@ -323,7 +323,7 @@ def _validate_derived_from(cursor, model):
                                          original_exception=exc)
     # Is the ident-hash a valid pointer?
     args = [uuid_]
-    table = 'latest_modules'
+    table = 'modules'
     version_condition = ''
     if version != (None, None,):
         args.extend(version)
@@ -759,7 +759,7 @@ def is_revision_publication(publication_id, cursor):
     existing piece of content.
     """
     cursor.execute("""\
-SELECT 't'::boolean FROM latest_modules
+SELECT 't'::boolean FROM modules
 WHERE uuid IN (SELECT uuid
                FROM pending_documents
                WHERE publication_id = %s)
@@ -1425,13 +1425,13 @@ INSERT INTO post_publications
   VALUES (%s, %s, %s)""", (module_ident, state_name, state_message))
 
 
-def update_module_state(cursor, module_ident, state_name):  # pragma: no cover
+def update_module_state(cursor, module_ident, state_name, recipe):  # pragma: no cover
     """This updates the module's state in the database."""
     cursor.execute("""\
 UPDATE modules
 SET stateid = (
     SELECT stateid FROM modulestates WHERE statename = %s
-) WHERE module_ident = %s""", (state_name, module_ident))
+), recipe = %s WHERE module_ident = %s""", (state_name, recipe, module_ident))
 
 
 __all__ = (

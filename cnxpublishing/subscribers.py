@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import psycopg2
 from cnxarchive.scripts import export_epub
 from pyramid.events import subscriber
 from pyramid.threadlocal import get_current_registry
@@ -10,7 +9,6 @@ from pyramid.threadlocal import get_current_registry
 from . import events
 from .bake import remove_baked, bake
 from .db import (
-    set_post_publications_state,
     update_module_state,
     with_db_cursor,
 )
@@ -34,7 +32,7 @@ def post_publication_processing(event, cursor):
     module_ident, ident_hash = event.module_ident, event.ident_hash
     logger.debug('Processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
-    update_module_state(cursor, module_ident, 'processing')
+    update_module_state(cursor, module_ident, 'processing', None)
     # Commit the state change before preceding.
     cursor.connection.commit()
 
@@ -48,17 +46,41 @@ def post_publication_processing(event, cursor):
     track_baking_proc_state(result, module_ident, cursor)
 
 
+def _get_recipes(module_ident, cursor):
+    """Returns a tuple of length 2 of primary and fallback recipes.
+
+    The primary will be based on the print_style of the book. The fallback
+    is the recipe used for last successful bake of this book, if different
+    than the primary. Either value or both values may be None"""
+    cursor.execute("""select coalesce(psf.fileid,mf.fileid),
+                         CASE
+                           WHEN lm.recipe != coalesce(psf.fileid,mf.fileid,0)
+                             THEN lm.recipe
+                             ELSE NULL
+                         END
+                      FROM modules m LEFT JOIN print_style_recipes psf
+                                         ON m.print_style = psf.print_style
+                                     LEFT JOIN module_files mf
+                                         ON m.module_ident = mf.module_ident
+                                         AND m.print_style = mf.filename
+                                     LEFT JOIN latest_modules lm
+                                         ON m.uuid = lm.uuid
+                      WHERE m.module_ident = %s""", (module_ident,))
+    return cursor.fetchone()
+
+
 @task()
 @with_db_cursor
 def baking_processor(module_ident, ident_hash, cursor=None):
+
     try:
         binder = export_epub.factory(ident_hash)
     except:
         logger.exception('Logging an uncaught exception during baking'
                          'ident_hash={} module_ident={}'
                          .format(ident_hash, module_ident))
-        # FIXME If the top module entry doesn't exist, this is going to fail.
-        update_module_state(cursor, module_ident, 'errored')
+        # FIXME If the top module doesn't exist, this is going to fail.
+        update_module_state(cursor, module_ident, 'errored', None)
         raise
     finally:
         logger.debug('Finished exporting module_ident={} ident_hash={}'
@@ -71,21 +93,29 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
     publisher, message = cursor.fetchone()
     remove_baked(ident_hash, cursor=cursor)
 
+    recipes = _get_recipes(module_ident, cursor)
+
     state = 'current'
-    state_message = None
-    try:
-        bake(binder, publisher, message, cursor=cursor)
-    except Exception as exc:
-        state = 'errored'
-        # TODO rollback to pre-removal of the baked content??
-        logger.exception('Logging an uncaught exception during baking')
-        update_module_state(cursor, module_ident, state)
-        raise
-    finally:
-        logger.debug('Finished processing module_ident={} ident_hash={} '
-                     'with a final state of \'{}\'.'
-                     .format(module_ident, ident_hash, state))
-        update_module_state(cursor, module_ident, state)
+    for recipe in recipes:
+        try:
+            bake(binder, recipe, publisher, message, cursor=cursor)
+        except Exception as exc:
+            if state == 'current' and recipes[1] is not None:
+                state = 'fallback'
+                continue
+            else:
+                state = 'errored'
+                # TODO rollback to pre-removal of the baked content??
+                cursor.connection.rollback()
+                logger.exception('Uncaught exception during baking')
+                update_module_state(cursor, module_ident, state, recipe)
+                raise
+        finally:
+            logger.debug('Finished module_ident={} ident_hash={} '
+                         'with a final state of \'{}\'.'
+                         .format(module_ident, ident_hash, state))
+            update_module_state(cursor, module_ident, state, recipe)
+            break
 
 
 @subscriber(events.ChannelProcessingStartUpEvent)
