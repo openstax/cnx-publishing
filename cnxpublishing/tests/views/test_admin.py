@@ -112,7 +112,7 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        self.config.include('cnxpublishing.tasks')
+        # self.config.include('cnxpublishing.tasks')
         init_db(self.db_conn_str, True)
 
     def tearDown(self):
@@ -122,7 +122,6 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
-    @unittest.skip("celery is too global")
     def test_error_banner_get(self):
         request = testing.DummyRequest()
 
@@ -132,7 +131,6 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
                          set(['start_date', 'start_time',
                               'end_date', 'end_time']))
 
-    @unittest.skip("celery is too global")
     def test_error_banner_post(self):
         request = testing.DummyRequest()
         request.POST = {
