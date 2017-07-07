@@ -5,9 +5,9 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import datetime
-
 from __future__ import absolute_import
+
+from datetime import datetime, timedelta
 
 import psycopg2
 from celery.result import AsyncResult
@@ -33,6 +33,9 @@ def admin_index(request):  # pragma: no cover
              },
             {'name': 'Post Publication Logs',
              'uri': request.route_url('admin-post-publications'),
+             },
+            {'name': 'Add Error Banner to CNX.org',
+             'uri': request.route_url('admin-add-error-banner'),
              },
             ],
         }
@@ -97,34 +100,52 @@ ORDER BY bpsa.created DESC LIMIT 100""")
 @view_config(route_name='admin-add-error-banner', request_method='GET',
              renderer='cnxpublishing.views:templates/error-banner.html',
              permission='administer')
-def admin_add_error_banner(request):
+def admin_post_error_banner(request):
+    today = datetime.today()
+    tomorrow = today + timedelta(days=1)
+    return {'start_date': today.strftime("%Y-%m-%d"),
+            'start_time': today.strftime("%H:%M"),
+            'end_date': tomorrow.strftime("%Y-%m-%d"),
+            'end_time': tomorrow.strftime("%H:%M")}
+
+
+@view_config(route_name='admin-add-error-banner-POST', request_method='POST',
+             renderer='templates/error-banner-complete.html',
+             permission='administer')
+def admin_post_error_banner_POST(request):
+
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
-    print("hello")
-    print(request.GET)
-    print(request.POST)
-    print("goodbye")
 
     args = {}
+    args['message'] = request.POST.get('message', 'Error')
+    args['priority'] = request.POST.get('priority', 1)
 
-    args['message'] = request.GET.get('message', 'Error')
-    args['priority'] = request.GET.get('priority', 1)
-    start_date = request.GET.get('start_date', '')  # make default this today
-    start_time = request.GET.get('start_time', '')  # make default this today
-    end_date = request.GET.get('end_date', '')  # make default this tomorrow
-    end_time = request.GET.get('end_time', '')  # make default this today
-
-    start = datetime.datetime.combine(start_date, start_time)
-    end = datetime.datetime.combine(end_date, end_time)
-
+    today = datetime.today()
+    tomorrow = today + timedelta(days=1)
+    start_date = datetime.strptime(
+        request.POST.get('start_date', today.strftime("%Y-%m-%d")),
+        '%Y-%m-%d').date()
+    start_time = datetime.strptime(
+        request.POST.get('start_time', today.strftime("%H:%M")),
+        '%H:%M').time()
+    end_date = datetime.strptime(
+        request.POST.get('end_date', tomorrow.strftime("%Y-%m-%d")),
+        '%Y-%m-%d').date()
+    end_time = datetime.strptime(
+        request.POST.get('end_time', tomorrow.strftime("%H:%M")),
+        '%H:%M').time()
+    start = datetime.combine(start_date, start_time)
+    end = datetime.combine(end_date, end_time)
     args.update({'starts': start, 'ends': end})
 
+    print(args)
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                INSERT INTO service_state_messages (starts, ends, priority, message)
+                INSERT INTO service_state_messages
+                    (starts, ends, priority, message)
                 VALUES (%(starts)s, %(ends)s, %(priority)s, %(message)s);
                 """, args)
 
-    return_message = "An error of message:'{}', priority:{}, start{} {}, end{} has been added"
-    return {}
+    return {'params': args}

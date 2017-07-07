@@ -97,3 +97,28 @@ SELECT
                  'state_message': '',
                  'title': 'Book of Infinity'},
                 ]}, resp_data)
+
+
+class ErrorBannerViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        self.config = testing.setUp(settings=self.settings)
+        self.config.include('cnxpublishing.tasks')
+        init_db(self.db_conn_str, True)
+
+    def tearDown(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def test_error_banner(self):

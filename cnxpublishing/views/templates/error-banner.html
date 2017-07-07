@@ -2,13 +2,13 @@
 {% block content %}
 <h1>Create an error banner</h1>
 
-<form id="banner_form" method="GET">
+<form method="post" id="error_banner_form">
   Message:
   <input type="text" name="message" required><br>
   <br><br>
 
   Priority
-  <select name="priority">
+  <select name="priority" required>
     <option value="1">Very Low Priority</option>
     <option value="2">Somewhat Low priority</option>
     <option value="3">Somewhat High Priotiry</option>
@@ -17,17 +17,15 @@
   <br><br>
 
   Start date:
-  <input type="date" name="start_date" value="2001-03-03 -- today">
-  <input type="time" name="start_time">
+  <input type="date" name="start_date" id="start_date" value={{start_date}} required>
+  <input type="time" name="start_time" id="start_time" value={{start_time}} required>
   <br><br>
   End Date:
-  <input type="date" name="end_date" value="today + 5 hrs?">
-  <input type="time" name="end_time">
+  <input type="date" name="end_date" id="end_date" value={{end_date}} required>
+  <input type="time" name="end_time" id="end_time" value={{end_time}} required>
   <br><br>
 
   <input type="submit" value="Submit">
 </form>
-
-<div id = response></div>
 
 {% endblock %}
