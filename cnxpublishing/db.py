@@ -1425,7 +1425,8 @@ INSERT INTO post_publications
   VALUES (%s, %s, %s)""", (module_ident, state_name, state_message))
 
 
-def update_module_state(cursor, module_ident, state_name, recipe):  # pragma: no cover
+def update_module_state(cursor, module_ident,
+                        state_name, recipe):  # pragma: no cover
     """This updates the module's state in the database."""
     cursor.execute("""\
 UPDATE modules
