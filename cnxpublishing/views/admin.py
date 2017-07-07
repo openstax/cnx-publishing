@@ -120,6 +120,7 @@ def admin_post_error_banner_POST(request):
     args = {}
     args['message'] = request.POST.get('message', 'Error')
     args['priority'] = request.POST.get('priority', 1)
+    args['type'] = request.POST.get('type', 1)
 
     today = datetime.today()
     tomorrow = today + timedelta(days=1)
@@ -143,8 +144,9 @@ def admin_post_error_banner_POST(request):
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 INSERT INTO service_state_messages
-                    (starts, ends, priority, message)
-                VALUES (%(starts)s, %(ends)s, %(priority)s, %(message)s);
+                    (service_state_id, starts, ends, priority, message)
+                VALUES (%(type)s, %(starts)s, %(ends)s,
+                        %(priority)s, %(message)s);
                 """, args)
 
     return args

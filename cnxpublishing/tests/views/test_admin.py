@@ -138,6 +138,7 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
         request.POST = {
             'message': 'test message',
             'priority': 1,
+            'type': 1,
             'start_date': '2017-01-01',
             'start_time': '00:01',
             'end_date': '2017-01-02',
@@ -165,6 +166,7 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
         # Assert the correct variables were passed to the template
         self.assertEqual('test message', results['message'])
         self.assertEqual(1, results['priority'])
+        self.assertEqual(1, results['type'])
         self.assertTrue(datetime.strftime(
             results['starts'], "%Y-%m-%d %H:%M") == '2017-01-01 00:01')
         self.assertTrue(datetime.strftime(
