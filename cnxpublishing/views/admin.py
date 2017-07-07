@@ -139,7 +139,6 @@ def admin_post_error_banner_POST(request):
     end = datetime.combine(end_date, end_time)
     args.update({'starts': start, 'ends': end})
 
-    print(args)
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
@@ -148,4 +147,4 @@ def admin_post_error_banner_POST(request):
                 VALUES (%(starts)s, %(ends)s, %(priority)s, %(message)s);
                 """, args)
 
-    return {'params': args}
+    return args
