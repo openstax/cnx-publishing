@@ -26,8 +26,8 @@
       </label>
     <br><br>Author:
       <input type="text" name="author" value={{author}}><br>
-    ident_hash:
-      <input type="text" name="ident_hash" value={{ident_hash}}><br>
+    uuid:
+      <input type="text" name="uuid" value={{uuid}}><br>
     Entries Per Page:  <input type="number" min="1" name="number" value={{num_entries}}><br>
     Page:  <input type="number" min="1" name="page" value={{page}}><br>
     <br><br>
@@ -53,7 +53,7 @@
         <td>{{ state.authors }}</td>
         <td>
           <i class="{{state.state_icon}}" style="{{state.state_icon_style}}"></i>
-          <a href="/a/content-status/{{ state.ident_hash }}">{{ state.state }}</a>
+          <a href="/a/content-status/{{ state.uuid }}">{{ state.state }}</a>
         </td>
         <td>{{ state.state_message }}</td>
       </tr>

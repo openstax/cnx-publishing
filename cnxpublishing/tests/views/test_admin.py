@@ -328,16 +328,24 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()
 
-        ident = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.1'
-        request.matchdict['ident_hash'] = ident
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        request.matchdict['uuid'] = uuid
 
         from ...views.admin import admin_content_status_single
         content = admin_content_status_single(request)
+        print(content)
         self.assertEqual({
-            'ident_hash': ident,
+            'uuid': uuid,
             'title': 'Book of Infinity',
             'authors': 'marknewlyn, charrose',
-            'created': content['created'],
-            'state': 'PENDING',
-            'state_message': '',
+            'states': [
+                {'ident_hash': content['states'][0]['ident_hash'],
+                 'created': content['states'][0]['created'],
+                 'state': 'PENDING',
+                 'state_message': ''},
+                {'ident_hash': content['states'][1]['ident_hash'],
+                 'created': content['states'][1]['created'],
+                 'state': 'PENDING',
+                 'state_message': ''}
+            ]
         }, content)
