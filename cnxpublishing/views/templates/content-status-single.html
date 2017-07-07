@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Content Status</h1>
+  <h1>Content Status History for single book</h1>
 
-  <p><b>Created:</b> {{created}}</p>
-  <p><b>Ident_hash:</b> {{ident_hash}}</p>
+  <p><b>uuid:</b> {{uuid}}</p>
   <p><b>Title:</b> {{title}}</p>
   <p><b>Authors:</b> {{authors}}</p>
-  <p><b>State:</b> {{state}}</p>
-  <p><b>Message:</b><br><pre>{{state_message}}</pre></p>
+  <br><br><br>
+
+  {% for state in states%}
+    <b>Ident_hash:</b> {{state.ident_hash}}<br>
+    <b>Created:</b> {{state.created}}<br>
+    <b>State:</b> {{state.state}}<br>
+    <b>Message:</b><pre>{{state.state_message}}</pre><br>
+    <br><br>
+  {% endfor %}
 
 {% endblock %}
