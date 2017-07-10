@@ -334,7 +334,7 @@ def admin_print_styles_single(request):
         with db_conn.cursor() as cursor:
             # maybe add a limit and order? <-- what is a reasonable number
             cursor.execute("""\
-                SELECT title, authors, revised, recipe
+                SELECT title, authors, revised, recipe, uuid,
                     ident_hash(m.uuid, m.major_version, m.minor_version)
                 FROM latest_modules
                 WHERE print_style=%s
@@ -350,6 +350,7 @@ def admin_print_styles_single(request):
                     'title': row[0],
                     'authors': row[1],
                     'revised': row[2],
+                    'uuid': row[4],
                     'ident_hash': row[-1],
                     'status': status,
                 })
