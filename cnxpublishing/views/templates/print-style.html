@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Print Styles</h1>
+  <br>
+  <table>
+    <tr>
+      <th>Style</th>
+      <th>Number of Books</th>
+      <th>Type</th>
+      <th>Version</th>
+      <th>Time Stamp</th>
+    </tr>
+    {% for style in styles %}
+      <tr>
+        <td>
+          <a href={{style.link}}>{{ style.print_style }}</a>
+        </td>
+        <td>{{ style.number }}</td>
+        <td>{{ style.type }}</td>
+        <td>{{ style.tag }}</td>
+        <td>{{ style.revised }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

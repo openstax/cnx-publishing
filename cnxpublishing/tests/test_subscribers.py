@@ -13,35 +13,6 @@ def channel_processing_start_up_event():
     return event
 
 
-@pytest.fixture
-def scoped_pyramid_app():
-    from .testing import integration_test_settings
-    settings = integration_test_settings()
-    from pyramid import testing
-    config = testing.setUp(settings=settings)
-    # Register the routes for reverse generation of urls.
-    config.include('cnxpublishing.views')
-    config.include('cnxpublishing.tasks')
-    config.scan('cnxpublishing.subscribers')
-
-    # Initialize the authentication policy.
-    from openstax_accounts.stub import main
-    main(config)
-    config.commit()
-    return config
-
-
-@pytest.fixture
-def celery_app(scoped_pyramid_app):
-    return scoped_pyramid_app.make_celery_app()
-
-
-# FIXME Several of these tests are skipped because the celery_worker
-#       process hangs after one test.
-#       See https://github.com/celery/celery/issues/4088
-#       If you remove the skip and run them one at a time they do pass.
-
-
 @pytest.mark.usefixtures('scoped_pyramid_app')
 def test_startup_event(db_cursor, complex_book_one,
                        channel_processing_start_up_event):
@@ -147,7 +118,6 @@ class TestPostPublicationProcessing(object):
                           (self.module_ident,))
         assert db_cursor.fetchone()[0] == 'current'
 
-    @pytest.mark.skip('issue running more than on celery worker test')
     def test_error_handling_of_unknown_error(self, db_cursor, mocker):
         exc_msg = 'something failed during baking'
 
@@ -175,11 +145,9 @@ class TestPostPublicationProcessing(object):
 
         from celery.result import AsyncResult
         result = AsyncResult(id=result_id)
-        # Testing that an exception was raised and
-        # that we have access to the traceback.
-        result.get(propagate=False)  # blocking operation
-        assert result.failed()
-        assert exc_msg in result.traceback
+        with pytest.raises(Exception) as exc_info:
+            result.get()  # blocking operation
+            assert exc_info.exception.args[0] == exc_msg
 
         # Make sure it is marked as 'errored'.
         db_cursor.execute("SELECT ms.statename "
@@ -189,7 +157,6 @@ class TestPostPublicationProcessing(object):
         db_cursor.fetchone()[0] == 'errored'
 
     # TODO move to a bake_process unit-test
-    @pytest.mark.skip('issue running more than on celery worker test')
     def test_error_handling_during_epub_export(self, db_cursor, mocker):
         exc_msg = 'something failed during baking'
 
