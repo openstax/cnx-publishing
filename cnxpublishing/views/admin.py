@@ -37,6 +37,9 @@ def admin_index(request):  # pragma: no cover
             {'name': 'Message Banners',
              'uri': request.route_url('admin-add-site-messages'),
              },
+            {'name': 'Print Styles',
+             'uri': request.route_url('admin-print-style'),
+             },
             ],
         }
 
@@ -270,4 +273,86 @@ def admin_edit_site_message_POST(request):
 
     args = admin_edit_site_message(request)
     args['response'] = "Message successfully Updated"
+    return args
+
+
+@view_config(route_name='admin-print-style', request_method='GET',
+             renderer='cnxpublishing.views:templates/post-publications.html',
+             permission='administer')
+def admin_print_styles(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    styles = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                SELECT ps.print_style, ps.fileid, ps.recipe_type,
+                    (SELECT count (*) from latest_modules as lm
+                        where lm.print_style=ps.print_style
+                            and lm.portal_type='Collection')
+                FROM print_style_recipes as ps;""")
+            for row in cursor.fetchall():
+                styles.append({
+                    'print_style': row[0],
+                    'file': row[1],
+                    'type': row[2],
+                    'number': row[3],
+                    # add in time stamp later after ross adds it to table
+                })
+    return {'styles': styles}
+
+
+@view_config(route_name='admin-print-style-single', request_method='GET',
+             renderer='cnxpublishing.views:templates/post-publications.html',
+             permission='administer')
+def admin_print_styles_single(request):
+
+    style = request.matchdict['style']
+    args = {}
+
+    # do db search to get file id and other info on the print_style
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT print_style, fileid, recipe_type
+                from print_style_recipes
+                WHERE print_style=%s
+                """, vars=(style,))
+        info = cursor.fetchall()
+        if len(info) != 1:
+            raise httpexceptions.HTTPBadRequest(
+                'invalid style: {}'.format(style))
+        args['print_style'] = info[0][0]
+        args['file'] = info[0][1]
+        args['recipe_type'] = info[0][2]
+
+
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    collections = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            # maybe add a limit and order? <-- what is a reasonable number
+            cursor.execute("""\
+                SELECT title, authors, revised, recipe
+                    ident_hash(m.uuid, m.major_version, m.minor_version)
+                FROM latest_modules
+                WHERE print_style=%s
+                AND portal_type='Collection'
+                LIMIT 100;
+                """, vars=(style,))
+            for row in cursor.fetchall():
+                recipie = row[3]
+                status = 'current'
+                if recipie != args['file']:
+                    status = 'stale'
+                collections.append({
+                    'title': row[0],
+                    'authors': row[1],
+                    'revised': row[2],
+                    'ident_hash': row[-1],
+                    'status': status,
+                })
+
+    args['collections'] = collections
     return args

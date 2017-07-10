@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{print_style}}</h1>
+  <table>
+    <tr>
+      <th>Title</th>
+      <th>Authors</th>
+      <th>Status</th>
+      <th>ident_hash</th>
+      <th>Timestamp</th>
+    </tr>
+    {% for collection in collections %}
+      <tr>
+        <!-- does this maybe want to link to content-status page for this book? -->
+        <td>{{ collection.title }}</td>
+        <td>{{ collection.authors }}</td>
+        <td>{{ collection.status }}</td>
+        <td>{{ collection.ident_hash }}</td>
+        <td>{{ collection.revised }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
