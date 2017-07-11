@@ -286,7 +286,7 @@ def admin_print_styles(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                SELECT ps.print_style, ps.fileid, ps.recipe_type, ps.revised
+                SELECT ps.print_style, ps.fileid, ps.recipe_type, ps.revised,
                     (SELECT count (*) from latest_modules as lm
                         where lm.print_style=ps.print_style
                             and lm.portal_type='Collection')
@@ -296,7 +296,7 @@ def admin_print_styles(request):
                     'print_style': row[0],
                     'file': row[1],
                     'type': row[2],
-                    'revised': row[3]
+                    'revised': row[3],
                     'number': row[4],
                 })
     return {'styles': styles}
