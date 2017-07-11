@@ -298,14 +298,6 @@ def admin_edit_site_message_POST(request):
 
 def get_baking_statuses_sql(request):
     args = {}
-    num_entries = request.GET.get('number', 100)
-    page = request.GET.get('page', 1)
-    try:
-        start_entry = (int(page) - 1) * int(num_entries)
-    except ValueError:
-        raise httpexceptions.HTTPBadRequest(
-            'invalid page({}) or entries per page({})'.
-            format(page, num_entries))
     sort = request.GET.get('sort', 'bpsa.created DESC')
     if (len(sort.split(" ")) != 2 or
             sort.split(" ")[0] not in SORTS_DICT.keys() or
@@ -332,18 +324,20 @@ def get_baking_statuses_sql(request):
         sql_filters = ""
 
     statement = """SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-                       m.name, m.authors, m.uuid,
+                       m.name, m.authors, m.uuid, m.print_style,
+                       ps.fileid as latest_recepie,  m.recipe,
+                       lm.version as latest_version, m.version,
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
-                     INNER JOIN modules AS m USING (module_ident)
+                INNER JOIN modules AS m USING (module_ident)
+                LEFT JOIN print_style_recipes as ps
+                    ON ps.print_style=m.print_style
+                LEFT JOIN latest_modules as lm
+                    ON lm.uuid=m.uuid
                 {}
-                ORDER BY {}
-                LIMIT %(num_entries)s OFFSET %(start_entry)s
+                ORDER BY {};
                 """.format(sql_filters, sort)
-    args.update({'sort': sort,
-                 'start_entry': start_entry,
-                 'num_entries': num_entries,
-                 'page': page})
+    args.update({'sort': sort})
     return statement, args
 
 
@@ -373,25 +367,41 @@ def admin_content_status(request):
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback.split("\n")[-2]
+                latest_recepie = row[5]
+                current_recepie = row[6]
+                latest_version = row[7]
+                current_version = row[8]
+                state = str(result.state)
+                if current_version != latest_version:
+                    state += ' stale_content'
+                if current_recepie != latest_recepie:
+                    state += ' stale_recipie'
+                state_icon = result.state
+                if state[:7] == "SUCCESS" and len(state) > 7:
+                    state_icon = 'PENDING'
                 states.append({
                     'ident_hash': row[0],
                     'title': row[1].decode('utf-8'),
                     'authors': format_autors(row[2]),
                     'uuid': row[3],
-                    'created': row[4],
-                    'state': result.state,
+                    'print_style': row[4],
+                    'recipe': row[5],
+                    'created': row[-2],
+                    'state': state,
                     'state_message': message,
-                    'state_icon': STATE_ICONS[result.state]['class'],
-                    'state_icon_style': STATE_ICONS[result.state]['style']
+                    'state_icon': STATE_ICONS[state_icon]['class'],
+                    'state_icon_style': STATE_ICONS[state_icon]['style'],
+                    'link': request.route_url('get-content',
+                                              ident_hash=row[3])
                 })
-    status_filters = request.GET.get('status_filter', [])
+    status_filters = request.GET.getall('status_filter')
     if status_filters == []:
         status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
     for f in (status_filters):
         args[f] = "checked"
     final_states = []
     for state in states:
-        if state['state'] in status_filters:
+        if state['state'].split(' ')[0] in status_filters:
             final_states.append(state)
 
     sort = request.GET.get('sort', 'bpsa.created DESC')
@@ -403,6 +413,22 @@ def admin_content_status(request):
     if sort == "STATE DESC":
         final_states = sorted(final_states,
                               key=lambda x: x['state'], reverse=True)
+
+    num_entries = request.GET.get('number', 100)
+    page = request.GET.get('page', 1)
+    try:
+        page = int(page)
+        num_entries = int(num_entries)
+        start_entry = (page - 1) * num_entries
+    except ValueError:
+        raise httpexceptions.HTTPBadRequest(
+            'invalid page({}) or entries per page({})'.
+            format(page, num_entries))
+    final_states = final_states[start_entry: start_entry + num_entries]
+    args.update({'start_entry': start_entry,
+                 'num_entries': num_entries,
+                 'page': page,
+                 'total_entries': len(final_states)})
 
     args.update({'states': final_states})
     return args
@@ -423,12 +449,18 @@ def admin_content_status_single(request):
         with db_conn.cursor() as cursor:
             cursor.execute("""
                 SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-                    m.uuid, m.name, m.authors,
-                    bpsa.created, bpsa.result_id::text
+                       m.name, m.authors, m.uuid, m.print_style,
+                       ps.fileid as latest_recepie,  m.recipe,
+                       lm.version as latest_version, m.version,
+                       bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
-                    INNER JOIN modules AS m USING (module_ident)
+                INNER JOIN modules AS m USING (module_ident)
+                LEFT JOIN print_style_recipes as ps
+                    ON ps.print_style=m.print_style
+                LEFT JOIN latest_modules as lm
+                ON lm.uuid=m.uuid
                 WHERE uuid=%s ORDER BY bpsa.created DESC;
-                    """, vars=(uuid,))
+                """, vars=(uuid,))
             modules = cursor.fetchall()
             if len(modules) == 0:
                 raise httpexceptions.HTTPBadRequest(
@@ -436,20 +468,32 @@ def admin_content_status_single(request):
 
             states = []
             row = modules[0]
-            print(row[1])
-            args = {'uuid': str(row[1]),
-                    'title': row[2].decode('utf-8'),
-                    'authors': format_autors(row[3]), }
+            args = {'uuid': str(row[3]),
+                    'title': row[1].decode('utf-8'),
+                    'authors': format_autors(row[2]),
+                    'print_style': row[4],
+                    'current_recipie': row[5]}
+
             for row in modules:
                 message = ''
                 result_id = row[-1]
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback
+                latest_recepie = row[5]
+                current_recepie = row[6]
+                latest_version = row[7]
+                current_version = row[8]
+                state = result.state
+                if current_recepie != latest_recepie:
+                    state += ' stale_recipie'
+                if current_version != latest_version:
+                    state += ' stale_content'
                 states.append({
                     'ident_hash': row[0],
-                    'created': str(row[4]),
-                    'state': result.state,
+                    'recipe': row[5],
+                    'created': str(row[6]),
+                    'state': state,
                     'state_message': message,
                 })
             args['states'] = states
