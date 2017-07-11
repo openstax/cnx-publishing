@@ -247,13 +247,16 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         init_db(self.db_conn_str, True)
         add_data(self)
 
+        # Set up routes
+        from ... import declare_api_routes
+        declare_api_routes(config)
+
     def tearDown(self):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("DROP SCHEMA public CASCADE")
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
-
 
     def test_admin_content_status_no_filters(self):
         request = testing.DummyRequest()
@@ -285,12 +288,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        'number': 2,
                        'sort': 'STATE ASC',
                        'author': 'charrose',
-                       'status_filter': ['FAILURE', 'RETRY', 'PENDING']}
+                       'status_filter': 'PENDING'}
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
-            'FAILURE': 'checked',
-            'RETRY': 'checked',
             'PENDING': 'checked',
             'start_entry': 0,
             'page': 1,
@@ -303,7 +304,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.assertEqual(len(content['states']), 2)
         for state in content['states']:
             self.assertTrue('charrose' in state['authors'])
-            self.assertTrue(state['state'] not in ['STARTED', 'SUCCESS'])
+            self.assertTrue(state['state'] == 'PENDING')
         self.assertEqual(
             content['states'],
             sorted(content['states'], key=lambda x: x['state']))
@@ -324,11 +325,11 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'states': [
                 {'ident_hash': content['states'][0]['ident_hash'],
                  'created': content['states'][0]['created'],
-                 'state': 'PENDING',
+                 'state': 'PENDING stale_content',
                  'state_message': ''},
                 {'ident_hash': content['states'][1]['ident_hash'],
                  'created': content['states'][1]['created'],
-                 'state': 'PENDING',
+                 'state': 'PENDING stale_content',
                  'state_message': ''}
             ]
         }, content)
