@@ -286,7 +286,7 @@ def admin_print_styles(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                SELECT ps.print_style, ps.fileid, ps.recipe_type, ps.revised,
+                SELECT ps.print_style, ps.fileid, ps.type, ps.revised,
                     (SELECT count (*) from latest_modules as lm
                         where lm.print_style=ps.print_style
                             and lm.portal_type='Collection')
@@ -306,25 +306,25 @@ def admin_print_styles(request):
              renderer='cnxpublishing.views:templates/post-publications.html',
              permission='administer')
 def admin_print_styles_single(request):
-
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
     style = request.matchdict['style']
     args = {}
-
     # do db search to get file id and other info on the print_style
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
-                SELECT print_style, fileid, recipe_type
+                SELECT print_style, fileid, type
                 from print_style_recipes
                 WHERE print_style=%s
                 """, vars=(style,))
-        info = cursor.fetchall()
-        if len(info) != 1:
-            raise httpexceptions.HTTPBadRequest(
-                'invalid style: {}'.format(style))
-        args['print_style'] = info[0][0]
-        args['file'] = info[0][1]
-        args['recipe_type'] = info[0][2]
+            info = cursor.fetchall()
+            if len(info) != 1:
+                raise httpexceptions.HTTPBadRequest(
+                    'invalid style: {}'.format(style))
+            args['print_style'] = info[0][0]
+            args['file'] = info[0][1]
+            args['recipe_type'] = info[0][2]
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
