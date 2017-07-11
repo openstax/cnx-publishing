@@ -286,7 +286,7 @@ def admin_print_styles(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                SELECT ps.print_style, ps.fileid, ps.recipe_type,
+                SELECT ps.print_style, ps.fileid, ps.recipe_type, ps.revised
                     (SELECT count (*) from latest_modules as lm
                         where lm.print_style=ps.print_style
                             and lm.portal_type='Collection')
@@ -296,8 +296,8 @@ def admin_print_styles(request):
                     'print_style': row[0],
                     'file': row[1],
                     'type': row[2],
-                    'number': row[3],
-                    # add in time stamp later after ross adds it to table
+                    'revised': row[3]
+                    'number': row[4],
                 })
     return {'styles': styles}
 
@@ -326,20 +326,19 @@ def admin_print_styles_single(request):
         args['file'] = info[0][1]
         args['recipe_type'] = info[0][2]
 
-
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
     collections = []
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
-            # maybe add a limit and order? <-- what is a reasonable number
+            # add a limit and order? <-- what is a reasonable number
             cursor.execute("""\
                 SELECT title, authors, revised, recipe, uuid,
                     ident_hash(m.uuid, m.major_version, m.minor_version)
                 FROM latest_modules
                 WHERE print_style=%s
                 AND portal_type='Collection'
-                LIMIT 100;
+                ORDER BY title LIMIT 100;
                 """, vars=(style,))
             for row in cursor.fetchall():
                 recipie = row[3]
@@ -354,6 +353,5 @@ def admin_print_styles_single(request):
                     'ident_hash': row[-1],
                     'status': status,
                 })
-
     args['collections'] = collections
     return args

@@ -232,3 +232,59 @@ class SiteMessageViewsTestCase(unittest.TestCase):
                           'end_date': '2017-01-03',
                           'end_time': '00:03',
                           'id': '1'}, results)
+
+# FIXME There is an issue with setting up the celery app more than once.
+#       Apparently, creating the app a second time doesn't really create
+#       it again. There is some global state hanging around that we can't
+#       easily get at. This causes the task results tables used in these
+#       views to not exist, because the code believes it's already been
+#       initialized.
+@unittest.skip("celery is too global")
+class PrintStyleViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        self.config = testing.setUp(settings=self.settings)
+        self.config.include('cnxpublishing.tasks')
+        init_db(self.db_conn_str, True)
+
+    def tearDown(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def test_print_styles(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_print_styles
+        content = admin_print_styles(request)
+        self.assertEqual(10, len(content['styles']))  # what is the actual test data?
+        for row in content['styles']:
+            self.assertEqual(set(row.keys()),
+                             set(['print_style', 'file', 'type', 'revised',
+                                  'number']))
+
+    def test_print_style_single(self):
+        request = testing.DummyRequest()
+        print_style = 'ccap-physics'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        content = admin_print_styles_single(request)
+        self.assertEqual(content['print_style'], 'ccap-physics')
+        self.assertEqual(content['file'], 1)  # what is the actual test data?
+        self.assertEqual(content['recipe_type'], 'css')  # what is the actual test data?
+        for row in content['collections']:
+            self.assertEqual(set(row.keys()),
+                             set(['title', 'authors', 'revised', 'uuid',
+                                  'ident_hash', 'status']))
+        # add test to assert they are the correct books, and correct ststus when test data updated
