@@ -239,7 +239,6 @@ class SiteMessageViewsTestCase(unittest.TestCase):
 #       easily get at. This causes the task results tables used in these
 #       views to not exist, because the code believes it's already been
 #       initialized.
-@unittest.skip("celery is too global")
 class PrintStyleViewsTestCase(unittest.TestCase):
     maxDiff = None
 
@@ -262,17 +261,19 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
+    @unittest.skip("celery is too global")
     def test_print_styles(self):
         request = testing.DummyRequest()
 
         from ...views.admin import admin_print_styles
         content = admin_print_styles(request)
-        self.assertEqual(10, len(content['styles']))  # what is the actual test data?
+        self.assertEqual(0, len(content['styles']))  # Test data doesn't have anything in this table
         for row in content['styles']:
             self.assertEqual(set(row.keys()),
                              set(['print_style', 'file', 'type', 'revised',
                                   'number']))
 
+    @unittest.skip("celery is too global")
     def test_print_style_single(self):
         request = testing.DummyRequest()
         print_style = 'ccap-physics'
@@ -281,8 +282,8 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_print_styles_single
         content = admin_print_styles_single(request)
         self.assertEqual(content['print_style'], 'ccap-physics')
-        self.assertEqual(content['file'], 1)  # what is the actual test data?
-        self.assertEqual(content['recipe_type'], 'css')  # what is the actual test data?
+        self.assertEqual(content['file'], 1)  # Test data empty
+        self.assertEqual(content['recipe_type'], 'css')  # Test data empty
         for row in content['collections']:
             self.assertEqual(set(row.keys()),
                              set(['title', 'authors', 'revised', 'uuid',

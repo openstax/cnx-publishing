@@ -277,7 +277,7 @@ def admin_edit_site_message_POST(request):
 
 
 @view_config(route_name='admin-print-style', request_method='GET',
-             renderer='cnxpublishing.views:templates/post-publications.html',
+             renderer='cnxpublishing.views:templates/print-style.html',
              permission='administer')
 def admin_print_styles(request):
     settings = request.registry.settings
@@ -303,7 +303,7 @@ def admin_print_styles(request):
 
 
 @view_config(route_name='admin-print-style-single', request_method='GET',
-             renderer='cnxpublishing.views:templates/post-publications.html',
+             renderer='cnxpublishing.views:templates/print-style-single.html',
              permission='administer')
 def admin_print_styles_single(request):
     settings = request.registry.settings
@@ -321,7 +321,7 @@ def admin_print_styles_single(request):
             info = cursor.fetchall()
             if len(info) != 1:
                 raise httpexceptions.HTTPBadRequest(
-                    'invalid style: {}'.format(style))
+                    'Invalid Print Style: {}'.format(style))
             args['print_style'] = info[0][0]
             args['file'] = info[0][1]
             args['recipe_type'] = info[0][2]
@@ -333,12 +333,12 @@ def admin_print_styles_single(request):
         with db_conn.cursor() as cursor:
             # add a limit and order? <-- what is a reasonable number
             cursor.execute("""\
-                SELECT title, authors, revised, recipe, uuid,
-                    ident_hash(m.uuid, m.major_version, m.minor_version)
+                SELECT name, authors, revised, recipe, uuid,
+                    ident_hash(uuid, major_version, minor_version)
                 FROM latest_modules
                 WHERE print_style=%s
                 AND portal_type='Collection'
-                ORDER BY title LIMIT 100;
+                ORDER BY name LIMIT 100;
                 """, vars=(style,))
             for row in cursor.fetchall():
                 recipie = row[3]
@@ -353,5 +353,6 @@ def admin_print_styles_single(request):
                     'ident_hash': row[-1],
                     'status': status,
                 })
+    args['number'] = len(collections)
     args['collections'] = collections
     return args
