@@ -323,8 +323,8 @@ def get_baking_statuses_sql(request):
     if sql_filters == "WHERE":
         sql_filters = ""
 
-    statement = """SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-                       m.name, m.authors, m.uuid, m.print_style,
+    statement = """
+                SELECT m.name, m.authors, m.uuid, m.print_style,
                        ps.fileid as latest_recepie,  m.recipe,
                        lm.version as latest_version, m.version,
                        bpsa.created, bpsa.result_id::text
@@ -367,10 +367,10 @@ def admin_content_status(request):
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback.split("\n")[-2]
-                latest_recepie = row[5]
-                current_recepie = row[6]
-                latest_version = row[7]
-                current_version = row[8]
+                latest_recepie = row[4]
+                current_recepie = row[5]
+                latest_version = row[6]
+                current_version = row[7]
                 state = str(result.state)
                 if current_version != latest_version:
                     state += ' stale_content'
@@ -380,21 +380,23 @@ def admin_content_status(request):
                 if state[:7] == "SUCCESS" and len(state) > 7:
                     state_icon = 'PENDING'
                 states.append({
-                    'ident_hash': row[0],
-                    'title': row[1].decode('utf-8'),
-                    'authors': format_autors(row[2]),
-                    'uuid': row[3],
-                    'print_style': row[4],
-                    'recipe': row[5],
+                    'title': row[0].decode('utf-8'),
+                    'authors': format_autors(row[1]),
+                    'uuid': row[2],
+                    'print_style': row[3],
+                    'recipe': row[4],
                     'created': row[-2],
                     'state': state,
                     'state_message': message,
                     'state_icon': STATE_ICONS[state_icon]['class'],
-                    'state_icon_style': STATE_ICONS[state_icon]['style'],
-                    'link': request.route_url('get-content',
-                                              ident_hash=row[3])
+                    'state_icon_style': STATE_ICONS[state_icon]['style']
                 })
-    status_filters = request.GET.getall('status_filter')
+    status_filters = [request.GET.get('pending_filter', ''),
+                      request.GET.get('started_filter', ''),
+                      request.GET.get('retry_filter', ''),
+                      request.GET.get('failure_filter', ''),
+                      request.GET.get('success_filter', '')]
+    status_filters = [x for x in status_filters if x != '']
     if status_filters == []:
         status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
     for f in (status_filters):
@@ -448,10 +450,10 @@ def admin_content_status_single(request):
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
-                SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
-                       m.name, m.authors, m.uuid, m.print_style,
+                SELECT m.name, m.authors, m.uuid, m.print_style,
                        ps.fileid as latest_recepie,  m.recipe,
                        lm.version as latest_version, m.version,
+                       m.module_ident,
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
@@ -459,7 +461,7 @@ def admin_content_status_single(request):
                     ON ps.print_style=m.print_style
                 LEFT JOIN latest_modules as lm
                 ON lm.uuid=m.uuid
-                WHERE uuid=%s ORDER BY bpsa.created DESC;
+                WHERE m.uuid=%s ORDER BY bpsa.created DESC;
                 """, vars=(uuid,))
             modules = cursor.fetchall()
             if len(modules) == 0:
@@ -468,11 +470,12 @@ def admin_content_status_single(request):
 
             states = []
             row = modules[0]
-            args = {'uuid': str(row[3]),
-                    'title': row[1].decode('utf-8'),
-                    'authors': format_autors(row[2]),
-                    'print_style': row[4],
-                    'current_recipie': row[5]}
+            args = {'uuid': str(row[2]),
+                    'title': row[0].decode('utf-8'),
+                    'authors': format_autors(row[1]),
+                    'print_style': row[3],
+                    'current_recipie': row[4],
+                    'current_ident': row[8]}
 
             for row in modules:
                 message = ''
@@ -480,21 +483,55 @@ def admin_content_status_single(request):
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback
-                latest_recepie = row[5]
-                current_recepie = row[6]
-                latest_version = row[7]
-                current_version = row[8]
+                latest_recepie = row[4]
+                current_recepie = row[5]
+                latest_version = row[6]
+                current_version = row[7]
                 state = result.state
                 if current_recepie != latest_recepie:
                     state += ' stale_recipie'
                 if current_version != latest_version:
                     state += ' stale_content'
                 states.append({
-                    'ident_hash': row[0],
+                    'version': row[7],
                     'recipe': row[5],
-                    'created': str(row[6]),
+                    'created': str(row[-2]),
                     'state': state,
                     'state_message': message,
                 })
+            args['current_state'] = states[0]['state']
             args['states'] = states
             return args
+
+
+@view_config(route_name='admin-content-status-single-POST',
+             request_method='POST',
+             renderer='templates/content-status-single.html',
+             permission='administer')
+def admin_content_status_single_POST(request):
+    args = admin_content_status_single(request)
+    title = args['title']
+    if args['current_state'] == 'SUCCESS':
+        args['response'] = title + ' is not stale, no need to bake'
+        return args
+
+    settings = request.registry.settings
+    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("SELECT stateid FROM modules WHERE module_ident=%s",
+                           vars=(args['current_ident'],))
+            data = cursor.fetchall()
+            if len(data) == 0:
+                raise httpexceptions.HTTPBadRequest(
+                    'invalid module_ident: {}'.format(args['current_ident']))
+            if data[0][0] == 5:
+                args['response'] = title + ' is already baking/set to bake'
+                return args
+
+            cursor.execute("""UPDATE modules SET stateid=5
+                           WHERE module_ident=%s""",
+                           vars=(args['current_ident'],))
+
+            args['response'] = title + " set to bake!"
+
+    return args

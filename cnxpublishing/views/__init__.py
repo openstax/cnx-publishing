@@ -55,8 +55,12 @@ def declare_browsable_routes(config):
               request_method='GET')
     add_route('admin-edit-site-message-POST', '/a/site-messages/{id}/',
               request_method='POST')
+
     add_route('admin-content-status', '/a/content-status/')
-    add_route('admin-content-status-single', '/a/content-status/{uuid}')
+    add_route('admin-content-status-single', '/a/content-status/{uuid}',
+              request_method='GET')
+    add_route('admin-content-status-single-POST', '/a/content-status/{uuid}',
+              request_method='POST')
 
 
 def includeme(config):

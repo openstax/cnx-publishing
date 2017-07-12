@@ -247,10 +247,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         init_db(self.db_conn_str, True)
         add_data(self)
 
-        # Set up routes
-        from ... import declare_api_routes
-        declare_api_routes(config)
-
     def tearDown(self):
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
@@ -274,9 +270,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'num_entries': 100,
             'sort': 'bpsa.created DESC',
             'sort_created': 'fa fa-angle-down',
+            'total_entries': 2,
             'states': content['states']
         }, content)
-        self.assertEqual(len(content['states']), 2)
         self.assertEqual(
             content['states'],
             sorted(content['states'], key=lambda x: x['created'], reverse=True))
@@ -288,7 +284,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        'number': 2,
                        'sort': 'STATE ASC',
                        'author': 'charrose',
-                       'status_filter': 'PENDING'}
+                       'pending_filter': 'PENDING'}
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
@@ -299,12 +295,13 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'author': 'charrose',
             'sort': 'STATE ASC',
             'sort_state': 'fa fa-angle-up',
+            'total_entries': 2,
             'states': content['states']
         }, content)
         self.assertEqual(len(content['states']), 2)
         for state in content['states']:
             self.assertTrue('charrose' in state['authors'])
-            self.assertTrue(state['state'] == 'PENDING')
+            self.assertTrue('PENDING' in state['state'])
         self.assertEqual(
             content['states'],
             sorted(content['states'], key=lambda x: x['state']))
@@ -317,19 +314,35 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         from ...views.admin import admin_content_status_single
         content = admin_content_status_single(request)
-        print(content)
         self.assertEqual({
             'uuid': uuid,
             'title': 'Book of Infinity',
             'authors': 'marknewlyn, charrose',
+            'print_style': None,
+            'current_recipie': None,
+            'current_ident': 2,
+            'current_state': u'PENDING stale_content',
             'states': [
-                {'ident_hash': content['states'][0]['ident_hash'],
+                {'version': '1.1',
+                 'recipe': None,
                  'created': content['states'][0]['created'],
                  'state': 'PENDING stale_content',
                  'state_message': ''},
-                {'ident_hash': content['states'][1]['ident_hash'],
+                {'version': '1.1',
+                 'recipe': None,
                  'created': content['states'][1]['created'],
                  'state': 'PENDING stale_content',
                  'state_message': ''}
             ]
         }, content)
+
+    @unittest.skip("celery is too global, run one at a time")
+    def test_admin_content_status_single_page_POST(self):
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        request.matchdict['uuid'] = uuid
+        content = admin_content_status_single_POST(request)
+        self.assertEqual(content['response'],
+                         'Book of Infinity is already baking/set to bake')
