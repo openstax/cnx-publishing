@@ -113,6 +113,14 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         init_db(self.db_conn_str, True)
+        self.create_post_args = {
+            'message': 'test message',
+            'priority': 1,
+            'type': 1,
+            'start_date': '2017-01-01',
+            'start_time': '00:01',
+            'end_date': '2017-01-02',
+            'end_time': '00:02', }
 
     def tearDown(self):
         with self.db_connect() as db_conn:
@@ -128,19 +136,11 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
         defaults = admin_post_error_banner(request)
         self.assertEqual(set(defaults.keys()),
                          set(['start_date', 'start_time',
-                              'end_date', 'end_time']))
+                              'end_date', 'end_time', 'banners']))
 
-    def test_error_banner_post(self):
+    def test_error_banner_add_post(self):
         request = testing.DummyRequest()
-        request.POST = {
-            'message': 'test message',
-            'priority': 1,
-            'type': 1,
-            'start_date': '2017-01-01',
-            'start_time': '00:01',
-            'end_date': '2017-01-02',
-            'end_time': '00:02',
-        }
+        request.POST = self.create_post_args
         from ...views.admin import admin_post_error_banner_POST
         results = admin_post_error_banner_POST(request)
 
@@ -161,10 +161,73 @@ class ErrorBannerViewsTestCase(unittest.TestCase):
                                   WHERE message='test message';""")
 
         # Assert the correct variables were passed to the template
-        self.assertEqual('test message', results['message'])
-        self.assertEqual(1, results['priority'])
-        self.assertEqual(1, results['type'])
-        self.assertTrue(datetime.strftime(
-            results['starts'], "%Y-%m-%d %H:%M") == '2017-01-01 00:01')
-        self.assertTrue(datetime.strftime(
-            results['ends'], "%Y-%m-%d %H:%M") == '2017-01-02 00:02')
+        self.assertEqual('Error banner successfully added', results['response'])
+        self.assertEqual(1, len(results['banners']))
+
+    def test_error_banner_delete(self):
+        request = testing.DummyRequest()
+        # first add a banner to delete
+        request.POST = self.create_post_args
+        from ...views.admin import admin_post_error_banner_POST
+        results = admin_post_error_banner_POST(request)
+
+        request.POST = {'delete': 1}
+        from ...views.admin import admin_post_error_banner_POST
+        results = admin_post_error_banner_POST(request)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""SELECT * from service_state_messages
+                                  WHERE id=1;""")
+                result = cursor.fetchall()
+                self.assertEqual(0, len(result))
+        self.assertEqual("Error banner id (1) successfully removed",
+                         results['response'])
+
+    def test_error_banner_edit(self):
+        request = testing.DummyRequest()
+        request = testing.DummyRequest()
+        # first add a banner to delete
+        request.POST = self.create_post_args
+        from ...views.admin import admin_post_error_banner_POST
+        results = admin_post_error_banner_POST(request)
+
+        request.matchdict['id'] = '1'
+        from ...views.admin import admin_edit_error_banner
+        results = admin_edit_error_banner(request)
+        self.assertEqual({'message': 'test message',
+                          'danger': 'selected',
+                          'maintenance': 'selected',
+                          'start_date': '2017-01-01',
+                          'start_time': '00:01',
+                          'end_date': '2017-01-02',
+                          'end_time': '00:02',
+                          'id': '1'}, results)
+
+    def test_error_banner_edit_post(self):
+        request = testing.DummyRequest()
+        request = testing.DummyRequest()
+        # first add a banner to delete
+        request.POST = self.create_post_args
+        from ...views.admin import admin_post_error_banner_POST
+        results = admin_post_error_banner_POST(request)
+
+        request.matchdict['id'] = '1'
+        request.POST = {'message': 'edited message',
+                        'priority': 2,
+                        'type': 2,
+                        'start_date': '2017-01-02',
+                        'start_time': '00:02',
+                        'end_date': '2017-01-03',
+                        'end_time': '00:03',
+                        'id': '1'}
+        from ...views.admin import admin_edit_error_banner_POST
+        results = admin_edit_error_banner_POST(request)
+        self.assertEqual({'response': 'Error banner successfully Updated',
+                          'message': 'edited message',
+                          'warning': 'selected',
+                          'notice': 'selected',
+                          'start_date': '2017-01-02',
+                          'start_time': '00:02',
+                          'end_date': '2017-01-03',
+                          'end_time': '00:03',
+                          'id': '1'}, results)
