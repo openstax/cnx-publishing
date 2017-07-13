@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>EDIT an error banner: {{id}}</h1>
+
+<form method="post" id="error_banner_form">
+  Message:
+  <input type="text" name="message" id="message" size="50" value="{{message}}" required><br>
+  <br><br>
+
+  Priority
+  <select name="priority" id="priority" required>
+    <option value="1" {{danger}}>Danger</option>
+    <option value="2" {{warning}}>Warning</option>
+    <option value="3" {{success}}>Success</option>
+  </select>
+  <br><br>
+
+  Type
+  <select name="type" id="type" required>
+    <option value="1" {{maintenance}}>Maintenance</option>
+    <option value="2" {{notice}}>Notice</option>
+  </select>
+  <br><br>
+
+  Start date:
+  <input type="date" name="start_date" id="start_date" value={{start_date}} required>
+  <input type="time" name="start_time" id="start_time" value={{start_time}} required>
+  <br><br>
+  End Date:
+  <input type="date" name="end_date" id="end_date" value={{end_date}} required>
+  <input type="time" name="end_time" id="end_time" value={{end_time}} required>
+  <br><br>
+
+  <input type="text" name="id" id="id" value="{{id}}" required hidden><br>
+  <button type="submit" name="edit" value="edit">Edit</button>
+</form>
+<br>
+
+<div id="completed"><b>{{response}}</b></div>
+<button id="back" onclick="window.location.href='/a/error-banner/'">Back</button>
+
+{% endblock %}

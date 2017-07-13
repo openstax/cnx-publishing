@@ -49,6 +49,10 @@ def declare_browsable_routes(config):
               request_method='GET')
     add_route('admin-add-error-banner-POST', '/a/error-banner/',
               request_method='POST')
+    add_route('admin-edit-error-banner', '/a/error-banner/edit/{id}/',
+              request_method='GET')
+    add_route('admin-edit-error-banner-POST', '/a/error-banner/edit/{id}/',
+              request_method='POST')
 
 
 def includeme(config):
