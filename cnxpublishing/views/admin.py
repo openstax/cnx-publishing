@@ -100,7 +100,7 @@ ORDER BY bpsa.created DESC LIMIT 100""")
 @view_config(route_name='admin-add-site-messages', request_method='GET',
              renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer')
-def admin_post_site_message(request):
+def admin_add_site_message(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
 
@@ -157,12 +157,10 @@ def parse_message_args(request):
 @view_config(route_name='admin-add-site-messages-POST', request_method='POST',
              renderer='templates/site-messages.html',
              permission='administer')
-def admin_post_site_message_POST(request):
+def admin_add_site_message_POST(request):
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
-
-    print(request.POST.keys())
 
     # If it was a post request to delete
     if 'delete' in request.POST.keys():
@@ -172,7 +170,7 @@ def admin_post_site_message_POST(request):
                 cursor.execute("""\
                     DELETE FROM service_state_messages WHERE id=%s;
                     """, vars=(error_id, ))
-        return_args = admin_post_site_message(request)
+        return_args = admin_add_site_message(request)
         return_args['response'] = "Message id ({}) successfully removed".\
                                   format(error_id)
         return return_args
@@ -188,7 +186,7 @@ def admin_post_site_message_POST(request):
                         %(priority)s, %(message)s);
                 """, args)
 
-    return_args = admin_post_site_message(request)
+    return_args = admin_add_site_message(request)
     return_args['response'] = "Message successfully added"
     return return_args
 
@@ -214,8 +212,9 @@ def admin_edit_site_message(request):
                 raise httpexceptions.HTTPBadRequest(
                     '{} is not a valid error_id'.format(error_id))
 
-            TYPE_MAP = {1: 'maintenance', 2: 'notice'}
-            PRIORITY_MAP = {1: 'danger', 2: 'warning', 3: 'success'}
+            TYPE_MAP = {1: 'maintenance', 2: 'notice', None: 'maintenance'}
+            PRIORITY_MAP = {1: 'danger', 2: 'warning', 3: 'success',
+                            None: 'danger'}
             args[TYPE_MAP[results[0][1]]] = 'selected'
             args[PRIORITY_MAP[results[0][4]]] = 'selected'
             args['message'] = results[0][5]
@@ -224,7 +223,6 @@ def admin_edit_site_message(request):
             args['start_time'] = results[0][2].strftime("%H:%M")
             args['end_date'] = results[0][3].strftime("%Y-%m-%d")
             args['end_time'] = results[0][3].strftime("%H:%M")
-    print(args)
     return args
 
 
@@ -252,5 +250,5 @@ def admin_edit_site_message_POST(request):
                 """, args)
 
     args = admin_edit_site_message(request)
-    args['response'] = "Error banner successfully Updated"
+    args['response'] = "Message successfully Updated"
     return args
