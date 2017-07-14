@@ -34,8 +34,8 @@ def admin_index(request):  # pragma: no cover
             {'name': 'Post Publication Logs',
              'uri': request.route_url('admin-post-publications'),
              },
-            {'name': 'Add Error Banner to CNX.org',
-             'uri': request.route_url('admin-add-error-banner'),
+            {'name': 'Message Banners',
+             'uri': request.route_url('admin-add-site-messages'),
              },
             ],
         }
@@ -97,10 +97,10 @@ ORDER BY bpsa.created DESC LIMIT 100""")
     return {'states': states}
 
 
-@view_config(route_name='admin-add-error-banner', request_method='GET',
-             renderer='cnxpublishing.views:templates/error-banner.html',
+@view_config(route_name='admin-add-site-messages', request_method='GET',
+             renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer')
-def admin_post_error_banner(request):
+def admin_post_site_message(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
 
@@ -128,9 +128,9 @@ def admin_post_error_banner(request):
             'banners': banners}
 
 
-def parse_error_args(request):
+def parse_message_args(request):
     args = {}
-    args['message'] = request.POST.get('message', 'Error')
+    args['message'] = request.POST.get('message', 'Warning')
     args['priority'] = request.POST.get('priority', 1)
     args['type'] = request.POST.get('type', 1)
 
@@ -154,10 +154,10 @@ def parse_error_args(request):
     return args
 
 
-@view_config(route_name='admin-add-error-banner-POST', request_method='POST',
-             renderer='templates/error-banner.html',
+@view_config(route_name='admin-add-site-messages-POST', request_method='POST',
+             renderer='templates/site-messages.html',
              permission='administer')
-def admin_post_error_banner_POST(request):
+def admin_post_site_message_POST(request):
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
@@ -172,13 +172,13 @@ def admin_post_error_banner_POST(request):
                 cursor.execute("""\
                     DELETE FROM service_state_messages WHERE id=%s;
                     """, vars=(error_id, ))
-        return_args = admin_post_error_banner(request)
-        return_args['response'] = "Error banner id ({}) successfully removed".\
+        return_args = admin_post_site_message(request)
+        return_args['response'] = "Message id ({}) successfully removed".\
                                   format(error_id)
         return return_args
 
-    # otherwise it was an post request to add an error banner
-    args = parse_error_args(request)
+    # otherwise it was an post request to add an message banner
+    args = parse_message_args(request)
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
@@ -188,15 +188,15 @@ def admin_post_error_banner_POST(request):
                         %(priority)s, %(message)s);
                 """, args)
 
-    return_args = admin_post_error_banner(request)
-    return_args['response'] = "Error banner successfully added"
+    return_args = admin_post_site_message(request)
+    return_args['response'] = "Message successfully added"
     return return_args
 
 
-@view_config(route_name='admin-edit-error-banner', request_method='GET',
-             renderer='templates/error-banner-edit.html',
+@view_config(route_name='admin-edit-site-message', request_method='GET',
+             renderer='templates/site-message-edit.html',
              permission='administer')
-def admin_edit_error_banner(request):
+def admin_edit_site_message(request):
     error_id = request.matchdict['id']
     args = {'id': error_id}
 
@@ -228,12 +228,12 @@ def admin_edit_error_banner(request):
     return args
 
 
-@view_config(route_name='admin-edit-error-banner-POST', request_method='POST',
-             renderer='templates/error-banner-edit.html',
+@view_config(route_name='admin-edit-site-message-POST', request_method='POST',
+             renderer='templates/site-message-edit.html',
              permission='administer')
-def admin_edit_error_banner_POST(request):
+def admin_edit_site_message_POST(request):
     error_id = request.matchdict['id']
-    args = parse_error_args(request)
+    args = parse_message_args(request)
     args['id'] = error_id
 
     settings = request.registry.settings
@@ -251,6 +251,6 @@ def admin_edit_error_banner_POST(request):
                 WHERE id=%(id)s;
                 """, args)
 
-    args = admin_edit_error_banner(request)
+    args = admin_edit_site_message(request)
     args['response'] = "Error banner successfully Updated"
     return args
