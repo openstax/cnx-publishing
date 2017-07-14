@@ -162,18 +162,18 @@ def admin_add_site_message_POST(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
 
-    # If it was a post request to delete
-    if 'delete' in request.POST.keys():
-        error_id = request.POST.get('delete', -1)
-        with psycopg2.connect(db_conn_str) as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("""\
-                    DELETE FROM service_state_messages WHERE id=%s;
-                    """, vars=(error_id, ))
-        return_args = admin_add_site_message(request)
-        return_args['response'] = "Message id ({}) successfully removed".\
-                                  format(error_id)
-        return return_args
+    # # If it was a post request to delete
+    # if 'delete' in request.POST.keys():
+    #     message_id = request.POST.get('delete', -1)
+    #     with psycopg2.connect(db_conn_str) as db_conn:
+    #         with db_conn.cursor() as cursor:
+    #             cursor.execute("""\
+    #                 DELETE FROM service_state_messages WHERE id=%s;
+    #                 """, vars=(message_id, ))
+    #     return_args = admin_add_site_message(request)
+    #     return_args['response'] = "Message id ({}) successfully removed".\
+    #                               format(message_id)
+    #     return return_args
 
     # otherwise it was an post request to add an message banner
     args = parse_message_args(request)
@@ -191,12 +191,31 @@ def admin_add_site_message_POST(request):
     return return_args
 
 
+@view_config(route_name='admin-delete-site-messages', request_method='DELETE',
+             renderer='templates/site-messages.html',
+             permission='administer')
+def admin_delete_site_message(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+
+    message_id = request.body.split("=")[1]
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                DELETE FROM service_state_messages WHERE id=%s;
+                """, vars=(message_id, ))
+    return_args = admin_add_site_message(request)
+    return_args['response'] = "Message id ({}) successfully removed".\
+                              format(message_id)
+    return return_args
+
+
 @view_config(route_name='admin-edit-site-message', request_method='GET',
              renderer='templates/site-message-edit.html',
              permission='administer')
 def admin_edit_site_message(request):
-    error_id = request.matchdict['id']
-    args = {'id': error_id}
+    message_id = request.matchdict['id']
+    args = {'id': message_id}
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
@@ -206,11 +225,11 @@ def admin_edit_site_message(request):
             cursor.execute("""\
                 SELECT id, service_state_id, starts, ends, priority, message
                 FROM service_state_messages WHERE id=%s;
-                """, vars=(error_id, ))
+                """, vars=(message_id, ))
             results = cursor.fetchall()
             if len(results) != 1:
                 raise httpexceptions.HTTPBadRequest(
-                    '{} is not a valid error_id'.format(error_id))
+                    '{} is not a valid id'.format(message_id))
 
             TYPE_MAP = {1: 'maintenance', 2: 'notice', None: 'maintenance'}
             PRIORITY_MAP = {1: 'danger', 2: 'warning', 3: 'success',
@@ -230,9 +249,9 @@ def admin_edit_site_message(request):
              renderer='templates/site-message-edit.html',
              permission='administer')
 def admin_edit_site_message_POST(request):
-    error_id = request.matchdict['id']
+    message_id = request.matchdict['id']
     args = parse_message_args(request)
-    args['id'] = error_id
+    args['id'] = message_id
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]

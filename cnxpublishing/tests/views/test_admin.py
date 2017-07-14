@@ -144,7 +144,7 @@ class SiteMessageViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_add_site_message_POST
         results = admin_add_site_message_POST(request)
 
-        # assert the error message has been added to the table
+        # assert the message has been added to the table
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""SELECT message, priority, starts, ends
@@ -171,9 +171,10 @@ class SiteMessageViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_add_site_message_POST
         results = admin_add_site_message_POST(request)
 
-        request.POST = {'delete': 1}
-        from ...views.admin import admin_add_site_message_POST
-        results = admin_add_site_message_POST(request)
+        request.method = 'DELETE'
+        request.body = 'id=1'
+        from ...views.admin import admin_delete_site_message
+        results = admin_delete_site_message(request)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""SELECT * from service_state_messages

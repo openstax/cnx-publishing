@@ -2,7 +2,7 @@
 {% block content %}
 <h1>Create a site message</h1>
 
-<form method="post" id="error_banner_form">
+<form method="post" id="message_banner_form">
   Message:
   <input type="text" name="message" id="message" size="50" required><br>
   <br><br>
@@ -36,7 +36,7 @@
 <br><br>
 <div><b>{{response}}</b></div>
 <br>
-Existing Errors:
+Existing Messages:
 <table>
   <tr>
     <th>ID</th>
@@ -60,12 +60,22 @@ Existing Errors:
         <a href="/a/site-messages/{{ banner.id }}/">Edit</a>
       </td>
       <td>
-        <form method="post">
-          <button type="submit" name="delete" value="{{ banner.id }}">Delete</button>
-        </form>
+        <button class="delete" value="{{ banner.id }}">Delete</button>
       </td>
     </tr>
   {% endfor %}
 </table>
+{% endblock %}
 
+{% block script%}
+  $( ".delete" ).click(function() {
+    $.ajax({
+        url: '/a/site-messages/',
+        data: {'id': $( this ).val()},
+        type: 'DELETE',
+        success: function(response) {
+          $("html").html(response);
+        }
+    });
+  });
 {% endblock %}
