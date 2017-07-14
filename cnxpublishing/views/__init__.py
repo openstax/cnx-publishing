@@ -45,13 +45,13 @@ def declare_browsable_routes(config):
     add_route('admin-moderation', '/a/moderation/')
     add_route('admin-api-keys', '/a/api-keys/')
     add_route('admin-post-publications', '/a/post-publications/')
-    add_route('admin-add-error-banner', '/a/error-banner/',
+    add_route('admin-add-site-messages', '/a/site-messages/',
               request_method='GET')
-    add_route('admin-add-error-banner-POST', '/a/error-banner/',
+    add_route('admin-add-site-messages-POST', '/a/site-messages/',
               request_method='POST')
-    add_route('admin-edit-error-banner', '/a/error-banner/edit/{id}/',
+    add_route('admin-edit-site-message', '/a/site-messages/{id}/',
               request_method='GET')
-    add_route('admin-edit-error-banner-POST', '/a/error-banner/edit/{id}/',
+    add_route('admin-edit-site-message-POST', '/a/site-messages/{id}/',
               request_method='POST')
 
 
