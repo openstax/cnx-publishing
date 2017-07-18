@@ -33,6 +33,13 @@ def declare_api_routes(config):
     add_route('api-keys', '/api-keys')
     add_route('api-key', '/api-keys/{id}')
 
+    # Print Style routes
+    add_route('print-style-history', '/status/print-style',)
+    add_route('print-style-history-name', '/status/print-style/{name}')
+    add_route('print-style-history-version',
+              '/status/print-style/{name}/{version}')
+    add_route('resource', '/resources/{hash}{ignore:(/.*)?}')  # noqa cnxarchive.views:get_resource
+
 
 def declare_browsable_routes(config):
     """Declaration of routes that can be browsed by users."""
