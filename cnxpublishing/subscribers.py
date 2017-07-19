@@ -46,15 +46,17 @@ def post_publication_processing(event, cursor):
     track_baking_proc_state(result, module_ident, cursor)
 
 
-def _get_recipes(module_ident, cursor):
-    """Returns a tuple of length 2 of primary and fallback recipes.
+def _get_recipe_ids(module_ident, cursor):
+    """Returns a tuple of length 2 of primary and fallback recipe ids.
 
     The primary will be based on the print_style of the book. The fallback
     is the recipe used for last successful bake of this book, if different
     than the primary. Either value or both values may be None"""
-    cursor.execute("""select coalesce(psf.fileid,mf.fileid),
+    cursor.execute("""select coalesce(psf.fileid, mf.fileid, mf2.fileid),
                          CASE
-                           WHEN lm.recipe != coalesce(psf.fileid,mf.fileid,0)
+                           WHEN lm.recipe != coalesce(psf.fileid,
+                                                      mf.fileid,
+                                                      mf2.fileid,0)
                              THEN lm.recipe
                              ELSE NULL
                          END
@@ -96,14 +98,14 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
     publisher, message = cursor.fetchone()
     remove_baked(ident_hash, cursor=cursor)
 
-    recipes = _get_recipes(module_ident, cursor)
+    recipe_ids = _get_recipe_ids(module_ident, cursor)
 
     state = 'current'
-    for recipe in recipes:
+    for recipe_id in recipe_ids:
         try:
-            bake(binder, recipe, publisher, message, cursor=cursor)
+            bake(binder, recipe_id, publisher, message, cursor=cursor)
         except Exception as exc:
-            if state == 'current' and recipes[1] is not None:
+            if state == 'current' and recipe_ids[1] is not None:
                 state = 'fallback'
                 continue
             else:
@@ -111,13 +113,13 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                 # TODO rollback to pre-removal of the baked content??
                 cursor.connection.rollback()
                 logger.exception('Uncaught exception during baking')
-                update_module_state(cursor, module_ident, state, recipe)
+                update_module_state(cursor, module_ident, state, recipe_id)
                 raise
         finally:
             logger.debug('Finished module_ident={} ident_hash={} '
                          'with a final state of \'{}\'.'
                          .format(module_ident, ident_hash, state))
-            update_module_state(cursor, module_ident, state, recipe)
+            update_module_state(cursor, module_ident, state, recipe_id)
             break
 
 

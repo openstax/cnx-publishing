@@ -20,6 +20,8 @@ here = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_DIR = os.path.join(here, 'data')
 RESOURCE_ONE_FILENAME = "e3d625fe.png"
 RESOURCE_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RESOURCE_ONE_FILENAME)
+RECIPE_ONE_FILENAME = "ruleset.css"
+RECIPE_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RECIPE_ONE_FILENAME)
 
 
 def _read_file(filepath, mode='rb'):
@@ -416,6 +418,11 @@ PAGE_FIVE = cnxepub.Document(
 
 COMPLEX_BOOK_ONE = cnxepub.Binder(
     id='94f4d0f5@draft',
+    resources=[
+        cnxepub.Resource(RECIPE_ONE_FILENAME,
+                         _read_file(RECIPE_ONE_FILEPATH, 'rb'),
+                         'text/css',
+                         filename=RECIPE_ONE_FILENAME)],
     metadata={
         u'title': u'Book of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',

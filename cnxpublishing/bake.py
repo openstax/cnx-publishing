@@ -50,12 +50,21 @@ def _formatter_callback_factory():  # pragma: no cover
     return includes
 
 
+def _get_recipe(recipe_id, cursor):
+    """Returns recipe as a unicode string"""
+
+    cursor.execute("""SELECT convert_from(file, 'utf-8') FROM files
+                      WHERE fileid = %s""", (recipe_id,))
+    return cursor.fetchone()[0]
+
+
 @with_db_cursor
-def bake(binder, recipe, publisher, message, cursor):
+def bake(binder, recipe_id, publisher, message, cursor):
     """Given a `Binder` as `binder`, bake the contents and
     persist those changes alongside the published content.
 
     """
+    recipe = _get_recipe(recipe_id, cursor)
     includes = _formatter_callback_factory()
     binder = collate_models(binder, ruleset=recipe, includes=includes)
 
