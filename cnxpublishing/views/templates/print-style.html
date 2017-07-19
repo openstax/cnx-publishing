@@ -8,6 +8,7 @@
       <th>Number of Books</th>
       <th>File Id</th>
       <th>Type</th>
+      <th>Version</th>
       <th>Time Stamp</th>
     </tr>
     {% for style in styles %}
@@ -18,6 +19,7 @@
         <td>{{ style.number }}</td>
         <td>{{ style.file }}</td>
         <td>{{ style.type }}</td>
+        <td>{{ style.tag }}</td>
         <td>{{ style.revised }}</td>
       </tr>
     {% endfor %}

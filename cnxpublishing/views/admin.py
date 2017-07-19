@@ -286,18 +286,19 @@ def admin_print_styles(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                SELECT ps.print_style, ps.fileid, ps.type, ps.revised,
+                SELECT print_style, fileid, recipe_type, revised, tag,
                     (SELECT count (*) from latest_modules as lm
                         where lm.print_style=ps.print_style
                             and lm.portal_type='Collection')
-                FROM print_style_recipes as ps;""")
+                FROM default_print_style_recipes as ps;""")
             for row in cursor.fetchall():
                 styles.append({
                     'print_style': row[0],
                     'file': row[1],
                     'type': row[2],
                     'revised': row[3],
-                    'number': row[4],
+                    'tag': row[4],
+                    'number': row[5],
                 })
     return {'styles': styles}
 
@@ -314,7 +315,7 @@ def admin_print_styles_single(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
-                SELECT print_style, fileid, type
+                SELECT print_style, fileid, recipe_type, tag
                 from print_style_recipes
                 WHERE print_style=%s
                 """, vars=(style,))
@@ -325,6 +326,7 @@ def admin_print_styles_single(request):
             args['print_style'] = info[0][0]
             args['file'] = info[0][1]
             args['recipe_type'] = info[0][2]
+            args['tag'] = info[0][3]
 
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
@@ -338,7 +340,7 @@ def admin_print_styles_single(request):
                 FROM latest_modules
                 WHERE print_style=%s
                 AND portal_type='Collection'
-                ORDER BY name LIMIT 100;
+                ORDER BY name;
                 """, vars=(style,))
             for row in cursor.fetchall():
                 recipie = row[3]
@@ -346,7 +348,7 @@ def admin_print_styles_single(request):
                 if recipie != args['file']:
                     status = 'stale'
                 collections.append({
-                    'title': row[0],
+                    'title': row[0].decode('utf-8'),
                     'authors': row[1],
                     'revised': row[2],
                     'uuid': row[4],
