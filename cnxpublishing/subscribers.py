@@ -63,6 +63,9 @@ def _get_recipes(module_ident, cursor):
                                      LEFT JOIN module_files mf
                                          ON m.module_ident = mf.module_ident
                                          AND m.print_style = mf.filename
+                                     LEFT JOIN module_files mf2
+                                         ON m.module_ident = mf2.module_ident
+                                         AND mf2.filename = 'ruleset.css'
                                      LEFT JOIN latest_modules lm
                                          ON m.uuid = lm.uuid
                       WHERE m.module_ident = %s""", (module_ident,))
