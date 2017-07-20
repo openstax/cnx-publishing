@@ -296,6 +296,7 @@ class SiteMessageViewsTestCase(unittest.TestCase):
                           'end_time': '00:03',
                           'id': '1'}, results)
 
+
 # FIXME There is an issue with setting up the celery app more than once.
 #       Apparently, creating the app a second time doesn't really create
 #       it again. There is some global state hanging around that we can't
