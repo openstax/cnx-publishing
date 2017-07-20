@@ -290,7 +290,7 @@ def admin_print_styles(request):
                     (SELECT count (*) from latest_modules as lm
                         where lm.print_style=ps.print_style
                             and lm.portal_type='Collection')
-                FROM default_print_style_recipes as ps;""")
+                FROM print_style_recipes as ps;""")
             for row in cursor.fetchall():
                 styles.append({
                     'print_style': row[0],

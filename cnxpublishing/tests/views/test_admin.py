@@ -253,6 +253,13 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
         init_db(self.db_conn_str, True)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""INSERT INTO files
+                                  (file, media_type) VALUES ('file', 'css');""")
+                cursor.execute("""INSERT INTO print_style_recipes
+                                  (print_style, fileid, tag)
+                                  VALUES ('ccap-physics', 1, '1.0');""")
 
     def tearDown(self):
         with self.db_connect() as db_conn:
@@ -261,29 +268,36 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
-    @unittest.skip("celery is too global")
+    # @unittest.skip("celery is too global")
     def test_print_styles(self):
         request = testing.DummyRequest()
 
         from ...views.admin import admin_print_styles
         content = admin_print_styles(request)
-        self.assertEqual(0, len(content['styles']))  # Test data doesn't have anything in this table
+        self.assertEqual(1, len(content['styles']))
         for row in content['styles']:
             self.assertEqual(set(row.keys()),
                              set(['print_style', 'file', 'type', 'revised',
-                                  'number']))
+                                  'number', 'tag']))
 
-    @unittest.skip("celery is too global")
+    # @unittest.skip("celery is too global")
     def test_print_style_single(self):
         request = testing.DummyRequest()
+
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("select fileid from files;")
+                print(cursor.fetchall())
+
         print_style = 'ccap-physics'
         request.matchdict['style'] = print_style
 
         from ...views.admin import admin_print_styles_single
         content = admin_print_styles_single(request)
+        print(content)
         self.assertEqual(content['print_style'], 'ccap-physics')
-        self.assertEqual(content['file'], 1)  # Test data empty
-        self.assertEqual(content['recipe_type'], 'css')  # Test data empty
+        self.assertEqual(content['file'], 1)
+        self.assertEqual(content['recipe_type'], 'web')
         for row in content['collections']:
             self.assertEqual(set(row.keys()),
                              set(['title', 'authors', 'revised', 'uuid',
