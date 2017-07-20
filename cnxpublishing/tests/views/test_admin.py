@@ -268,7 +268,6 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                 cursor.execute("CREATE SCHEMA public")
         testing.tearDown()
 
-    # @unittest.skip("celery is too global")
     def test_print_styles(self):
         request = testing.DummyRequest()
 
@@ -280,7 +279,6 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                              set(['print_style', 'file', 'type', 'revised',
                                   'number', 'tag']))
 
-    # @unittest.skip("celery is too global")
     def test_print_style_single(self):
         request = testing.DummyRequest()
 
@@ -302,4 +300,3 @@ class PrintStyleViewsTestCase(unittest.TestCase):
             self.assertEqual(set(row.keys()),
                              set(['title', 'authors', 'revised', 'uuid',
                                   'ident_hash', 'status']))
-        # add test to assert they are the correct books, and correct ststus when test data updated

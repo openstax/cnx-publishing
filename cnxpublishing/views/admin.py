@@ -333,7 +333,6 @@ def admin_print_styles_single(request):
     collections = []
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
-            # add a limit and order? <-- what is a reasonable number
             cursor.execute("""\
                 SELECT name, authors, revised, recipe, uuid,
                     ident_hash(uuid, major_version, minor_version)
