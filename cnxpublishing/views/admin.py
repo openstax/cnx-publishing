@@ -100,6 +100,88 @@ ORDER BY bpsa.created DESC LIMIT 100""")
     return {'states': states}
 
 
+@view_config(route_name='admin-print-style', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style.html',
+             permission='administer')
+def admin_print_styles(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    styles = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                SELECT print_style, fileid, recipe_type, revised, tag,
+                    (SELECT count (*) from latest_modules as lm
+                        where lm.print_style=ps.print_style
+                            and lm.portal_type='Collection')
+                FROM print_style_recipes as ps;""")
+            for row in cursor.fetchall():
+                styles.append({
+                    'print_style': row[0],
+                    'file': row[1],
+                    'type': row[2],
+                    'revised': row[3],
+                    'tag': row[4],
+                    'number': row[5],
+                })
+    return {'styles': styles}
+
+
+@view_config(route_name='admin-print-style-single', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style-single.html',
+             permission='administer')
+def admin_print_styles_single(request):
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    style = request.matchdict['style']
+    args = {}
+    # do db search to get file id and other info on the print_style
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT print_style, fileid, recipe_type, tag
+                from print_style_recipes
+                WHERE print_style=%s
+                """, vars=(style,))
+            info = cursor.fetchall()
+            if len(info) != 1:
+                raise httpexceptions.HTTPBadRequest(
+                    'Invalid Print Style: {}'.format(style))
+            args['print_style'] = info[0][0]
+            args['file'] = info[0][1]
+            args['recipe_type'] = info[0][2]
+            args['tag'] = info[0][3]
+
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    collections = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                SELECT name, authors, revised, recipe, uuid,
+                    ident_hash(uuid, major_version, minor_version)
+                FROM latest_modules
+                WHERE print_style=%s
+                AND portal_type='Collection'
+                ORDER BY name;
+                """, vars=(style,))
+            for row in cursor.fetchall():
+                recipie = row[3]
+                status = 'current'
+                if recipie != args['file']:
+                    status = 'stale'
+                collections.append({
+                    'title': row[0].decode('utf-8'),
+                    'authors': row[1],
+                    'revised': row[2],
+                    'uuid': row[4],
+                    'ident_hash': row[-1],
+                    'status': status,
+                })
+    args['number'] = len(collections)
+    args['collections'] = collections
+
+
 @view_config(route_name='admin-add-site-messages', request_method='GET',
              renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer')
