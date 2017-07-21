@@ -52,7 +52,7 @@
       <tr>
         <td>{{ state.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
         <td>
-          <a href="/a/content-status/{{ state.uuid }}">{{ state.title }}</a>
+          <a href="{{ state.status_link }}">{{ state.title }}</a>
         </td>
         <td>{{ state.authors }}</td>
         <td>
@@ -61,7 +61,7 @@
         <td>{{ state.print_style }}</td>
         <td>{{ state.recipie }}</td>
         <td>
-          <a href='/contents/{{ state.uuid }}'>{{ state.uuid }}</a>
+          <a href='{{ state.content_link }}'>{{ state.uuid }}</a>
         </td>
         <td>{{ state.state_message }}</td>
       </tr>

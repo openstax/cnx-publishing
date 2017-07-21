@@ -15,6 +15,7 @@ from pyramid import httpexceptions
 from pyramid.view import view_config
 
 from cnxarchive.utils.ident_hash import IdentHashError
+
 from .. import config
 from .moderation import get_moderation
 from .api_keys import get_api_keys
@@ -325,7 +326,7 @@ def get_baking_statuses_sql(request):
 
     statement = """
                 SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recepie,  m.recipe,
+                       ps.fileid as latest_recipe,  m.recipe,
                        lm.version as latest_version, m.version,
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
@@ -356,26 +357,26 @@ def format_autors(authors):
 def admin_content_status(request):
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
-    statement, args = get_baking_statuses_sql(request)
+    statement, sql_args = get_baking_statuses_sql(request)
     states = []
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute(statement, vars=args)
+            cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
                 message = ''
                 result_id = row[-1]
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback.split("\n")[-2]
-                latest_recepie = row[4]
-                current_recepie = row[5]
+                latest_recipe = row[4]
+                current_recipe = row[5]
                 latest_version = row[6]
                 current_version = row[7]
                 state = str(result.state)
                 if current_version != latest_version:
                     state += ' stale_content'
-                if current_recepie != latest_recepie:
-                    state += ' stale_recipie'
+                if current_recipe != latest_recipe:
+                    state += ' stale_recipe'
                 state_icon = result.state
                 if state[:7] == "SUCCESS" and len(state) > 7:
                     state_icon = 'PENDING'
@@ -389,7 +390,11 @@ def admin_content_status(request):
                     'state': state,
                     'state_message': message,
                     'state_icon': STATE_ICONS[state_icon]['class'],
-                    'state_icon_style': STATE_ICONS[state_icon]['style']
+                    'state_icon_style': STATE_ICONS[state_icon]['style'],
+                    'status_link': request.route_path(
+                        'admin-content-status-single', uuid=row[2]),
+                    'content_link': request.route_path(
+                        'get-content', ident_hash=row[2])
                 })
     status_filters = [request.GET.get('pending_filter', ''),
                       request.GET.get('started_filter', ''),
@@ -399,8 +404,6 @@ def admin_content_status(request):
     status_filters = [x for x in status_filters if x != '']
     if status_filters == []:
         status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
-    for f in (status_filters):
-        args[f] = "checked"
     final_states = []
     for state in states:
         if state['state'].split(' ')[0] in status_filters:
@@ -408,8 +411,7 @@ def admin_content_status(request):
 
     sort = request.GET.get('sort', 'bpsa.created DESC')
     sort_match = SORTS_DICT[sort.split(' ')[0]]
-    args['sort_' + sort_match] = ARROW_MATCH[sort.split(' ')[1]]
-    args['sort'] = sort
+    sort_arrow = ARROW_MATCH[sort.split(' ')[1]]
     if sort == "STATE ASC":
         final_states = sorted(final_states, key=lambda x: x['state'])
     if sort == "STATE DESC":
@@ -427,13 +429,18 @@ def admin_content_status(request):
             'invalid page({}) or entries per page({})'.
             format(page, num_entries))
     final_states = final_states[start_entry: start_entry + num_entries]
-    args.update({'start_entry': start_entry,
-                 'num_entries': num_entries,
-                 'page': page,
-                 'total_entries': len(final_states)})
 
-    args.update({'states': final_states})
-    return args
+    return_args = {'start_entry': start_entry,
+                   'num_entries': num_entries,
+                   'page': page,
+                   'total_entries': len(final_states),
+                   'states': final_states,
+                   'sort_' + sort_match: sort_arrow,
+                   'sort': sort}
+    for f in (status_filters):
+        return_args[f] = "checked"
+    return_args.update(sql_args)
+    return return_args
 
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
@@ -451,7 +458,7 @@ def admin_content_status_single(request):
         with db_conn.cursor() as cursor:
             cursor.execute("""
                 SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recepie,  m.recipe,
+                       ps.fileid as latest_recipe,  m.recipe,
                        lm.version as latest_version, m.version,
                        m.module_ident,
                        bpsa.created, bpsa.result_id::text
@@ -474,7 +481,7 @@ def admin_content_status_single(request):
                     'title': row[0].decode('utf-8'),
                     'authors': format_autors(row[1]),
                     'print_style': row[3],
-                    'current_recipie': row[4],
+                    'current_recipe': row[4],
                     'current_ident': row[8]}
 
             for row in modules:
@@ -483,13 +490,13 @@ def admin_content_status_single(request):
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback
-                latest_recepie = row[4]
-                current_recepie = row[5]
+                latest_recipe = row[4]
+                current_recipe = row[5]
                 latest_version = row[6]
                 current_version = row[7]
                 state = result.state
-                if current_recepie != latest_recepie:
-                    state += ' stale_recipie'
+                if current_recipe != latest_recipe:
+                    state += ' stale_recipe'
                 if current_version != latest_version:
                     state += ' stale_content'
                 states.append({
