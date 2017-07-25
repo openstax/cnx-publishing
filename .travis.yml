@@ -1,3 +1,4 @@
+dist: precise
 language: python
 # Note, /usr/bin/python is used because we must install to the system python
 # in order to make the package available to the plpython Postgres extension.
