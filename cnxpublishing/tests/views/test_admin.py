@@ -10,6 +10,7 @@ from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
+from pyramid import httpexceptions
 
 from .. import use_cases
 from ..testing import (
@@ -142,18 +143,19 @@ class PrintStyleViewsTestCase(unittest.TestCase):
 
     def test_print_style_single(self):
         request = testing.DummyRequest()
-
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("select fileid from files;")
-                print(cursor.fetchall())
+                cursor.execute("""INSERT INTO latest_modules
+                                  (print_style, portal_type, name, licenseid,
+                                        doctype, uuid, created, revised)
+                                  VALUES ('ccap-physics', 'Collection', 'test', 1,
+                                        'doc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', now(), now());""")
 
         print_style = 'ccap-physics'
         request.matchdict['style'] = print_style
 
         from ...views.admin import admin_print_styles_single
         content = admin_print_styles_single(request)
-        print(content)
         self.assertEqual(content['print_style'], 'ccap-physics')
         self.assertEqual(content['file'], 1)
         self.assertEqual(content['recipe_type'], 'web')
@@ -161,6 +163,17 @@ class PrintStyleViewsTestCase(unittest.TestCase):
             self.assertEqual(set(row.keys()),
                              set(['title', 'authors', 'revised', 'uuid',
                                   'ident_hash', 'status']))
+
+    def test_print_style_single_no_style(self):
+        request = testing.DummyRequest()
+        print_style = 'fake-print-style'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        with self.assertRaises(httpexceptions.HTTPBadRequest) as cm:
+            admin_print_styles_single(request)
+
+        self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")
 
 
 class SiteMessageViewsTestCase(unittest.TestCase):
