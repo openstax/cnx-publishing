@@ -14,7 +14,7 @@
     </tr>
     {% for collection in collections %}
       <tr>
-        <td><a href='/a/content-status/{{collection.uuid}}'>{{ collection.title }}<a></td>
+        <td><a href={{collection.link}}>{{ collection.title }}<a></td>
         <td>{{ collection.authors }}</td>
         <td>{{ collection.status }}</td>
         <td>{{ collection.ident_hash }}</td>

@@ -14,7 +14,7 @@
     {% for style in styles %}
       <tr>
         <td>
-          <a href="/a/print-style/{{style.print_style}}">{{ style.print_style }}</a>
+          <a href={{style.link}}>{{ style.print_style }}</a>
         </td>
         <td>{{ style.number }}</td>
         <td>{{ style.file }}</td>

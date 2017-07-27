@@ -114,6 +114,9 @@ class PrintStyleViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
+        self.config.add_route('get-content', '/contents/{ident_hash}')
+        self.config.add_route('admin-print-style-single',
+                              '/a/print-style/{style}')
         init_db(self.db_conn_str, True)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
@@ -136,10 +139,14 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_print_styles
         content = admin_print_styles(request)
         self.assertEqual(1, len(content['styles']))
-        for row in content['styles']:
-            self.assertEqual(set(row.keys()),
-                             set(['print_style', 'file', 'type', 'revised',
-                                  'number', 'tag']))
+        self.assertEqual(content['styles'][0],
+                         {'print_style': 'ccap-physics',
+                          'file': 1,
+                          'type': 'web',
+                          'revised': content['styles'][0]['revised'],
+                          'number': 0,
+                          'tag': '1.0',
+                          'link': '/a/print-style/ccap-physics'})
 
     def test_print_style_single(self):
         request = testing.DummyRequest()
@@ -159,10 +166,14 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         self.assertEqual(content['print_style'], 'ccap-physics')
         self.assertEqual(content['file'], 1)
         self.assertEqual(content['recipe_type'], 'web')
-        for row in content['collections']:
-            self.assertEqual(set(row.keys()),
-                             set(['title', 'authors', 'revised', 'uuid',
-                                  'ident_hash', 'status']))
+        self.assertEqual(len(content['collections']), 1)
+        self.assertEqual(content['collections'][0],
+                         {'title': 'test',
+                          'authors': None,
+                          'revised': content['collections'][0]['revised'],
+                          'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'status': 'stale'})
 
     def test_print_style_single_no_style(self):
         request = testing.DummyRequest()
@@ -170,7 +181,7 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         request.matchdict['style'] = print_style
 
         from ...views.admin import admin_print_styles_single
-        with self.assertRaises(httpexceptions.HTTPBadRequest) as cm:
+        with self.assertRaises(httpexceptions.HTTPNotFound) as cm:
             admin_print_styles_single(request)
 
         self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")

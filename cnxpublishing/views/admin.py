@@ -299,6 +299,8 @@ def admin_print_styles(request):
                     'revised': row[3],
                     'tag': row[4],
                     'number': row[5],
+                    'link': request.route_path('admin-print-style-single',
+                                               style=row[0])
                 })
     return {'styles': styles}
 
@@ -321,20 +323,13 @@ def admin_print_styles_single(request):
                 """, vars=(style,))
             info = cursor.fetchall()
             if len(info) != 1:
-                raise httpexceptions.HTTPBadRequest(
+                raise httpexceptions.HTTPNotFound(
                     'Invalid Print Style: {}'.format(style))
-            args['print_style'] = info[0][0]
-            args['file'] = info[0][1]
-            args['recipe_type'] = info[0][2]
-            args['tag'] = info[0][3]
+            print_style_info = info[0]
 
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-    collections = []
-    with psycopg2.connect(db_conn_str) as db_conn:
-        with db_conn.cursor() as cursor:
+            collections = []
             cursor.execute("""\
-                SELECT name, authors, revised, recipe, uuid,
+                SELECT name, authors, revised, recipe,
                     ident_hash(uuid, major_version, minor_version)
                 FROM latest_modules
                 WHERE print_style=%s
@@ -342,18 +337,23 @@ def admin_print_styles_single(request):
                 ORDER BY name;
                 """, vars=(style,))
             for row in cursor.fetchall():
-                recipie = row[3]
+                recipe = row[3]
                 status = 'current'
-                if recipie != args['file']:
+                if recipe != print_style_info[1]:
                     status = 'stale'
                 collections.append({
                     'title': row[0].decode('utf-8'),
                     'authors': row[1],
                     'revised': row[2],
-                    'uuid': row[4],
                     'ident_hash': row[-1],
+                    'link': request.route_path('get-content',
+                                               ident_hash=row[-1]),
                     'status': status,
+
                 })
-    args['number'] = len(collections)
-    args['collections'] = collections
-    return args
+    return {'number': len(collections),
+            'collections': collections,
+            'print_style': print_style_info[0],
+            'file': print_style_info[1],
+            'recipe_type': print_style_info[2],
+            'tag': print_style_info[3]}
