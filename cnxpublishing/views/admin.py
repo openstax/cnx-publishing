@@ -298,6 +298,15 @@ def admin_edit_site_message_POST(request):
 
 
 def get_baking_statuses_sql(request):
+    """ Creates SQL to get info on baking books filtered from request.
+
+    All books that have ever attmenpted to bake will be retured if they
+    pass the filters in the GET request.
+    If a single book has been requested to bake multiple times there will
+    be a row for each of the baking attempts.
+    By default the results are sorted in descending order of when they were
+    requested to bake.
+    """
     args = {}
     sort = request.GET.get('sort', 'bpsa.created DESC')
     if (len(sort.split(" ")) != 2 or
@@ -355,6 +364,10 @@ def format_autors(authors):
              renderer='cnxpublishing.views:templates/content-status.html',
              permission='administer')
 def admin_content_status(request):
+    """
+    Returns a dictionary with the states and info of baking books,
+    and the filters from the GET request to pre-populate the form.
+    """
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
     statement, sql_args = get_baking_statuses_sql(request)
@@ -408,7 +421,6 @@ def admin_content_status(request):
     for state in states:
         if state['state'].split(' ')[0] in status_filters:
             final_states.append(state)
-
     sort = request.GET.get('sort', 'bpsa.created DESC')
     sort_match = SORTS_DICT[sort.split(' ')[0]]
     sort_arrow = ARROW_MATCH[sort.split(' ')[1]]
@@ -430,23 +442,26 @@ def admin_content_status(request):
             format(page, num_entries))
     final_states = final_states[start_entry: start_entry + num_entries]
 
-    return_args = {'start_entry': start_entry,
-                   'num_entries': num_entries,
-                   'page': page,
-                   'total_entries': len(final_states),
-                   'states': final_states,
-                   'sort_' + sort_match: sort_arrow,
-                   'sort': sort}
+    returns = sql_args
+    returns.update({'start_entry': start_entry,
+                    'num_entries': num_entries,
+                    'page': page,
+                    'total_entries': len(final_states),
+                    'states': final_states,
+                    'sort_' + sort_match: sort_arrow,
+                    'sort': sort})
     for f in (status_filters):
-        return_args[f] = "checked"
-    return_args.update(sql_args)
-    return return_args
+        returns[f] = "checked"
+    return returns
 
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
              renderer='templates/content-status-single.html',
              permission='administer')
 def admin_content_status_single(request):
+    """
+    Returns a dictionary with all the past baking statuses of a single book.
+    """
     uuid = request.matchdict['uuid']
     pat = ("[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}$")
     if not compile(pat).match(uuid):
@@ -476,13 +491,7 @@ def admin_content_status_single(request):
                     '{} is not a book'.format(uuid))
 
             states = []
-            row = modules[0]
-            args = {'uuid': str(row[2]),
-                    'title': row[0].decode('utf-8'),
-                    'authors': format_autors(row[1]),
-                    'print_style': row[3],
-                    'current_recipe': row[4],
-                    'current_ident': row[8]}
+            collection_info = modules[0]
 
             for row in modules:
                 message = ''
@@ -506,16 +515,22 @@ def admin_content_status_single(request):
                     'state': state,
                     'state_message': message,
                 })
-            args['current_state'] = states[0]['state']
-            args['states'] = states
-            return args
+
+    return {'uuid': str(collection_info[2]),
+            'title': collection_info[0].decode('utf-8'),
+            'authors': format_autors(collection_info[1]),
+            'print_style': collection_info[3],
+            'current_recipe': collection_info[4],
+            'current_ident': collection_info[8],
+            'current_state': states[0]['state'],
+            'states': states}
 
 
-@view_config(route_name='admin-content-status-single-POST',
-             request_method='POST',
+@view_config(route_name='admin-content-status-single', request_method='POST',
              renderer='templates/content-status-single.html',
              permission='administer')
 def admin_content_status_single_POST(request):
+    """ Retriggers baking for a given book. """
     args = admin_content_status_single(request)
     title = args['title']
     if args['current_state'] == 'SUCCESS':

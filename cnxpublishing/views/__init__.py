@@ -57,10 +57,7 @@ def declare_browsable_routes(config):
               request_method='POST')
 
     add_route('admin-content-status', '/a/content-status/')
-    add_route('admin-content-status-single', '/a/content-status/{uuid}',
-              request_method='GET')
-    add_route('admin-content-status-single-POST', '/a/content-status/{uuid}',
-              request_method='POST')
+    add_route('admin-content-status-single', '/a/content-status/{uuid}')
 
 
 def includeme(config):

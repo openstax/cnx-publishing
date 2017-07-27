@@ -244,6 +244,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
+        self.config.add_route('admin-content-status-single',
+                              '/a/content-status/{uuid}')
+        self.config.add_route('get-content', '/contents/{ident_hash}')
+
         init_db(self.db_conn_str, True)
         add_data(self)
 
@@ -314,12 +318,14 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         from ...views.admin import admin_content_status_single
         content = admin_content_status_single(request)
+        print(content)
+        print(content['current_ident'])
         self.assertEqual({
             'uuid': uuid,
             'title': 'Book of Infinity',
             'authors': 'marknewlyn, charrose',
             'print_style': None,
-            'current_recipie': None,
+            'current_recipe': None,
             'current_ident': 2,
             'current_state': u'PENDING stale_content',
             'states': [
@@ -336,7 +342,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ]
         }, content)
 
-    @unittest.skip("celery is too global, run one at a time")
     def test_admin_content_status_single_page_POST(self):
         request = testing.DummyRequest()
         from ...views.admin import admin_content_status_single_POST
