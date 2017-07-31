@@ -318,8 +318,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         from ...views.admin import admin_content_status_single
         content = admin_content_status_single(request)
-        print(content)
-        print(content['current_ident'])
         self.assertEqual({
             'uuid': uuid,
             'title': 'Book of Infinity',
