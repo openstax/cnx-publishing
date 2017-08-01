@@ -7,7 +7,7 @@
 # ###
 from __future__ import absolute_import
 from datetime import datetime, timedelta
-from re import compile, match
+from uuid import UUID
 
 import psycopg2
 from celery.result import AsyncResult
@@ -463,8 +463,9 @@ def admin_content_status_single(request):
     Returns a dictionary with all the past baking statuses of a single book.
     """
     uuid = request.matchdict['uuid']
-    pat = ("[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}$")
-    if not compile(pat).match(uuid):
+    try:
+        UUID(uuid)
+    except ValueError:
         raise httpexceptions.HTTPBadRequest(
             '{} is not a valid uuid'.format(uuid))
 
