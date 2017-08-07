@@ -297,8 +297,8 @@ def admin_edit_site_message_POST(request):
     return args
 
 
-def get_baking_statuses_sql(request):
-    """ Creates SQL to get info on baking books filtered from request.
+def get_baking_statuses_sql(get_request):
+    """ Creates SQL to get info on baking books filtered from GET request.
 
     All books that have ever attmenpted to bake will be retured if they
     pass the filters in the GET request.
@@ -308,7 +308,7 @@ def get_baking_statuses_sql(request):
     requested to bake.
     """
     args = {}
-    sort = request.GET.get('sort', 'bpsa.created DESC')
+    sort = get_request.get('sort', 'bpsa.created DESC')
     if (len(sort.split(" ")) != 2 or
             sort.split(" ")[0] not in SORTS_DICT.keys() or
             sort.split(" ")[1] not in ARROW_MATCH.keys()):
@@ -316,8 +316,8 @@ def get_baking_statuses_sql(request):
             'invalid sort: {}'.format(sort))
     if sort == "STATE ASC" or sort == "STATE DESC":
         sort = 'bpsa.created DESC'
-    uuid_filter = request.GET.get('uuid', '')
-    author_filter = request.GET.get('author', '')
+    uuid_filter = get_request.get('uuid', '')
+    author_filter = get_request.get('author', '')
 
     sql_filters = "WHERE"
     if uuid_filter != '':
@@ -336,7 +336,12 @@ def get_baking_statuses_sql(request):
     statement = """
                 SELECT m.name, m.authors, m.uuid, m.print_style,
                        ps.fileid as latest_recipe,  m.recipe,
-                       lm.version as latest_version, m.version,
+                       module_version(lm.major_version, lm.minor_version)
+                        as latest_version,
+                       module_version(m.major_version, m.minor_version)
+                        as cur_version,
+                       m.module_ident,
+                       ident_hash(m.uuid, m.major_version, m.minor_version),
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
@@ -351,13 +356,10 @@ def get_baking_statuses_sql(request):
     return statement, args
 
 
-def format_autors(authors):
-    if len(authors) == 0:
+def format_authors(authors):
+    if not authors:
         return ""
-    return_str = ""
-    for author in authors:
-        return_str += author.decode('utf-8') + ", "
-    return return_str[:-2]
+    return ', '.join([author.decode('utf-8') for author in authors])
 
 
 @view_config(route_name='admin-content-status', request_method='GET',
@@ -370,7 +372,7 @@ def admin_content_status(request):
     """
     settings = request.registry.settings
     db_conn_str = settings[config.CONNECTION_STRING]
-    statement, sql_args = get_baking_statuses_sql(request)
+    statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
@@ -395,7 +397,7 @@ def admin_content_status(request):
                     state_icon = 'PENDING'
                 states.append({
                     'title': row[0].decode('utf-8'),
-                    'authors': format_autors(row[1]),
+                    'authors': format_authors(row[1]),
                     'uuid': row[2],
                     'print_style': row[3],
                     'recipe': row[4],
@@ -407,7 +409,7 @@ def admin_content_status(request):
                     'status_link': request.route_path(
                         'admin-content-status-single', uuid=row[2]),
                     'content_link': request.route_path(
-                        'get-content', ident_hash=row[2])
+                        'get-content', ident_hash=row[-3])
                 })
     status_filters = [request.GET.get('pending_filter', ''),
                       request.GET.get('started_filter', ''),
@@ -415,12 +417,14 @@ def admin_content_status(request):
                       request.GET.get('failure_filter', ''),
                       request.GET.get('success_filter', '')]
     status_filters = [x for x in status_filters if x != '']
-    if status_filters == []:
+    if not status_filters:
         status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
-    final_states = []
-    for state in states:
-        if state['state'].split(' ')[0] in status_filters:
-            final_states.append(state)
+        final_states = states
+    else:
+        final_states = []
+        for state in states:
+            if state['state'].split(' ')[0] in status_filters:
+                final_states.append(state)
     sort = request.GET.get('sort', 'bpsa.created DESC')
     sort_match = SORTS_DICT[sort.split(' ')[0]]
     sort_arrow = ARROW_MATCH[sort.split(' ')[1]]
@@ -450,7 +454,7 @@ def admin_content_status(request):
                     'states': final_states,
                     'sort_' + sort_match: sort_arrow,
                     'sort': sort})
-    for f in (status_filters):
+    for f in status_filters:
         returns[f] = "checked"
     return returns
 
@@ -470,22 +474,10 @@ def admin_content_status_single(request):
             '{} is not a valid uuid'.format(uuid))
 
     settings = request.registry.settings
+    statement, sql_args = get_baking_statuses_sql({'uuid': uuid})
     with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
         with db_conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recipe,  m.recipe,
-                       lm.version as latest_version, m.version,
-                       m.module_ident,
-                       bpsa.created, bpsa.result_id::text
-                FROM document_baking_result_associations AS bpsa
-                INNER JOIN modules AS m USING (module_ident)
-                LEFT JOIN print_style_recipes as ps
-                    ON ps.print_style=m.print_style
-                LEFT JOIN latest_modules as lm
-                ON lm.uuid=m.uuid
-                WHERE m.uuid=%s ORDER BY bpsa.created DESC;
-                """, vars=(uuid,))
+            cursor.execute(statement, sql_args)
             modules = cursor.fetchall()
             if len(modules) == 0:
                 raise httpexceptions.HTTPBadRequest(
@@ -519,7 +511,7 @@ def admin_content_status_single(request):
 
     return {'uuid': str(collection_info[2]),
             'title': collection_info[0].decode('utf-8'),
-            'authors': format_autors(collection_info[1]),
+            'authors': format_authors(collection_info[1]),
             'print_style': collection_info[3],
             'current_recipe': collection_info[4],
             'current_ident': collection_info[8],
@@ -547,7 +539,7 @@ def admin_content_status_single_POST(request):
             if len(data) == 0:
                 raise httpexceptions.HTTPBadRequest(
                     'invalid module_ident: {}'.format(args['current_ident']))
-            if data[0][0] == 5:
+            if data[0][0] == 5 or data[0][0] == 6:
                 args['response'] = title + ' is already baking/set to bake'
                 return args
 
