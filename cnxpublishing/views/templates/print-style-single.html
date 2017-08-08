@@ -2,13 +2,14 @@
 {% block content %}
   <h1>Print Style: {{print_style}}</h1>
   <p> Recipie type: {{recipe_type}} </p>
-  <p> File number: {{file}}</p>
   <p> Number of Books Using this Style: {{number}}</p>
   <table>
     <tr>
       <th>Title</th>
       <th>Authors</th>
       <th>Status</th>
+      <th>Tag</th>
+      <th>Recipe</th>
       <th>ident_hash</th>
       <th>Revised</th>
     </tr>
@@ -17,6 +18,8 @@
         <td><a href={{collection.link}}>{{ collection.title }}<a></td>
         <td>{{ collection.authors }}</td>
         <td>{{ collection.status }}</td>
+        <td>{{ collection.tag }}</td>
+        <td>{{ collection.recipe }}</td>
         <td>{{ collection.ident_hash }}</td>
         <td>{{ collection.revised }}</td>
       </tr>

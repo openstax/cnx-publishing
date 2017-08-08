@@ -141,7 +141,6 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         self.assertEqual(1, len(content['styles']))
         self.assertEqual(content['styles'][0],
                          {'print_style': 'ccap-physics',
-                          'file': 1,
                           'type': 'web',
                           'revised': content['styles'][0]['revised'],
                           'number': 0,
@@ -154,9 +153,9 @@ class PrintStyleViewsTestCase(unittest.TestCase):
             with db_conn.cursor() as cursor:
                 cursor.execute("""INSERT INTO latest_modules
                                   (print_style, portal_type, name, licenseid,
-                                        doctype, uuid, created, revised)
+                                        doctype, uuid, created, revised, recipe)
                                   VALUES ('ccap-physics', 'Collection', 'test', 1,
-                                        'doc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', now(), now());""")
+                                        'doc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', now(), now(), 1);""")
 
         print_style = 'ccap-physics'
         request.matchdict['style'] = print_style
@@ -164,7 +163,6 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_print_styles_single
         content = admin_print_styles_single(request)
         self.assertEqual(content['print_style'], 'ccap-physics')
-        self.assertEqual(content['file'], 1)
         self.assertEqual(content['recipe_type'], 'web')
         self.assertEqual(len(content['collections']), 1)
         self.assertEqual(content['collections'][0],
@@ -172,8 +170,10 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                           'authors': None,
                           'revised': content['collections'][0]['revised'],
                           'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'tag': '1.0',
+                          'recipe': 1,
                           'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
-                          'status': 'stale'})
+                          'status': 'current'})
 
     def test_print_style_single_no_style(self):
         request = testing.DummyRequest()
