@@ -5,12 +5,14 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import pytest
 import unittest
+
 from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
-import pytest
+from pyramid.httpexceptions import HTTPBadRequest
 
 from .. import use_cases
 from ..testing import (
@@ -333,3 +335,13 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         content = admin_content_status_single_POST(request)
         self.assertEqual(content['response'],
                          'Book of Infinity is already baking/set to bake')
+
+    def test_admin_content_status_single_page_POST_bad_uuid(self):
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
+        request.matchdict['uuid'] = uuid
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_content_status_single_POST(request)
+        self.assertIn('not a book', caught_exc.exception.message)
