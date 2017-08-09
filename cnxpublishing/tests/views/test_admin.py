@@ -5,14 +5,16 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import pytest
 import unittest
+
 from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
-from pyramid import httpexceptions
 import pytest
 import psycopg2
+from pyramid.httpexceptions import HTTPBadRequest
 
 from .. import use_cases
 from ..testing import (
@@ -299,18 +301,20 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def test_admin_content_status_bad_sort(self):
         request = testing.DummyRequest()
 
-        request.GET = {'sort': 'invalid sort'}
+        request.GET = {'sort': 'bad sort'}
         from ...views.admin import admin_content_status
-        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status(request)
+        self.assertIn('invalid sort', caught_exc.exception.message)
 
     def test_admin_content_status_bad_page_number(self):
         request = testing.DummyRequest()
 
         request.GET = {'page': 'abc'}
         from ...views.admin import admin_content_status
-        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status(request)
+        self.assertIn('invalid page', caught_exc.exception.message)
 
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()
@@ -349,8 +353,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         request.matchdict['uuid'] = uuid
 
         from ...views.admin import admin_content_status_single
-        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status_single(request)
+        self.assertIn('is not a valid uuid', caught_exc.exception.message)
 
     def test_admin_content_status_single_uuid_no_book(self):
         request = testing.DummyRequest()
@@ -359,8 +364,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         request.matchdict['uuid'] = uuid
 
         from ...views.admin import admin_content_status_single
-        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status_single(request)
+        self.assertIn('not a book', caught_exc.exception.message)
 
     def test_admin_content_status_single_page_POST_already_baking(self):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
@@ -404,3 +410,13 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                     """, (uuid, ))
                 state = cursor.fetchone()
                 self.assertEqual(state[0], 5)
+
+    def test_admin_content_status_single_page_POST_bad_uuid(self):
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
+        request.matchdict['uuid'] = uuid
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_content_status_single_POST(request)
+        self.assertIn('not a book', caught_exc.exception.message)
