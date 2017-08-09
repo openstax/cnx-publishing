@@ -49,15 +49,37 @@ def celery_includes():
     ]
 
 
+@pytest.fixture(scope='session')
+def celery_config():
+    from .testing import integration_test_settings
+    settings = integration_test_settings()
+    return {
+        'broker_url': settings['celery.broker'],
+        'result_backend': settings['celery.backend'],
+    }
+
+
+@pytest.fixture(scope='session')
+def celery_parameters():
+    from ..tasks import PyramidAwareTask
+    return {
+        'name': 'tasks',
+        'task_cls': PyramidAwareTask,
+    }
+
+
 @pytest.fixture
-def scoped_pyramid_app():
+def scoped_pyramid_app(celery_app):
     from .testing import integration_test_settings
     settings = integration_test_settings()
     from pyramid import testing
     config = testing.setUp(settings=settings)
     # Register the routes for reverse generation of urls.
     config.include('cnxpublishing.views')
-    config.include('cnxpublishing.tasks')
+    # Tack the pyramid config on the celery app.
+    # See cnxpublishing.tasks.includeme
+    config.registry.celery_app = celery_app
+    config.registry.celery_app.conf['pyramid_config'] = config
     config.scan('cnxpublishing.subscribers')
 
     # Initialize the authentication policy.
@@ -65,8 +87,3 @@ def scoped_pyramid_app():
     main(config)
     config.commit()
     return config
-
-
-@pytest.fixture
-def celery_app(scoped_pyramid_app):
-    return scoped_pyramid_app.make_celery_app()
