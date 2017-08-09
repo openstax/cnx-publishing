@@ -69,7 +69,7 @@ def celery_parameters():
 
 
 @pytest.fixture
-def scoped_pyramid_app(celery_app):
+def scoped_pyramid_app(celery_app, db_init_and_wipe):
     from .testing import integration_test_settings
     settings = integration_test_settings()
     from pyramid import testing
@@ -82,8 +82,16 @@ def scoped_pyramid_app(celery_app):
     config.registry.celery_app.conf['pyramid_config'] = config
     config.scan('cnxpublishing.subscribers')
 
+    # Celery only creates the tables once per session.  This gets celery to
+    # create the tables again (as a side effect of a new session manager) since
+    # we are starting with an empty database.
+    from celery.backends.database.session import SessionManager
+    celery_app.backend.ResultSession(SessionManager())
+
     # Initialize the authentication policy.
     from openstax_accounts.stub import main
     main(config)
     config.commit()
-    return config
+    yield config
+
+    testing.tearDown()

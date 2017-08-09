@@ -10,6 +10,7 @@ from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
+import pytest
 
 from .. import use_cases
 from ..testing import (
@@ -18,13 +19,7 @@ from ..testing import (
     )
 
 
-# FIXME There is an issue with setting up the celery app more than once.
-#       Apparently, creating the app a second time doesn't really create
-#       it again. There is some global state hanging around that we can't
-#       easily get at. This causes the task results tables used in these
-#       views to not exist, because the code believes it's already been
-#       initialized.
-@unittest.skip("celery is too global")
+@pytest.mark.usefixtures('scoped_pyramid_app')
 class PostPublicationsViewsTestCase(unittest.TestCase):
     maxDiff = None
 
@@ -34,18 +29,6 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
         from cnxpublishing.config import CONNECTION_STRING
         cls.db_conn_str = cls.settings[CONNECTION_STRING]
         cls.db_connect = staticmethod(db_connection_factory())
-
-    def setUp(self):
-        self.config = testing.setUp(settings=self.settings)
-        self.config.include('cnxpublishing.tasks')
-        init_db(self.db_conn_str, True)
-
-    def tearDown(self):
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("DROP SCHEMA public CASCADE")
-                cursor.execute("CREATE SCHEMA public")
-        testing.tearDown()
 
     @property
     def target(self):
