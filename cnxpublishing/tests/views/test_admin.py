@@ -60,7 +60,6 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_post_publications
         return admin_post_publications
 
-    @unittest.skip("celery is too global, run one at a time")
     def test_no_results(self):
         request = testing.DummyRequest()
 
@@ -68,7 +67,6 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
 
         self.assertEqual({'states': []}, resp_data)
 
-    @unittest.skip("celery is too global, run one at a time")
     def test(self):
         request = testing.DummyRequest()
 
@@ -224,13 +222,7 @@ class SiteMessageViewsTestCase(unittest.TestCase):
                           'id': '1'}, results)
 
 
-# FIXME There is an issue with setting up the celery app more than once.
-#       Apparently, creating the app a second time doesn't really create
-#       it again. There is some global state hanging around that we can't
-#       easily get at. This causes the task results tables used in these
-#       views to not exist, because the code believes it's already been
-#       initialized.
-@unittest.skip("celery is too global")
+@pytest.mark.usefixtures('scoped_pyramid_app')
 class ContentStatusViewsTestCase(unittest.TestCase):
     maxDiff = None
 
@@ -248,15 +240,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                               '/a/content-status/{uuid}')
         self.config.add_route('get-content', '/contents/{ident_hash}')
 
-        init_db(self.db_conn_str, True)
         add_data(self)
-
-    def tearDown(self):
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                cursor.execute("DROP SCHEMA public CASCADE")
-                cursor.execute("CREATE SCHEMA public")
-        testing.tearDown()
 
     def test_admin_content_status_no_filters(self):
         request = testing.DummyRequest()
