@@ -298,6 +298,24 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             content['states'],
             sorted(content['states'], key=lambda x: x['state']))
 
+    def test_admin_content_status_stale_recipe(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET recipe=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+        request.GET = {'page': 1,
+                       'number': 1}
+        from ...views.admin import admin_content_status
+        content = admin_content_status(request)
+        print [x['state'] for x in content['states']]
+        self.assertEqual('PENDING stale_content stale_recipe',
+                         content['states'][0]['state'])
+
     def test_admin_content_status_bad_sort(self):
         request = testing.DummyRequest()
 
