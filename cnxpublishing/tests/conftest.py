@@ -47,3 +47,26 @@ def celery_includes():
         'celery.contrib.testing.tasks',  # For the shared 'ping' task.
         'cnxpublishing.subscribers',
     ]
+
+
+@pytest.fixture
+def scoped_pyramid_app():
+    from .testing import integration_test_settings
+    settings = integration_test_settings()
+    from pyramid import testing
+    config = testing.setUp(settings=settings)
+    # Register the routes for reverse generation of urls.
+    config.include('cnxpublishing.views')
+    config.include('cnxpublishing.tasks')
+    config.scan('cnxpublishing.subscribers')
+
+    # Initialize the authentication policy.
+    from openstax_accounts.stub import main
+    main(config)
+    config.commit()
+    return config
+
+
+@pytest.fixture
+def celery_app(scoped_pyramid_app):
+    return scoped_pyramid_app.make_celery_app()
