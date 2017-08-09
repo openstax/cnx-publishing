@@ -152,11 +152,9 @@ class TestPostPublicationProcessing(object):
 
         from celery.result import AsyncResult
         result = AsyncResult(id=result_id)
-        # Testing that an exception was raised and
-        # that we have access to the traceback.
-        result.get(propagate=False)  # blocking operation
-        assert result.failed()
-        assert exc_msg in result.traceback
+        with pytest.raises(Exception) as exc_info:
+            result.get()  # blocking operation
+            assert exc_info.exception.args[0] == exc_msg
 
         # Make sure it is marked as 'errored'.
         db_cursor.execute("SELECT ms.statename "
