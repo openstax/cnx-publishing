@@ -377,7 +377,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                     WHERE uuid=%s;
                     """, (uuid, ))
 
-
         request = testing.DummyRequest()
         from ...views.admin import admin_content_status_single_POST
 
