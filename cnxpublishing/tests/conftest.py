@@ -47,3 +47,56 @@ def celery_includes():
         'celery.contrib.testing.tasks',  # For the shared 'ping' task.
         'cnxpublishing.subscribers',
     ]
+
+
+@pytest.fixture(scope='session')
+def celery_config():
+    from .testing import integration_test_settings
+    settings = integration_test_settings()
+    return {
+        'broker_url': settings['celery.broker'],
+        'result_backend': settings['celery.backend'],
+    }
+
+
+@pytest.fixture(scope='session')
+def celery_parameters():
+    from ..tasks import PyramidAwareTask
+    return {
+        'name': 'tasks',
+        'task_cls': PyramidAwareTask,
+    }
+
+
+@pytest.fixture
+def scoped_pyramid_app(celery_app, db_init_and_wipe):
+    from .testing import integration_test_settings
+    settings = integration_test_settings()
+    from pyramid import testing
+    config = testing.setUp(settings=settings)
+    # Register the routes for reverse generation of urls.
+    config.include('cnxpublishing.views')
+    # Tack the pyramid config on the celery app.
+    # See cnxpublishing.tasks.includeme
+    config.registry.celery_app = celery_app
+    config.registry.celery_app.conf['pyramid_config'] = config
+    config.scan('cnxpublishing.subscribers')
+
+    # Celery only creates the tables once per session.  This gets celery to
+    # create the tables again (as a side effect of a new session manager) since
+    # we are starting with an empty database.
+    from celery.backends.database.session import SessionManager
+    celery_app.backend.ResultSession(SessionManager())
+
+    # Initialize the authentication policy.
+    from openstax_accounts.stub import main
+    main(config)
+    config.commit()
+    yield config
+
+    testing.tearDown()
+
+    # Force celery to create a new event loop.
+    # See https://github.com/celery/celery/issues/4088
+    from kombu.async import set_event_loop
+    set_event_loop(None)
