@@ -290,13 +290,20 @@ def admin_print_styles(request):
     with psycopg2.connect(db_conn_str) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-                SELECT print_style, max(recipe_type),
-                    max(revised), max(tag),
-                    (SELECT count (*) from latest_modules as lm
-                        where lm.print_style=ps.print_style
-                            and lm.portal_type='Collection')
-                FROM print_style_recipes as ps
-                GROUP BY print_style;""")
+                WITH latest AS (
+                    SELECT print_style, max(revised) AS revised
+                        FROM print_style_recipes
+                        GROUP BY print_style
+                ) SELECT ps.print_style, ps.recipe_type, ps.revised, tag,
+                    (SELECT count(*)
+                        FROM latest_modules AS lm
+                        WHERE lm.print_style = ps.print_style AND
+                              lm.portal_type = 'Collection')
+                    FROM latest
+                    JOIN print_style_recipes AS ps
+                    ON ps.print_style = latest.print_style AND
+                       ps.revised = latest.revised;
+                """)
             for row in cursor.fetchall():
                 styles.append({
                     'print_style': row[0],
