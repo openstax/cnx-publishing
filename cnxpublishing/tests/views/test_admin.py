@@ -10,7 +10,9 @@ from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
+from pyramid import httpexceptions
 import pytest
+import psycopg2
 
 from .. import use_cases
 from ..testing import (
@@ -294,6 +296,22 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             content['states'],
             sorted(content['states'], key=lambda x: x['state']))
 
+    def test_admin_content_status_bad_sort(self):
+        request = testing.DummyRequest()
+
+        request.GET = {'sort': 'invalid sort'}
+        from ...views.admin import admin_content_status
+        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+            admin_content_status(request)
+
+    def test_admin_content_status_bad_page_number(self):
+        request = testing.DummyRequest()
+
+        request.GET = {'page': 'abc'}
+        from ...views.admin import admin_content_status
+        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+            admin_content_status(request)
+
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()
 
@@ -324,12 +342,65 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ]
         }, content)
 
-    def test_admin_content_status_single_page_POST(self):
+    def test_admin_content_status_single_bad_uuid(self):
+        request = testing.DummyRequest()
+
+        uuid = 'bad-uuid'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+            admin_content_status_single(request)
+
+    def test_admin_content_status_single_uuid_no_book(self):
+        request = testing.DummyRequest()
+
+        uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+        with self.assertRaises(httpexceptions.HTTPBadRequest) as caught_exc:
+            admin_content_status_single(request)
+
+    def test_admin_content_status_single_page_POST_already_baking(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid=5
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+
         request = testing.DummyRequest()
         from ...views.admin import admin_content_status_single_POST
 
-        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
         request.matchdict['uuid'] = uuid
         content = admin_content_status_single_POST(request)
         self.assertEqual(content['response'],
                          'Book of Infinity is already baking/set to bake')
+
+    def test_admin_content_status_single_page_POST_bake(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        request.matchdict['uuid'] = uuid
+        content = admin_content_status_single_POST(request)
+        self.assertEqual(content['response'],
+                         'Book of Infinity set to bake!')
+
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    SELECT stateid FROM modules WHERE uuid=%s;
+                    """, (uuid, ))
+                state = cursor.fetchone()
+                self.assertEqual(state[0], 5)
