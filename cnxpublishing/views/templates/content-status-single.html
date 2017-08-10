@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Content Status History for single book</h1>
+
+  <p><b>uuid:</b> {{uuid}}</p>
+  <p><b>Title:</b> {{title}}</p>
+  <p><b>Authors:</b> {{authors}}</p>
+  <p><b>Print Style:</b> {{print_style}}</p>
+  <p><b>CURRENT STATE:</b> {{current_state}}
+  <form method="post" id="bake_button">
+    <input hidden type="text" value="current_state">
+    <input type="submit" value="BAKE">
+  </form>
+  <br>
+  <div><b>{{response}}</b></div>
+  <br><br><br>
+
+  {% for state in states%}
+    <b>Version:</b> {{state.version}} &emsp;&emsp;&emsp;
+    <b>Created:</b> {{state.created}} &emsp;&emsp;&emsp;
+    <b>Recipie:</b> {{state.recipe}} &emsp;&emsp;&emsp;
+    <b>State:</b> {{state.state}}<br>
+    <b>Message:</b><pre>{{state.state_message}}</pre>
+    <br><br>
+  {% endfor %}
+
+{% endblock %}
