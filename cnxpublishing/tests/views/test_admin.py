@@ -386,6 +386,31 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             admin_content_status_single(request)
         self.assertIn('not a book', caught_exc.exception.message)
 
+    def test_admin_content_status_single_stale_recipe(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET recipe=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+
+        request.GET = {'page': 1,
+                       'number': 1}
+        from ...views.admin import admin_content_status
+        content = admin_content_status_single(request)
+        print [x['state'] for x in content['states']]
+        self.assertEqual('PENDING stale_recipe stale_content',
+                         content['states'][0]['state'])
+
+
     def test_admin_content_status_single_page_POST_already_baking(self):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
         with psycopg2.connect(self.db_conn_str) as db_conn:
