@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Content Status</h1>
+  <form action="/a/content-status/" method="get">
+    <b>Filters:</b><br>
+    Status: <br>
+      <label><input type="checkbox" name="pending_filter" {{PENDING}} value="PENDING">
+        PENDING
+        (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="started_filter" {{STARTED}} value="STARTED">
+        STARTED
+        (<i class="fa fa-exclamation-triangle" style="font-size:20px;color:gold"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="retry_filter" {{RETRY}} value="RETRY">
+        RETRY
+        (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="failure_filter" {{FAILURE}} value="FAILURE">
+        FAILURE
+        (<i class="fa fa-close" style="font-size:20px;color:red"></i>)
+      </label>&emsp;&emsp;&emsp;
+      <label><input type="checkbox" name="success_filter" {{SUCCESS}} value="SUCCESS">
+        SUCCESS
+        (<i class="fa fa-check-square" style="font-size:20px;color:limeGreen"></i>)
+      </label>
+    <br><br>Author:
+      <input type="text" name="author" value={{author}}><br>
+    uuid:
+      <input type="text" name="uuid" value={{uuid}}><br>
+    Entries Per Page:  <input type="number" min="1" name="number" value={{num_entries}}><br>
+    Page:  <input type="number" min="1" name="page" value={{page}}><br>
+    <br>
+    <input type="submit" value="Filter"><br>
+  </form>
+  <br><br>
+  Showing {{start_entry + 1}} - {{start_entry + num_entries}} of {{total_entries}}
+  <br><br><br>
+
+  <table>
+    <tr>
+      <th onclick='sortBooks("bpsa.created")'>Created<i class="{{sort_created}}"></i></th>
+      <th onclick='sortBooks("m.name")'>Title<i class="{{sort_name}}"></i></th>
+      <th>Authors</th>
+      <th onclick='sortBooks("STATE")'>State<i class="{{sort_state}}"></i></th>
+      <th>Print Style</th>
+      <th>Recipe</th>
+      <th>Link to book</th>
+      <th>Message</th>
+    </tr>
+    {% for state in states %}
+      <tr>
+        <td>{{ state.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>
+          <a href="{{ state.status_link }}">{{ state.title }}</a>
+        </td>
+        <td>{{ state.authors }}</td>
+        <td>
+          <i class="{{state.state_icon}}" style="{{state.state_icon_style}}"></i>{{ state.state }}
+        </td>
+        <td>{{ state.print_style }}</td>
+        <td>{{ state.recipie }}</td>
+        <td>
+          <a href='{{ state.content_link }}'>{{ state.content_link }}</a>
+        </td>
+        <td>{{ state.state_message }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
+{% block script %}
+  function sortBooks(col) {
+    var new_link = "";
+    var current_url = window.location.href;
+    if (current_url.includes("sort=")) {
+      new_sort = current_url.includes("sort=" + col + "%20ASC")
+            ? "sort=" + col + " DESC"
+            : "sort=" + col + " ASC";
+      new_link = current_url.replace(/sort=[^&]*/, new_sort);
+    } else if (current_url.includes("/?")) { // no sort filter
+      new_link = current_url + "&sort=" + col + " ASC";
+    } else {  // no filters of any kind
+      new_link = current_url + "?sort=" + col + " ASC";
+    }
+    window.location.href = new_link;
+  }
+{% endblock %}

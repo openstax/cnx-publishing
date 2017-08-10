@@ -5,19 +5,48 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import pytest
 import unittest
+
 from datetime import datetime
 
 from cnxdb.init import init_db
 from pyramid import testing
 from pyramid import httpexceptions
 import pytest
+import psycopg2
+from pyramid.httpexceptions import HTTPBadRequest
 
 from .. import use_cases
 from ..testing import (
     integration_test_settings,
     db_connection_factory,
     )
+
+
+def add_data(self):
+    with self.db_connect() as db_conn:
+        with db_conn.cursor() as cursor:
+            # Insert one book into archive.
+            book = use_cases.setup_BOOK_in_archive(self, cursor)
+            db_conn.commit()
+
+            # Insert some data into the association table.
+            cursor.execute("""
+            INSERT INTO document_baking_result_associations
+            (result_id, module_ident)
+            SELECT
+            uuid_generate_v4(),
+            (SELECT module_ident FROM modules ORDER BY module_ident DESC LIMIT 1);""")
+            db_conn.commit()
+
+            cursor.execute("""\
+            INSERT INTO document_baking_result_associations
+            (result_id, module_ident)
+            SELECT
+            uuid_generate_v4(),
+            (SELECT module_ident FROM modules ORDER BY module_ident DESC LIMIT 1);""")
+    return book
 
 
 @pytest.mark.usefixtures('scoped_pyramid_app')
@@ -46,27 +75,7 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
     def test(self):
         request = testing.DummyRequest()
 
-        with self.db_connect() as db_conn:
-            with db_conn.cursor() as cursor:
-                # Insert one book into archive.
-                book = use_cases.setup_BOOK_in_archive(self, cursor)
-                db_conn.commit()
-
-                # Insert some data into the association table.
-                cursor.execute("""
-INSERT INTO document_baking_result_associations
-  (result_id, module_ident)
-SELECT
-  uuid_generate_v4(),
-  (SELECT module_ident FROM modules ORDER BY module_ident DESC LIMIT 1);""")
-                db_conn.commit()
-
-                cursor.execute("""\
-INSERT INTO document_baking_result_associations
-  (result_id, module_ident)
-SELECT
-  uuid_generate_v4(),
-  (SELECT module_ident FROM modules ORDER BY module_ident DESC LIMIT 1);""")
+        book = add_data(self)
 
         resp_data = self.target(request)
         self.assertEqual({
@@ -302,3 +311,240 @@ class SiteMessageViewsTestCase(unittest.TestCase):
                           'end_date': '2017-01-03',
                           'end_time': '00:03',
                           'id': '1'}, results)
+
+
+@pytest.mark.usefixtures('scoped_pyramid_app')
+class ContentStatusViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        self.config = testing.setUp(settings=self.settings)
+        self.config.include('cnxpublishing.tasks')
+        self.config.add_route('admin-content-status-single',
+                              '/a/content-status/{uuid}')
+        self.config.add_route('get-content', '/contents/{ident_hash}')
+
+        add_data(self)
+
+    def test_admin_content_status_no_filters(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_content_status
+        content = admin_content_status(request)
+        self.assertEqual({
+            'SUCCESS': 'checked',
+            'PENDING': 'checked',
+            'STARTED': 'checked',
+            'RETRY': 'checked',
+            'FAILURE': 'checked',
+            'start_entry': 0,
+            'page': 1,
+            'num_entries': 100,
+            'sort': 'bpsa.created DESC',
+            'sort_created': 'fa fa-angle-down',
+            'total_entries': 2,
+            'states': content['states']
+        }, content)
+        self.assertEqual(
+            content['states'],
+            sorted(content['states'], key=lambda x: x['created'], reverse=True))
+
+    def test_admin_content_status_w_filters(self):
+        request = testing.DummyRequest()
+
+        request.GET = {'page': 1,
+                       'number': 2,
+                       'sort': 'STATE ASC',
+                       'author': 'charrose',
+                       'pending_filter': 'PENDING'}
+        from ...views.admin import admin_content_status
+        content = admin_content_status(request)
+        self.assertEqual({
+            'PENDING': 'checked',
+            'start_entry': 0,
+            'page': 1,
+            'num_entries': 2,
+            'author': 'charrose',
+            'sort': 'STATE ASC',
+            'sort_state': 'fa fa-angle-up',
+            'total_entries': 2,
+            'states': content['states']
+        }, content)
+        self.assertEqual(len(content['states']), 2)
+        for state in content['states']:
+            self.assertTrue('charrose' in state['authors'])
+            self.assertTrue('PENDING' in state['state'])
+        self.assertEqual(
+            content['states'],
+            sorted(content['states'], key=lambda x: x['state']))
+
+    def test_admin_content_status_stale_recipe(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET recipe=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+        request.GET = {'page': 1,
+                       'number': 1}
+        from ...views.admin import admin_content_status
+        content = admin_content_status(request)
+        print [x['state'] for x in content['states']]
+        self.assertEqual('PENDING stale_content stale_recipe',
+                         content['states'][0]['state'])
+
+    def test_admin_content_status_bad_sort(self):
+        request = testing.DummyRequest()
+
+        request.GET = {'sort': 'bad sort'}
+        from ...views.admin import admin_content_status
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            admin_content_status(request)
+        self.assertIn('invalid sort', caught_exc.exception.message)
+
+    def test_admin_content_status_bad_page_number(self):
+        request = testing.DummyRequest()
+
+        request.GET = {'page': 'abc'}
+        from ...views.admin import admin_content_status
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            admin_content_status(request)
+        self.assertIn('invalid page', caught_exc.exception.message)
+
+    def test_admin_content_status_single_page(self):
+        request = testing.DummyRequest()
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+        content = admin_content_status_single(request)
+        self.assertEqual({
+            'uuid': uuid,
+            'title': 'Book of Infinity',
+            'authors': 'marknewlyn, charrose',
+            'print_style': None,
+            'current_recipe': None,
+            'current_ident': 2,
+            'current_state': u'PENDING stale_content',
+            'states': [
+                {'version': '1.1',
+                 'recipe': None,
+                 'created': content['states'][0]['created'],
+                 'state': 'PENDING stale_content',
+                 'state_message': ''},
+                {'version': '1.1',
+                 'recipe': None,
+                 'created': content['states'][1]['created'],
+                 'state': 'PENDING stale_content',
+                 'state_message': ''}
+            ]
+        }, content)
+
+    def test_admin_content_status_single_bad_uuid(self):
+        request = testing.DummyRequest()
+
+        uuid = 'bad-uuid'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            admin_content_status_single(request)
+        self.assertIn('is not a valid uuid', caught_exc.exception.message)
+
+    def test_admin_content_status_single_uuid_no_book(self):
+        request = testing.DummyRequest()
+
+        uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            admin_content_status_single(request)
+        self.assertIn('not a book', caught_exc.exception.message)
+
+    def test_admin_content_status_single_stale_recipe(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET recipe=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        request.matchdict['uuid'] = uuid
+
+        from ...views.admin import admin_content_status_single
+
+        request.GET = {'page': 1,
+                       'number': 1}
+        from ...views.admin import admin_content_status
+        content = admin_content_status_single(request)
+        print [x['state'] for x in content['states']]
+        self.assertEqual('PENDING stale_recipe stale_content',
+                         content['states'][0]['state'])
+
+    def test_admin_content_status_single_page_POST_already_baking(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid=5
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        request.matchdict['uuid'] = uuid
+        content = admin_content_status_single_POST(request)
+        self.assertEqual(content['response'],
+                         'Book of Infinity is already baking/set to bake')
+
+    def test_admin_content_status_single_page_POST_bake(self):
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    UPDATE modules SET stateid=1
+                    WHERE uuid=%s;
+                    """, (uuid, ))
+
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        request.matchdict['uuid'] = uuid
+        content = admin_content_status_single_POST(request)
+        self.assertEqual(content['response'],
+                         'Book of Infinity set to bake!')
+
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    SELECT stateid FROM modules WHERE uuid=%s;
+                    """, (uuid, ))
+                state = cursor.fetchone()
+                self.assertEqual(state[0], 5)
+
+    def test_admin_content_status_single_page_POST_bad_uuid(self):
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status_single_POST
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
+        request.matchdict['uuid'] = uuid
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_content_status_single_POST(request)
+        self.assertIn('not a book', caught_exc.exception.message)
