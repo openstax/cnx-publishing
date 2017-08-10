@@ -410,7 +410,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.assertEqual('PENDING stale_recipe stale_content',
                          content['states'][0]['state'])
 
-
     def test_admin_content_status_single_page_POST_already_baking(self):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
         with psycopg2.connect(self.db_conn_str) as db_conn:
