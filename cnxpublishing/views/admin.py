@@ -364,7 +364,7 @@ def format_authors(authors):
 
 @view_config(route_name='admin-content-status', request_method='GET',
              renderer='cnxpublishing.views:templates/content-status.html',
-             permission='administer')
+             permission='view')
 def admin_content_status(request):
     """
     Returns a dictionary with the states and info of baking books,
@@ -461,7 +461,7 @@ def admin_content_status(request):
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
              renderer='templates/content-status-single.html',
-             permission='administer')
+             permission='view')
 def admin_content_status_single(request):
     """
     Returns a dictionary with all the past baking statuses of a single book.
