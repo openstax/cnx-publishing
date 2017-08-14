@@ -30,7 +30,7 @@ def track_baking_proc_state(result, module_ident, cursor):
 def post_publication_processing(event, cursor):
     """Process post-publication events coming out of the database."""
     module_ident, ident_hash = event.module_ident, event.ident_hash
-    logger.debug('Processing module_ident={} ident_hash={}'.format(
+    logger.debug('Queued for processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
     update_module_state(cursor, module_ident, 'processing', None)
     # Commit the state change before preceding.
@@ -78,6 +78,8 @@ def _get_recipe_ids(module_ident, cursor):
 @with_db_cursor
 def baking_processor(module_ident, ident_hash, cursor=None):
 
+    logger.debug('Starting baking module_ident={} ident_hash={}'
+                 .format(module_ident, ident_hash))
     try:
         binder = export_epub.factory(ident_hash)
     except:
@@ -88,7 +90,7 @@ def baking_processor(module_ident, ident_hash, cursor=None):
         update_module_state(cursor, module_ident, 'errored', None)
         raise
     finally:
-        logger.debug('Finished exporting module_ident={} ident_hash={}'
+        logger.debug('Exported module_ident={} ident_hash={}'
                      .format(module_ident, ident_hash))
 
     cursor.execute("""\
@@ -116,7 +118,7 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                 update_module_state(cursor, module_ident, state, recipe_id)
                 raise
         finally:
-            logger.debug('Finished module_ident={} ident_hash={} '
+            logger.debug('Finished baking module_ident={} ident_hash={} '
                          'with a final state of \'{}\'.'
                          .format(module_ident, ident_hash, state))
             update_module_state(cursor, module_ident, state, recipe_id)
