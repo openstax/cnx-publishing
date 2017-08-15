@@ -50,7 +50,7 @@
     </tr>
     {% for state in states %}
       <tr>
-        <td>{{ state.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td><datetime>{{ state.created.strftime('%Y-%m-%d %H:%M:%S') }}</datetime></td>
         <td>
           <a href="{{ state.status_link }}">{{ state.title }}</a>
         </td>
