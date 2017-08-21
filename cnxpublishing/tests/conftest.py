@@ -41,6 +41,25 @@ def complex_book_one(db_cursor):
     return (binder, ident_hash_to_module_ident_mapping,)
 
 
+@pytest.fixture
+def complex_book_one_v2(db_cursor):
+    # FIXME This uses `None` as the test_case argument.
+    binder = use_cases.setup_COMPLEX_BOOK_ONE_v2_in_archive(None, db_cursor)
+    idents = map(lambda m: m.ident_hash,
+                 cnxepub.flatten_to(binder, lambda m: True))
+    db_cursor.connection.commit()
+    db_cursor.execute(
+        "SELECT ident_hash(uuid, major_version, minor_version), module_ident "
+        "FROM modules "
+        "WHERE ident_hash(uuid, major_version, minor_version) = ANY (%s)",
+        (idents,))
+    ident_hash_to_module_ident_mapping = dict(db_cursor.fetchall())
+    for m in cnxepub.flatten_to(binder, lambda m: bool(m.ident_hash)):
+        module_ident = ident_hash_to_module_ident_mapping[m.ident_hash]
+        ident_hash_to_module_ident_mapping[m.ident_hash] = module_ident
+    return (binder, ident_hash_to_module_ident_mapping,)
+
+
 @pytest.fixture(scope='session')
 def celery_includes():
     return [

@@ -927,6 +927,31 @@ def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
     return model
 
 
+def setup_COMPLEX_BOOK_ONE_v2_in_archive(test_case, cursor):
+    """Set up COMPLEX_BOOK_ONE v2"""
+    model = deepcopy(COMPLEX_BOOK_ONE)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408'
+    model.metadata['version'] = '2.1'
+
+    doc = setup_PAGE_ONE_in_archive(test_case, cursor)
+    model[0][0] = doc
+    doc = setup_PAGE_TWO_in_archive(test_case, cursor)
+    model[0][1] = doc
+    doc = setup_PAGE_THREE_in_archive(test_case, cursor)
+    model[1][0] = doc
+    del model[1][1]
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        publish_model(cursor, model, publisher, publication_message)
+    _set_uri(model)
+    return model
+
+
 def setup_COMPLEX_BOOK_TWO_in_archive(test_case, cursor):
     """Set up COMPLEX_BOOK_ONE"""
     model = deepcopy(COMPLEX_BOOK_TWO)

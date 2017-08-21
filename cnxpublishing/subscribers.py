@@ -6,7 +6,7 @@ from pyramid.events import subscriber
 from pyramid.threadlocal import get_current_registry
 
 
-from . import events
+from . import events, utils
 from .bake import remove_baked, bake
 from .db import (
     update_module_state,
@@ -89,9 +89,32 @@ def _get_recipe_ids(module_ident, cursor):
     return cursor.fetchone()
 
 
-@task()
+@task(bind=True)
 @with_db_cursor
-def baking_processor(module_ident, ident_hash, cursor=None):
+def baking_processor(self, module_ident, ident_hash, cursor=None):
+    if self.request.retries == 0:
+        cursor.execute("""\
+SELECT module_ident, ident_hash(uuid, major_version, minor_version)
+FROM modules NATURAL JOIN modulestates
+WHERE uuid = %s AND statename IN ('post-publication', 'processing')
+ORDER BY major_version DESC, minor_version DESC""",
+                       (utils.split_ident_hash(ident_hash)[0],))
+        latest_module_ident = cursor.fetchone()
+        if latest_module_ident:
+            if latest_module_ident[0] != module_ident:
+                logger.debug("""\
+More recent version (module_ident={} ident_hash={}) in queue. \
+Move this message (module_ident={} ident_hash={}) \
+to the deferred (low priority) queue"""
+                             .format(latest_module_ident[0],
+                                     latest_module_ident[1],
+                                     module_ident, ident_hash))
+
+                raise self.retry(queue='deferred')
+        else:
+            # In case we can't find the latest version being baked, we'll
+            # continue with baking this one
+            pass
 
     logger.debug('Starting baking module_ident={} ident_hash={}'
                  .format(module_ident, ident_hash))
