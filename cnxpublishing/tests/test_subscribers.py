@@ -194,3 +194,62 @@ class TestPostPublicationProcessing(object):
                           "WHERE module_ident = %s",
                           (self.module_ident,))
         db_cursor.fetchone()[0] == 'errored'
+
+    def test_duplicate_baking(self, db_cursor):
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event1 = self.make_event()
+
+        self.target(event1)
+
+        # While the baking is happening, if the module state is set to
+        # "post-publication" again, another event is created
+        event2 = self.make_event()
+
+        self.target(event2)
+
+        # Check there is only one request being queued
+        db_cursor.execute("SELECT count(*) "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s", (self.module_ident,))
+        assert db_cursor.fetchone()[0] == 1
+
+    def test_rebaking(self, db_cursor, mocker):
+        mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self.make_event()
+
+        self.target(event)
+
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s ", (self.module_ident,))
+        result_id = db_cursor.fetchone()[0]
+
+        from celery.result import AsyncResult
+        result = AsyncResult(id=result_id)
+        result.get()  # blocking operation
+        assert result.state == 'SUCCESS'
+        assert mock_bake.call_count == 1
+
+        # After baking is finished, if the module state is set to
+        # "post-publication" again, another event is created
+        event = self.make_event()
+
+        self.target(event)
+
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s "
+                          "ORDER BY created DESC", (self.module_ident,))
+        result_id2 = db_cursor.fetchone()
+
+        assert result_id2 != result_id
+        result2 = AsyncResult(id=result_id2)
+        result2.get()  # blocking operation
+        assert result2.state == 'SUCCESS'
+        assert mock_bake.call_count == 2
