@@ -8,6 +8,7 @@
 import pytest
 import uuid
 import unittest
+import StringIO
 try:
     from unittest import mock
 except ImportError:
@@ -18,6 +19,7 @@ from datetime import datetime
 from pyramid import testing
 import psycopg2
 from pyramid.httpexceptions import HTTPBadRequest
+from StringIO import StringIO
 
 from .. import use_cases
 from ..testing import (
@@ -519,3 +521,228 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         with self.assertRaises(HTTPBadRequest) as caught_exc:
             content = admin_content_status_single_POST(request)
         self.assertIn('not a book', caught_exc.exception.message)
+
+
+@pytest.mark.usefixtures('scoped_pyramid_app')
+class FeaturedBooksViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+
+        self.config = testing.setUp(settings=self.settings)
+        init_db(self.db_conn_str)
+        self.config.include('cnxpublishing.tasks')
+        self.config.add_route('admin-featured-books', '/a/featured-books/')
+        self.config.add_route('get-content', '/contents/{ident_hash}')
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    CREATE TABLE featured_books (
+                        "uuid" UUID, "major_version" INT, "minor_version" INT);
+                """)
+                cursor.execute("""\
+                INSERT INTO modules (uuid, major_version, minor_version,
+                    name, licenseid, doctype)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 1,
+                    'Physics', 1, 'Module');
+                INSERT INTO modules (uuid, major_version, minor_version,
+                    name, licenseid, doctype)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 2,
+                    'Physics', 1, 'Module');
+                INSERT INTO modules (uuid, major_version, minor_version,
+                    name, licenseid, doctype)
+                VALUES ('94919e72-7573-4ed4-828e-673c1fe0cf9b', 1, 2,
+                    'Biology', 1, 'Module');
+
+                INSERT INTO featured_books (uuid, major_version, minor_version)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 1);
+                INSERT INTO featured_books (uuid, major_version, minor_version)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 2);
+
+                INSERT INTO tags (tagid, tag, scheme)
+                VALUES (9, 'CNX Featured', 'featured');
+
+                """)
+
+    def tearDown(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def test_admin_featured_book(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_featured_books
+        content = admin_featured_books(request)
+
+        uuid = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'
+
+        featured = content["featured_books"]
+        self.assertEqual(len(featured), 2)
+        self.assertEqual(featured,
+                         [{'uuid': uuid + "@1.1", 'title': 'Physics'},
+                          {'uuid': uuid + "@1.2", 'title': 'Physics'}])
+
+    def test_admin_delete_featured_book(self):
+        request = testing.DummyRequest()
+        request.method = 'DELETE'
+        ident_hash = 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.1'
+        request.body = 'id=' + ident_hash
+
+        from ...views.admin import admin_delete_featured_book
+        content = admin_delete_featured_book(request)
+
+        self.assertEqual(content['response'],
+                         "Module ({}) removed from featured books list".
+                         format(ident_hash))
+
+        self.assertEqual(len(content['featured_books']), 1)
+        with psycopg2.connect(self.db_conn_str) as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""\
+                    SELECT uuid, major_version, minor_version
+                    FROM featured_books;
+                    """)
+                featured = cursor.fetchall()
+
+                self.assertEqual(len(featured), 1)
+                self.assertEqual(featured[0],
+                                 tuple([uuid.UUID('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee'),
+                                        1, 2]))
+
+    def test_admin_add_featured_book(self):
+        request = testing.DummyRequest()
+
+        class MockCGIFieldStorage(object):
+            pass
+
+        upload = MockCGIFieldStorage()
+        upload.file = StringIO('foo')
+        upload.filename = 'foo.png'
+
+        inputs = {'ident_hash': '94919e72-7573-4ed4-828e-673c1fe0cf9b@1.2',
+                  'picture': upload}
+
+        request.POST = inputs
+
+        from ...views.admin import admin_add_featured_books
+        content = admin_add_featured_books(request)
+        self.assertEqual(content['response'],
+                         ("Image added. 94919e72-7573-4ed4-828e-673c1fe0cf9b@1.2 "
+                         "successfully added to featured books list"))
+        self.assertEqual(len(content['featured_books']), 3)
+
+    def test_admin_update_featured_book(self):
+        request = testing.DummyRequest()
+
+        class MockCGIFieldStorage(object):
+            pass
+
+        upload = MockCGIFieldStorage()
+        upload.file = StringIO('foo')
+        upload.filename = 'foo.png'
+
+        inputs = {'ident_hash': 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.1',
+                  'picture': upload}
+
+        request.POST = inputs
+
+        from ...views.admin import admin_add_featured_books
+        content = admin_add_featured_books(request)
+        self.assertEqual(content['response'],
+                         ("Image added. d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.1 "
+                         "already added in featured books list"))
+        self.assertEqual(len(content['featured_books']), 2)
+
+    def test_admin_add_featured_book_invalid_uuid(self):
+        request = testing.DummyRequest()
+        request.matchdict['ident_hash'] = 'd5dbbd8e-d137-4f89-9d0a'
+
+        from ...views.admin import admin_add_featured_books
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_add_featured_books(request)
+        self.assertIn('is not a valid uuid', caught_exc.exception.message)
+
+    def test_admin_add_featured_book_bad_version(self):
+        request = testing.DummyRequest()
+        request.POST = {'ident_hash': 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@a.b'}
+
+        from ...views.admin import admin_add_featured_books
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_add_featured_books(request)
+        self.assertIn('a.b is not a valid version', caught_exc.exception.message)
+
+        request.POST = {'ident_hash': 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.b'}
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_add_featured_books(request)
+        self.assertIn('1.b is not a valid version', caught_exc.exception.message)
+
+    def test_admin_add_featured_book_uuid_does_not_exist(self):
+        request = testing.DummyRequest()
+        request.POST = {'ident_hash': 'd5dbbd8e-d137-4f89-9d0a-abcdaaaaaaaa@1.1'}
+
+        from ...views.admin import admin_add_featured_books
+        with self.assertRaises(HTTPBadRequest) as caught_exc:
+            content = admin_add_featured_books(request)
+        self.assertIn('is not an existing module', caught_exc.exception.message)
+
+    def test_admin_add_featured_book_image_already_exist(self):
+        request = testing.DummyRequest()
+
+        class MockCGIFieldStorage(object):
+            pass
+
+        upload = MockCGIFieldStorage()
+        upload.file = StringIO('foo')
+        upload.filename = 'foo.png'
+
+        from ...views.admin import admin_add_featured_books
+        # run this twice
+        inputs = {'ident_hash': 'd5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee@1.1',
+                  'picture': upload}
+        request.POST = inputs
+        content = admin_add_featured_books(request)
+
+        inputs = {'ident_hash': '94919e72-7573-4ed4-828e-673c1fe0cf9b@1.2',
+                  'picture': upload}
+        request.POST = inputs
+
+        content = admin_add_featured_books(request)
+        self.assertEqual(content['response'],
+                         ("Image file already in the databse. 94919e72-7573-4ed4-828e-673c1fe0cf9b@1.2 "
+                          "successfully added to featured books list"))
+
+    def test_admin_add_featured_book_no_version(self):
+        request = testing.DummyRequest()
+
+        class MockCGIFieldStorage(object):
+            pass
+
+        upload = MockCGIFieldStorage()
+        upload.file = StringIO('foo')
+        upload.filename = 'foo.png'
+
+        inputs = {'ident_hash': '94919e72-7573-4ed4-828e-673c1fe0cf9b',
+                  'picture': upload}
+
+        request.POST = inputs
+
+        from ...views.admin import admin_add_featured_books
+        content = admin_add_featured_books(request)
+        self.assertEqual(content['response'],
+                         ("Image added. 94919e72-7573-4ed4-828e-673c1fe0cf9b "
+                         "successfully added to featured books list"))
+        self.assertEqual(len(content['featured_books']), 3)

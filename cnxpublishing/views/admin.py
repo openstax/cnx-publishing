@@ -7,7 +7,8 @@
 # ###
 from __future__ import absolute_import
 from datetime import datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
+import hashlib
 
 from celery.result import AsyncResult
 from psycopg2.extras import DictCursor
@@ -59,6 +60,9 @@ def admin_index(request):  # pragma: no cover
              },
             {'name': 'Content Status',
              'uri': request.route_url('admin-content-status'),
+             },
+            {'name': 'Featured Books',
+             'uri': request.route_url('admin-featured-books'),
              },
             ],
         }
@@ -536,3 +540,169 @@ def admin_content_status_single_POST(request):
             args['response'] = title + " set to bake!"
 
     return args
+
+
+@view_config(route_name='admin-featured-books', request_method='GET',
+             renderer='templates/featured-books.html',
+             permission='view')
+def admin_featured_books(request):
+    settings = request.registry.settings
+    with db_connect() as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT ident_hash(f.uuid, f.major_version, f.minor_version),
+                (SELECT name
+                from modules as m
+                WHERE f.uuid=m.uuid
+                    and (f.major_version=m.major_version OR
+                         f.major_version is NULL)
+                    and (f.minor_version=m.minor_version OR
+                         f.minor_version is NULL)
+                ORDER by revised DESC LIMIT 1)
+                FROM featured_books as f;""")
+            data = cursor.fetchall()
+            featured_books = []
+            for row in data:
+                title = row[1]
+                if title is None:
+                    title = ""
+                featured_books.append({'uuid': row[0],
+                                       'title': title.decode('utf-8')})
+
+    return {'featured_books': featured_books}
+
+
+@view_config(route_name='admin-featured-books', request_method='DELETE',
+             renderer='templates/featured-books.html',
+             permission='administer')
+def admin_delete_featured_book(request):
+    ident_hash = request.body.split("=")[1]
+    ident_hash = ident_hash.replace("%40", "@")
+
+    with db_connect() as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                DELETE FROM featured_books as f
+                WHERE ident_hash(f.uuid, f.major_version, f.minor_version)=%s;
+                """, vars=(ident_hash, ))
+
+    return_args = admin_featured_books(request)
+    return_args['response'] = "Module ({}) removed from featured books list".\
+                              format(ident_hash)
+    return return_args
+
+
+@view_config(route_name='admin-featured-books', request_method='POST',
+             renderer='templates/featured-books.html',
+             permission='administer')
+def admin_add_featured_books(request):
+    ident_hash = request.POST.get('ident_hash', '').strip()
+    uuid = ident_hash.split("@")[0]
+    try:
+        UUID(uuid)
+    except ValueError:
+        raise httpexceptions.HTTPBadRequest(
+            '{} is not a valid uuid'.format(uuid))
+    major = None
+    minor = None
+    if len(ident_hash.split("@")) > 1:
+        version = ident_hash.split("@")[1]
+        try:
+            major = int(version.split(".")[0])
+        except ValueError:
+            raise httpexceptions.HTTPBadRequest(
+                '{} is not a valid version'.format(version))
+        if len(version.split(".")) > 1:
+            try:
+                minor = int(version.split(".")[1])
+            except ValueError:
+                raise httpexceptions.HTTPBadRequest(
+                    '{} is not a valid version'.format(version))
+
+    with db_connect() as db_conn:
+        with db_conn.cursor() as cursor:
+
+            module_ident = ""
+            if (major and minor):
+                cursor.execute("""\
+                    SELECT module_ident from modules as m
+                    WHERE m.uuid =%s and m.major_version=%s and
+                        m.minor_version=%s
+                    ;""", vars=(uuid, major, minor))
+            elif(major and not minor):
+                cursor.execute("""\
+                    SELECT module_ident, minor_version from modules as m
+                    WHERE m.uuid =%s and m.major_version=%s
+                    ORDER BY revised desc LIMIT 1;
+                    ;""", vars=(uuid, major))
+            else:  # just uuid
+                cursor.execute("""\
+                    SELECT module_ident, major_version, minor_version
+                    from modules as m WHERE m.uuid =%s
+                    ORDER BY revised desc LIMIT 1;
+                    ;""", vars=(uuid, ))
+            modules_found = cursor.fetchall()
+            try:
+                module_ident = modules_found[0][0]
+            except IndexError:
+                raise httpexceptions.HTTPBadRequest(
+                    '{} is not an existing module'.format(ident_hash))
+            try:
+                major = module_ident = modules_found[0][1]
+                minor = module_ident = modules_found[0][2]
+            except IndexError:
+                pass
+            filename = request.POST['picture'].filename
+            input_file = request.POST['picture'].file
+            input_file.seek(0)
+            f = input_file.read()
+            file_bytes = bytearray(f)
+            file_sha1 = hashlib.new('sha1', file_bytes).hexdigest()
+
+            cursor.execute("""SELECT sha1 from files WHERE sha1 = %s;""",
+                           vars=(file_sha1, ))
+            files_found = len(cursor.fetchall())
+            response = ""
+            if files_found > 0:
+                # the file is already in the database
+                response += "Image file already in the databse. "
+            else:
+                # have to add the file
+                cursor.execute("""\
+                    INSERT INTO files (file, media_type)
+                    VALUES (%s, 'image/png')
+                    RETURNING fileid;
+                    """, vars=(file_bytes, ))
+                fileid = cursor.fetchall()[0][0]
+                cursor.execute("""\
+                    INSERT INTO module_files (module_ident, fileid, filename)
+                    VALUES (%s, %s, 'featured-cover.png')
+                    """, vars=(module_ident, fileid, ))
+                response += "Image added. "
+
+            cursor.execute("""\
+                SELECT uuid from featured_books
+                WHERE uuid=%(uuid)s AND  major_version=%(major)s
+                        AND minor_version=%(minor)s;
+                """, vars={'uuid': uuid, 'major': major, 'minor': minor})
+            f = cursor.fetchall()
+            if len(f) > 0:
+                response += "{} already added in featured books list".\
+                                format(ident_hash)
+            else:
+                cursor.execute("""\
+                    INSERT INTO featured_books
+                    (uuid, major_version, minor_version)
+                    VALUES (%(uuid)s, %(major)s, %(minor)s);
+                    """, vars={'uuid': uuid, 'major': major, 'minor': minor})
+                cursor.execute("""\
+                    INSERT INTO moduletags (module_ident, tagid)
+                    VALUES (%s, 9);
+                    """, vars=(module_ident, ))
+                response += "{} successfully added to featured books list".\
+                            format(ident_hash)
+
+    return_args = admin_featured_books(request)
+    return_args['response'] = response
+    return return_args
+    pass

@@ -59,6 +59,8 @@ def declare_browsable_routes(config):
     add_route('admin-content-status', '/a/content-status/')
     add_route('admin-content-status-single', '/a/content-status/{uuid}')
 
+    add_route('admin-featured-books', '/a/featured-books/')
+
 
 def includeme(config):
     """Declare all routes."""

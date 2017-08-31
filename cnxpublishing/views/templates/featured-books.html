@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Add a featured book</h1>
+
+<form method="post" id="message_banner_form" enctype="multipart/form-data">
+  uuid:
+  <input type="text" name="ident_hash" id="ident_hash" size="50" required><br>
+  <br>
+
+  Image:
+  <input type="file" name="picture" id="picture" accept=".png" required>
+  <br><br>
+  <input type="submit" value="Add">
+</form>
+
+<br><br>
+<div><b>{{response}}</b></div>
+<br>
+Featured Books:
+<table>
+  <tr>
+    <th>ident_hash</th>
+    <th>title</th>
+    <th>REMOVE</th>
+  </tr>
+  {% for book in featured_books %}
+    <tr>
+      <td>{{ book.uuid }}</td>
+      <td>{{ book.title }}</td>
+      <td>
+        <button class="delete" value="{{ book.uuid }}">Delete</button>
+      </td>
+    </tr>
+  {% endfor %}
+</table>
+{% endblock %}
+
+{% block script%}
+$( ".delete" ).click(function() {
+  $.ajax({
+      url: '/a/featured-books/',
+      data: {'id': $( this ).val()},
+      type: 'DELETE',
+      success: function(response) {
+        $("html").html(response);
+      }
+  });
+});
+{% endblock %}
