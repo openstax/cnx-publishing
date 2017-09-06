@@ -1,13 +1,13 @@
-dist: precise
+dist: trusty
+sudo: required
 language: python
 # Note, /usr/bin/python is used because we must install to the system python
 # in order to make the package available to the plpython Postgres extension.
 python:
   - "2.7"
-addons:
-  postgresql: "9.4"
 services:
   - rabbitmq
+  - docker
 before_install:
   - pip install pep8
   - pep8 --exclude=tests *.py cnxpublishing/
@@ -16,21 +16,18 @@ before_install:
   - sudo apt-get update
   # remove zope.interface installed from aptitude
   - sudo apt-get purge python-zope.interface
-  # Install the 'plpython' extension language
+
+  # Stop local postgres
+  - sudo service postgresql stop
+
+  # Create cnx-db docker image
+  - docker-compose -f .travis-compose.yml up -d
 
   # Installation for cnx-archive:
-  # * Install the 'plpython' extension language
-  - sudo apt-get install postgresql-plpython-9.4
-  # * Install the 'plxslt' extension language
-  - sudo apt-get install libxml2-dev libxslt-dev postgresql-server-dev-9.4
-  - git clone https://github.com/petere/plxslt.git
-  - cd plxslt && sudo make && sudo make install && cd ..
   # * Install cnx-query-grammar
-  - git clone https://github.com/Connexions/cnx-query-grammar.git
-  - cd cnx-query-grammar && python setup.py install && cd ..
+  - pip install git+https://github.com/Connexions/cnx-query-grammar.git#egg=cnx-query-grammar
   # * Install rhaptos.cnxmlutils
-  - git clone https://github.com/Connexions/rhaptos.cnxmlutils.git
-  - cd rhaptos.cnxmlutils && python setup.py install && cd ..
+  - pip install git+https://github.com/Connexions/rhaptos.cnxmlutils.git#egg=cnx-rhaptos.cnxmlutils
 
   # Installation for cnx-publishing
   # Install cssselect2 (unreleased), required by cnx-easybake
@@ -38,33 +35,25 @@ before_install:
   # Install cnx-easybake
   - pip install git+https://github.com/Connexions/cnx-easybake.git#egg=cnx-easybake
   # * Install cnx-epub
-  - git clone https://github.com/Connexions/cnx-epub.git
-  - cd cnx-epub && python setup.py install && cd ..
-
-  # * Install cnx-archive
-  - git clone https://github.com/Connexions/cnx-archive.git
-  - cd cnx-archive && python setup.py install && cd ..
+  - pip install git+https://github.com/Connexions/cnx-epub.git#egg=cnx-epub
   # * Install cnx-db
-  - git clone https://github.com/Connexions/cnx-db.git
-  - cd cnx-db && python setup.py install && cd ..
+  - pip install git+https://github.com/Connexions/cnx-db.git#egg=cnx-db
+  # * Install cnx-archive
+  - pip install git+https://github.com/Connexions/cnx-archive.git#egg=cnx-archive
   # Install the coverage utility and codecov reporting utility
   - pip install coverage
   - pip install codecov
 install:
   - pip install ".[test]"
 before_script:
-  # Set up postgres roles
-  - sudo -u postgres psql -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
-  # Set up the database
-  - sudo -u postgres createdb -O cnxarchive cnxarchive-testing
-  - git clone https://github.com/okbob/session_exec
-  - cd session_exec
-  - make USE_PGXS=1 -e && sudo make USE_PGXS=1 -e install
-  - cd ..
+  # Give cnxarchive superuser privileges on postgres
+  - docker exec cnxpublishing_db_1 /bin/bash -c "echo 'ALTER USER cnxarchive WITH SUPERUSER' | psql -U postgres postgres"
+  # Stop init_venv from doing anything
+  - docker exec cnxpublishing_db_1 /bin/bash -c "echo 'CREATE SCHEMA venv' | psql -U cnxarchive cnxarchive-testing"
   - pip install -U pytest pytest-runner pytest-cov
 script:
   # This is the same as `coverage run setup.py test`.
-  - pytest cnxpublishing
+  - AS_VENV_IMPORTABLE=false pytest cnxpublishing
 after_success:
   # Report test coverage to codecov.io
   - codecov
