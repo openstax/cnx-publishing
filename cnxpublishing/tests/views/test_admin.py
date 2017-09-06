@@ -10,7 +10,6 @@ import unittest
 
 from datetime import datetime
 
-from cnxdb.init import init_db
 from pyramid import testing
 import pytest
 import psycopg2
@@ -20,6 +19,7 @@ from .. import use_cases
 from ..testing import (
     integration_test_settings,
     db_connection_factory,
+    init_db,
     )
 
 
@@ -104,7 +104,7 @@ class SiteMessageViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
         self.create_post_args = {
             'message': 'test message',
             'priority': 1,

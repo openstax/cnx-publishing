@@ -19,12 +19,11 @@ except ImportError:
 
 import psycopg2
 import cnxepub
-from cnxdb.init import init_db
 from pyramid import testing
 
 from ..utils import join_ident_hash, split_ident_hash
 from . import use_cases
-from .testing import db_connect, integration_test_settings
+from .testing import db_connect, integration_test_settings, init_db
 
 
 VALID_LICENSE_URL = "http://creativecommons.org/licenses/by/4.0/"
@@ -71,7 +70,7 @@ class BaseDatabaseIntegrationTestCase(unittest.TestCase):
             cls._tear_down_database()
 
     def setUp(self):
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
 
         # Declare a request, so that we can use the route generator methods.
         request = testing.DummyRequest()
