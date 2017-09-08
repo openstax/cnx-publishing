@@ -11,6 +11,7 @@ from __future__ import absolute_import
 
 import celery
 import venusian
+from kombu import Queue
 from pyramid.scripting import prepare
 
 
@@ -69,6 +70,11 @@ def includeme(config):
         broker_url=settings['celery.broker'],
         result_backend=settings['celery.backend'],
         result_persistent=True,
+        task_default_queue='default',
+        task_queues=(
+            Queue('default'),
+            Queue('deferred'),
+        ),
     )
     # Override the existing Task class.
     config.registry.celery_app.Task = PyramidAwareTask

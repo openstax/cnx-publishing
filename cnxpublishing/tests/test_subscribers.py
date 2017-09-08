@@ -43,7 +43,6 @@ def test_startup_event(db_cursor, complex_book_one,
 
 
 class TestPostPublicationProcessing(object):
-
     @pytest.fixture(autouse=True)
     def suite_fixture(self, scoped_pyramid_app, complex_book_one,
                       celery_worker):
@@ -194,3 +193,104 @@ class TestPostPublicationProcessing(object):
                           "WHERE module_ident = %s",
                           (self.module_ident,))
         db_cursor.fetchone()[0] == 'errored'
+
+    def test_duplicate_baking(self, db_cursor):
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event1 = self.make_event()
+
+        self.target(event1)
+
+        # While the baking is happening, if the module state is set to
+        # "post-publication" again, another event is created
+        event2 = self.make_event()
+
+        self.target(event2)
+
+        # Check there is only one request being queued
+        db_cursor.execute("SELECT count(*) "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s", (self.module_ident,))
+        assert db_cursor.fetchone()[0] == 1
+
+    def test_rebaking(self, db_cursor, mocker):
+        mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self.make_event()
+
+        self.target(event)
+
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s ", (self.module_ident,))
+        result_id = db_cursor.fetchone()[0]
+
+        from celery.result import AsyncResult
+        result = AsyncResult(id=result_id)
+        result.get()  # blocking operation
+        assert result.state == 'SUCCESS'
+        assert mock_bake.call_count == 1
+
+        # After baking is finished, if the module state is set to
+        # "post-publication" again, another event is created
+        event = self.make_event()
+
+        self.target(event)
+
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s "
+                          "ORDER BY created DESC", (self.module_ident,))
+        result_id2 = db_cursor.fetchone()
+
+        assert result_id2 != result_id
+        result2 = AsyncResult(id=result_id2)
+        result2.get()  # blocking operation
+        assert result2.state == 'SUCCESS'
+        assert mock_bake.call_count == 2
+
+    def test_priority(self, db_cursor, mocker, complex_book_one_v2):
+        from celery.exceptions import Retry
+
+        mock_retry = mocker.patch('celery.app.task.Task.retry')
+        mock_retry.return_value = Exception('Task can be retried')
+
+        binder_v2, ident_mapping = complex_book_one_v2
+        mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
+        binder_v2_module_ident = ident_mapping[binder_v2.ident_hash]
+
+        db_cursor.execute("select array_agg(uuid) from modules where portal_type = 'Collection'")
+
+        # Create the post publication event for complex book one
+        event1 = self.make_event()
+
+        # Create the post publication event for complex book one v2
+        event2 = self.make_event(payload=self.make_payload(
+            module_ident=binder_v2_module_ident,
+            ident_hash=binder_v2.ident_hash))
+
+        self.target(event1)
+        self.target(event2)
+
+        db_cursor.execute("SELECT module_ident, result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident IN %s",
+                          ((self.module_ident, binder_v2_module_ident),))
+        result_ids = dict(db_cursor.fetchall())
+
+        from celery.result import AsyncResult
+        result1 = AsyncResult(id=result_ids[self.module_ident])
+        with pytest.raises(Exception) as exc_info:
+            result1.get()  # blocking operation
+            assert str(exc_info.exception) == 'Task can be retried'
+            assert mock_retry.call_args_list == [((), {'queue': 'deferred'})]
+
+        result2 = AsyncResult(id=result_ids[binder_v2_module_ident])
+        result2.get()  # blocking operation
+
+        assert mock_bake.call_count == 1
+        assert mock_bake.call_args[0][0].ident_hash == binder_v2.ident_hash
