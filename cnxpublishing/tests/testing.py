@@ -9,6 +9,7 @@ import os
 import functools
 
 import psycopg2
+from cnxdb.init import init_db as _init_db
 from pyramid.paster import get_appsettings
 
 
@@ -65,3 +66,8 @@ def db_connect(method):
             with db_connection.cursor() as cursor:
                 return method(self, cursor, *args, **kwargs)
     return wrapped
+
+
+def init_db(db_conn_str):
+    venv = os.getenv('AS_VENV_IMPORTABLE', 'true').lower() == 'true'
+    _init_db(db_conn_str, venv)

@@ -7,12 +7,12 @@
 # ###
 import unittest
 
-from cnxdb.init import init_db
 from pyramid import testing
 
 from ..testing import (
     integration_test_settings,
     db_connection_factory,
+    init_db,
     )
 
 
@@ -31,7 +31,7 @@ class ApiKeyViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
 
     def tearDown(self):
         with self.db_connect() as db_conn:

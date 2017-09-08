@@ -12,13 +12,13 @@ import unittest
 import zipfile
 
 import cnxepub
-from cnxdb.init import init_db
 from webtest import TestApp
 from pyramid import testing
 
 from ..testing import (
     integration_test_settings,
     db_connection_factory,
+    init_db,
     )
 
 
@@ -135,7 +135,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
         config = testing.setUp(settings=self.settings)
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
 
         # Assign API keys for testing
         self.set_up_api_keys()
