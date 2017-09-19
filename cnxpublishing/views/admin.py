@@ -27,10 +27,11 @@ STATE_ICONS = {
                 'style': 'font-size:20px;color:gold'},
     "PENDING": {'class': 'fa fa-exclamation-triangle',
                 'style': 'font-size:20px;color:gold'},
-    "RETRY": {'class': 'a fa-close',
+    "RETRY": {'class': 'fa fa-close',
               'style': 'font-size:20px;color:red'},
     "FAILURE": {'class': 'fa fa-close',
                 'style': 'font-size:20px;color:red'}}
+DEFAULT_ICON = STATE_ICONS['PENDING']
 SORTS_DICT = {
     "bpsa.created": 'created',
     "m.name": 'name',
@@ -404,8 +405,10 @@ def admin_content_status(request):
                     'created': row[-2],
                     'state': state,
                     'state_message': message,
-                    'state_icon': STATE_ICONS[state_icon]['class'],
-                    'state_icon_style': STATE_ICONS[state_icon]['style'],
+                    'state_icon': STATE_ICONS.get(
+                        state_icon, DEFAULT_ICON)['class'],
+                    'state_icon_style': STATE_ICONS.get(
+                        state_icon, DEFAULT_ICON)['style'],
                     'status_link': request.route_path(
                         'admin-content-status-single', uuid=row[2]),
                     'content_link': request.route_path(
