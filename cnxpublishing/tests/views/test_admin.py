@@ -6,7 +6,12 @@
 # See LICENCE.txt for details.
 # ###
 import pytest
+import uuid
 import unittest
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from datetime import datetime
 
@@ -333,6 +338,55 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status(request)
         self.assertIn('invalid page', caught_exc.exception.message)
+
+    @mock.patch('cnxpublishing.views.admin.AsyncResult')
+    @mock.patch('psycopg2.connect')
+    def test_admin_content_status_state_icons(self, mock_psycopg2_connect,
+                                              mock_async_result):
+        states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
+                  'FAILURE', 'REVOKED', 'UNKNOWN']
+
+        def round_robin_states(*args, **kwargs):
+            result = mock.Mock(
+                state=states[mock_async_result.call_count - 1 % len(states)])
+            result.failed.return_value = False
+            return result
+
+        mock_async_result.side_effect = round_robin_states
+
+        cursor = mock.MagicMock()
+        cursor.fetchall.return_value = [
+            ('Just some random module {} for testing'.format(i),
+             ['authors'],
+             uuid.uuid4(),
+             'print-style',
+             'latest-recipe',
+             'latest-recipe',
+             '1.1',
+             '1.1',
+             datetime.now().isoformat(),
+             'result-{}'.format(i))
+            for i in range(len(states))]
+
+        db_conn = mock_psycopg2_connect.return_value.__enter__()
+        db_conn.cursor().__enter__.return_value = cursor
+
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status
+
+        content = admin_content_status(request)
+        state_icons = [(i['state'], i['state_icon'])
+                       for i in content['states']]
+
+        self.assertEqual([
+            ('PENDING', 'fa fa-exclamation-triangle'),
+            ('QUEUED', 'fa fa-exclamation-triangle'),
+            ('STARTED', 'fa fa-exclamation-triangle'),
+            ('RETRY', 'fa fa-close'),
+            ('SUCCESS', 'fa fa-check-square'),
+            ('FAILURE', 'fa fa-close'),
+            ('REVOKED', 'fa fa-exclamation-triangle'),
+            ('UNKNOWN', 'fa fa-exclamation-triangle')], state_icons)
 
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()
