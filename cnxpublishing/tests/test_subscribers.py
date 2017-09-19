@@ -253,6 +253,44 @@ class TestPostPublicationProcessing(object):
         assert result2.state == 'SUCCESS'
         assert mock_bake.call_count == 2
 
+    def test_no_recipe(self, db_cursor, mocker):
+        mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+
+        event = self.make_event()
+
+        # Delete the ruleset, to follow the no-recipe path
+
+        db_cursor.execute("DELETE FROM module_files "
+                          "WHERE filename = 'ruleset.css' "
+                          "AND  module_ident = %s ", (self.module_ident,))
+
+        db_cursor.connection.commit()
+
+        self.target(event)
+
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s ", (self.module_ident,))
+        result_id = db_cursor.fetchone()[0]
+
+        from celery.result import AsyncResult
+        result = AsyncResult(id=result_id)
+        result.get()  # blocking operation
+        assert result.state == 'SUCCESS'
+        assert mock_bake.call_count == 0
+
+        db_cursor.execute("SELECT recipe, stateid "
+                          "FROM modules "
+                          "WHERE module_ident = %s ", (self.module_ident,))
+        result_recipe, result_stateid = db_cursor.fetchone()
+
+        assert result_recipe is None
+        assert result_stateid == 1
+
     def test_priority(self, db_cursor, mocker, complex_book_one_v2):
         from celery.exceptions import Retry
 
@@ -262,8 +300,6 @@ class TestPostPublicationProcessing(object):
         binder_v2, ident_mapping = complex_book_one_v2
         mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
         binder_v2_module_ident = ident_mapping[binder_v2.ident_hash]
-
-        db_cursor.execute("select array_agg(uuid) from modules where portal_type = 'Collection'")
 
         # Create the post publication event for complex book one
         event1 = self.make_event()
