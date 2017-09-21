@@ -184,6 +184,15 @@ def _insert_metadata(cursor, model, publisher, message):
             moduleid = None
         params['_moduleid'] = moduleid
 
+        # Verify that uuid is reserved in document_contols. If not, add it.
+        cursor.execute("SELECT * from document_controls where uuid = %s",
+                       (uuid,))
+        try:
+            _ = cursor.fetchone()[0]
+        except TypeError as exc:  # NoneType
+            cursor.execute("INSERT INTO document_controls (uuid) VALUES (%s)",
+                           (uuid,))
+
         created = model.metadata.get('created', None)
         # Format the statement to accept the identifiers.
         stmt = MODULE_INSERTION_TEMPLATE.format(**{
