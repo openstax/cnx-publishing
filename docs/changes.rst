@@ -6,6 +6,11 @@
 
    - feature message
 
+0.9.1
+-----
+
+- Make sure to reserve uuids for new composite content (#184)
+
 0.9.0
 -----
 
