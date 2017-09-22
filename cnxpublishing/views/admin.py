@@ -383,7 +383,8 @@ def admin_content_status(request):
                 result_id = row[-1]
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
-                    message = result.traceback.split("\n")[-2]
+                    if result.traceback is not None:
+                        message = result.traceback.split("\n")[-2]
                 latest_recipe = row[4]
                 current_recipe = row[5]
                 latest_version = row[6]
