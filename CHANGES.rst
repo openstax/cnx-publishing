@@ -5,6 +5,11 @@
 
    - feature message
 
+0.8.1
+-----
+
+- Check for a traceback when handling a celery task failure (#185)
+
 0.8.0
 -----
 
