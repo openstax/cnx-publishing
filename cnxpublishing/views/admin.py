@@ -9,14 +9,12 @@ from __future__ import absolute_import
 from datetime import datetime, timedelta
 from uuid import UUID
 
-import psycopg2
-from psycopg2.extras import DictCursor
-
 from celery.result import AsyncResult
+from psycopg2.extras import DictCursor
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
-from .. import config
+from ..db import db_connect
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
@@ -93,11 +91,8 @@ def admin_api_keys(request):  # pragma: no cover
              renderer='cnxpublishing.views:templates/post-publications.html',
              permission='administer')
 def admin_post_publications(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     states = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
@@ -126,11 +121,8 @@ ORDER BY bpsa.created DESC LIMIT 100""")
              renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer')
 def admin_add_site_message(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     banners = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 SELECT id, service_state_id, starts, ends, priority, message
@@ -183,10 +175,6 @@ def parse_message_args(request):
              renderer='templates/site-messages.html',
              permission='administer')
 def admin_add_site_message_POST(request):
-
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     # # If it was a post request to delete
     # if 'delete' in request.POST.keys():
     #     message_id = request.POST.get('delete', -1)
@@ -202,7 +190,7 @@ def admin_add_site_message_POST(request):
 
     # otherwise it was an post request to add an message banner
     args = parse_message_args(request)
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 INSERT INTO service_state_messages
@@ -220,11 +208,8 @@ def admin_add_site_message_POST(request):
              renderer='templates/site-messages.html',
              permission='administer')
 def admin_delete_site_message(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     message_id = request.body.split("=")[1]
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 DELETE FROM service_state_messages WHERE id=%s;
@@ -242,10 +227,7 @@ def admin_edit_site_message(request):
     message_id = request.matchdict['id']
     args = {'id': message_id}
 
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 SELECT id, service_state_id, starts, ends, priority, message
@@ -278,10 +260,7 @@ def admin_edit_site_message_POST(request):
     args = parse_message_args(request)
     args['id'] = message_id
 
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 UPDATE service_state_messages
@@ -373,11 +352,9 @@ def admin_content_status(request):
     Returns a dictionary with the states and info of baking books,
     and the filters from the GET request to pre-populate the form.
     """
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
     statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
-    with psycopg2.connect(db_conn_str, cursor_factory=DictCursor) as db_conn:
+    with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
@@ -482,10 +459,8 @@ def admin_content_status_single(request):
         raise httpexceptions.HTTPBadRequest(
             '{} is not a valid uuid'.format(uuid))
 
-    settings = request.registry.settings
     statement, sql_args = get_baking_statuses_sql({'uuid': uuid})
-    db_conn_str = settings[config.CONNECTION_STRING]
-    with psycopg2.connect(db_conn_str, cursor_factory=DictCursor) as db_conn:
+    with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, sql_args)
             modules = cursor.fetchall()
@@ -542,7 +517,7 @@ def admin_content_status_single_POST(request):
         return args
 
     settings = request.registry.settings
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("SELECT stateid FROM modules WHERE module_ident=%s",
                            vars=(args['current_ident'],))

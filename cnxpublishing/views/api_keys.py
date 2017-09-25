@@ -5,10 +5,9 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import psycopg2
 from pyramid.view import view_config
 
-from .. import config
+from ..db import db_connect
 
 
 @view_config(route_name='api-keys', request_method='GET',
@@ -16,9 +15,7 @@ from .. import config
              renderer='json', permission='administer')
 def get_api_keys(request):
     """Return the list of API keys."""
-    settings = request.registry.settings
-
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (

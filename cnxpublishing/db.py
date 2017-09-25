@@ -6,6 +6,7 @@
 # See LICENCE.txt for details.
 # ###
 from __future__ import print_function
+import contextlib
 import os
 import sys
 import io
@@ -42,11 +43,17 @@ END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
 register_uuid()
 
 
-def db_connect(connection_string=None):
+@contextlib.contextmanager
+def db_connect(connection_string=None, **kwargs):
     """Function to supply a database connection object."""
     if connection_string is None:
         connection_string = get_current_registry().settings[CONNECTION_STRING]
-    return psycopg2.connect(connection_string)
+    db_conn = psycopg2.connect(connection_string, **kwargs)
+    try:
+        with db_conn:
+            yield db_conn
+    finally:
+        db_conn.close()
 
 
 def with_db_cursor(func):
@@ -59,9 +66,7 @@ def with_db_cursor(func):
     def wrapped(*args, **kwargs):
         if 'cursor' in kwargs or func.func_code.co_argcount == len(args):
             return func(*args, **kwargs)
-        registry = get_current_registry()
-        conn_str = registry.settings[CONNECTION_STRING]
-        with psycopg2.connect(conn_str) as db_connection:
+        with db_connect() as db_connection:
             with db_connection.cursor() as cursor:
                 kwargs['cursor'] = cursor
                 return func(*args, **kwargs)
@@ -85,9 +90,7 @@ def _role_type_to_db_type(type_):
     ``cnxepub.ATTRIBUTED_ROLE_KEYS``) to a database compatible
     value for ``role_types``.
     """
-    registry = get_current_registry()
-    conn_str = registry.settings[CONNECTION_STRING]
-    with psycopg2.connect(conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 WITH unnested_role_types AS (
@@ -258,8 +261,7 @@ INSERT INTO pending_resource_associations
 #       more than once in a 24hr period.
 def obtain_licenses():
     """Obtain the licenses in a dictionary form, keyed by url."""
-    settings = get_current_registry().settings
-    with psycopg2.connect(settings[CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT combined_row.url, row_to_json(combined_row) FROM (
@@ -882,9 +884,7 @@ RETURNING state, state_messages""", (change_state, publication_id,))
 
 def check_publication_state(publication_id):
     """Check the publication's current state."""
-    registry = get_current_registry()
-    conn_str = registry.settings[CONNECTION_STRING]
-    with psycopg2.connect(conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT "state", "state_messages"
