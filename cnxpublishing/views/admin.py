@@ -59,6 +59,9 @@ def admin_index(request):  # pragma: no cover
             {'name': 'Message Banners',
              'uri': request.route_url('admin-add-site-messages'),
              },
+            {'name': 'Print Styles',
+             'uri': request.route_url('admin-print-style'),
+             },
             {'name': 'Content Status',
              'uri': request.route_url('admin-content-status'),
              },
@@ -296,6 +299,112 @@ def admin_edit_site_message_POST(request):
     args = admin_edit_site_message(request)
     args['response'] = "Message successfully Updated"
     return args
+
+
+@view_config(route_name='admin-print-style', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style.html',
+             permission='administer')
+def admin_print_styles(request):
+    """
+    Returns a dictionary of all unique print_styles, and their latest tag,
+    revision, and recipe_type.
+    """
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    styles = []
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                WITH latest AS (
+                    SELECT print_style, max(revised) AS revised
+                        FROM print_style_recipes
+                        GROUP BY print_style
+                ) SELECT ps.print_style, ps.recipe_type, ps.revised, tag,
+                    (SELECT count(*)
+                        FROM latest_modules AS lm
+                        WHERE lm.print_style = ps.print_style AND
+                              lm.portal_type = 'Collection')
+                    FROM latest
+                    JOIN print_style_recipes AS ps
+                    ON ps.print_style = latest.print_style AND
+                       ps.revised = latest.revised;
+                """)
+            for row in cursor.fetchall():
+                styles.append({
+                    'print_style': row[0],
+                    'type': row[1],
+                    'revised': row[2],
+                    'tag': row[3],
+                    'number': row[4],
+                    'link': request.route_path('admin-print-style-single',
+                                               style=row[0])
+                })
+    return {'styles': styles}
+
+
+@view_config(route_name='admin-print-style-single', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style-single.html',
+             permission='administer')
+def admin_print_styles_single(request):
+    """ Returns all books with any version of the given print style.
+
+    Returns the print_style, recipe type, num books using the print_style,
+    along with a dictionary of the book, author, revision date, recipie,
+    tag of the print_style, and a link to the content.
+    """
+    settings = request.registry.settings
+    db_conn_str = settings[config.CONNECTION_STRING]
+    style = request.matchdict['style']
+    args = {}
+    # do db search to get file id and other info on the print_style
+    with psycopg2.connect(db_conn_str) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT fileid, recipe_type
+                FROM print_style_recipes
+                WHERE print_style=%s
+                ORDER BY revised DESC;
+                """, vars=(style,))
+            info = cursor.fetchall()
+            if len(info) < 1:
+                raise httpexceptions.HTTPNotFound(
+                    'Invalid Print Style: {}'.format(style))
+            current_recipe = info[0][0]
+            recipe_type = info[0][1]
+
+            collections = []
+            cursor.execute("""\
+                SELECT name, authors, lm.revised, lm.recipe, psr.tag,
+                    ident_hash(uuid, major_version, minor_version)
+                FROM latest_modules as lm
+                JOIN print_style_recipes as psr
+                ON (psr.print_style = lm.print_style and
+                    psr.fileid = lm.recipe)
+                WHERE lm.print_style=%s
+                AND portal_type='Collection'
+                ORDER BY psr.tag DESC;
+                """, vars=(style,))
+            for row in cursor.fetchall():
+                recipe = row[3]
+                status = 'current'
+                if recipe != current_recipe:
+                    status = 'stale'
+                collections.append({
+                    'title': row[0].decode('utf-8'),
+                    'authors': row[1],
+                    'revised': row[2],
+                    'recipe': row[3],
+                    'tag': row[4],
+                    'ident_hash': row[-1],
+                    'link': request.route_path('get-content',
+                                               ident_hash=row[-1]),
+                    'status': status,
+
+                })
+    return {'number': len(collections),
+            'collections': collections,
+            'print_style': style,
+            'recipe_type': recipe_type}
 
 
 def get_baking_statuses_sql(get_request):

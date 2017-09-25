@@ -16,6 +16,7 @@ except ImportError:
 from datetime import datetime
 
 from pyramid import testing
+from pyramid import httpexceptions
 import pytest
 import psycopg2
 from pyramid.httpexceptions import HTTPBadRequest
@@ -95,6 +96,92 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
                  'state_message': '',
                  'title': 'Book of Infinity'},
                 ]}, resp_data)
+
+
+class PrintStyleViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        self.config = testing.setUp(settings=self.settings)
+        self.config.include('cnxpublishing.tasks')
+        self.config.add_route('get-content', '/contents/{ident_hash}')
+        self.config.add_route('admin-print-style-single',
+                              '/a/print-style/{style}')
+        init_db(self.db_conn_str, True)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""INSERT INTO files
+                                  (file, media_type) VALUES ('file', 'css');""")
+                cursor.execute("""INSERT INTO print_style_recipes
+                                  (print_style, fileid, tag)
+                                  VALUES ('ccap-physics', 1, '1.0');""")
+
+    def tearDown(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def test_print_styles(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_print_styles
+        content = admin_print_styles(request)
+        self.assertEqual(1, len(content['styles']))
+        self.assertEqual(content['styles'][0],
+                         {'print_style': 'ccap-physics',
+                          'type': 'web',
+                          'revised': content['styles'][0]['revised'],
+                          'number': 0,
+                          'tag': '1.0',
+                          'link': '/a/print-style/ccap-physics'})
+
+    def test_print_style_single(self):
+        request = testing.DummyRequest()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""INSERT INTO latest_modules
+                                  (print_style, portal_type, name, licenseid,
+                                        doctype, uuid, created, revised, recipe)
+                                  VALUES ('ccap-physics', 'Collection', 'test', 1,
+                                        'doc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', now(), now(), 1);""")
+
+        print_style = 'ccap-physics'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        content = admin_print_styles_single(request)
+        self.assertEqual(content['print_style'], 'ccap-physics')
+        self.assertEqual(content['recipe_type'], 'web')
+        self.assertEqual(len(content['collections']), 1)
+        self.assertEqual(content['collections'][0],
+                         {'title': 'test',
+                          'authors': None,
+                          'revised': content['collections'][0]['revised'],
+                          'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'tag': '1.0',
+                          'recipe': 1,
+                          'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'status': 'current'})
+
+    def test_print_style_single_no_style(self):
+        request = testing.DummyRequest()
+        print_style = 'fake-print-style'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        with self.assertRaises(httpexceptions.HTTPNotFound) as cm:
+            admin_print_styles_single(request)
+
+        self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")
 
 
 class SiteMessageViewsTestCase(unittest.TestCase):
