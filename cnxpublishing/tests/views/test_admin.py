@@ -16,7 +16,6 @@ except ImportError:
 from datetime import datetime
 
 from pyramid import testing
-import pytest
 import psycopg2
 from pyramid.httpexceptions import HTTPBadRequest
 
@@ -248,6 +247,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.config.add_route('admin-content-status-single',
                               '/a/content-status/{uuid}')
         self.config.add_route('get-content', '/contents/{ident_hash}')
+        self.config.add_route('get-resource', '/resources/{hash}')
 
         add_data(self)
 
@@ -355,17 +355,21 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         mock_async_result.side_effect = round_robin_states
 
         cursor = mock.MagicMock()
+        uuid_ = uuid.uuid4(),
         cursor.fetchall.return_value = [
-            ('Just some random module {} for testing'.format(i),
-             ['authors'],
-             uuid.uuid4(),
-             'print-style',
-             'latest-recipe',
-             'latest-recipe',
-             '1.1',
-             '1.1',
-             datetime.now().isoformat(),
-             'result-{}'.format(i))
+            {'name': 'Just some random module {} for testing'.format(i),
+             'authors': ['authors'],
+             'uuid': uuid_,
+             'print_style': 'print-style',
+             'latest_recipe_id': 'latest-recipe',
+             'recipe_id': 'latest-recipe',
+             'recipe': '093979b0ca430454e4a1dedb409f186b66c7494e',
+             'latest_version': '1.1',
+             'current_version': '1.1',
+             'module_ident': 'm0000',
+             'ident_hash': '{}@1.1'.format(uuid_),
+             'created': datetime.now().isoformat(),
+             'result_id': 'result-{}'.format(i)}
             for i in range(len(states))]
 
         db_conn = mock_psycopg2_connect.return_value.__enter__()
@@ -461,7 +465,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_content_status
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
-        self.assertEqual('PENDING stale_recipe stale_content',
+        self.assertEqual('PENDING stale_content',
                          content['states'][0]['state'])
 
     def test_admin_content_status_single_page_POST_already_baking(self):
