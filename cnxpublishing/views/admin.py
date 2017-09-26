@@ -10,11 +10,11 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 import psycopg2
+from psycopg2.extras import DictCursor
+
 from celery.result import AsyncResult
 from pyramid import httpexceptions
 from pyramid.view import view_config
-
-from cnxarchive.utils.ident_hash import IdentHashError
 
 from .. import config
 from .moderation import get_moderation
@@ -336,11 +336,12 @@ def get_baking_statuses_sql(get_request):
 
     statement = """
                 SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recipe,  m.recipe,
+                       ps.fileid as latest_recipe_id,  m.recipe as recipe_id,
+                       f.sha1 as recipe,
                        module_version(lm.major_version, lm.minor_version)
                         as latest_version,
                        module_version(m.major_version, m.minor_version)
-                        as cur_version,
+                        as current_version,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
                        bpsa.created, bpsa.result_id::text
@@ -350,6 +351,7 @@ def get_baking_statuses_sql(get_request):
                     ON ps.print_style=m.print_style
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
+                LEFT JOIN files f on m.recipe = f.fileid
                 {}
                 ORDER BY {};
                 """.format(sql_filters, sort)
@@ -375,35 +377,38 @@ def admin_content_status(request):
     db_conn_str = settings[config.CONNECTION_STRING]
     statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with psycopg2.connect(db_conn_str, cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
                 message = ''
-                result_id = row[-1]
+                result_id = row['result_id']
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     if result.traceback is not None:
                         message = result.traceback.split("\n")[-2]
-                latest_recipe = row[4]
-                current_recipe = row[5]
-                latest_version = row[6]
-                current_version = row[7]
+                latest_recipe = row['latest_recipe_id']
+                current_recipe = row['recipe_id']
+                latest_version = row['latest_version']
+                current_version = row['current_version']
                 state = str(result.state)
                 if current_version != latest_version:
                     state += ' stale_content'
-                if current_recipe != latest_recipe:
+                if (current_recipe is not None and
+                        current_recipe != latest_recipe):
                     state += ' stale_recipe'
                 state_icon = result.state
                 if state[:7] == "SUCCESS" and len(state) > 7:
                     state_icon = 'PENDING'
                 states.append({
-                    'title': row[0].decode('utf-8'),
-                    'authors': format_authors(row[1]),
-                    'uuid': row[2],
-                    'print_style': row[3],
-                    'recipe': row[4],
-                    'created': row[-2],
+                    'title': row['name'].decode('utf-8'),
+                    'authors': format_authors(row['authors']),
+                    'uuid': row['uuid'],
+                    'print_style': row['print_style'],
+                    'recipe': row['recipe'],
+                    'recipe_link': request.route_path(
+                        'get-resource', hash=row['recipe']),
+                    'created': row['created'],
                     'state': state,
                     'state_message': message,
                     'state_icon': STATE_ICONS.get(
@@ -411,9 +416,9 @@ def admin_content_status(request):
                     'state_icon_style': STATE_ICONS.get(
                         state_icon, DEFAULT_ICON)['style'],
                     'status_link': request.route_path(
-                        'admin-content-status-single', uuid=row[2]),
+                        'admin-content-status-single', uuid=row['uuid']),
                     'content_link': request.route_path(
-                        'get-content', ident_hash=row[-3])
+                        'get-content', ident_hash=row['ident_hash'])
                 })
     status_filters = [request.GET.get('pending_filter', ''),
                       request.GET.get('started_filter', ''),
@@ -479,7 +484,8 @@ def admin_content_status_single(request):
 
     settings = request.registry.settings
     statement, sql_args = get_baking_statuses_sql({'uuid': uuid})
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    db_conn_str = settings[config.CONNECTION_STRING]
+    with psycopg2.connect(db_conn_str, cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, sql_args)
             modules = cursor.fetchall()
@@ -492,33 +498,34 @@ def admin_content_status_single(request):
 
             for row in modules:
                 message = ''
-                result_id = row[-1]
+                result_id = row['result_id']
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback
-                latest_recipe = row[4]
-                current_recipe = row[5]
-                latest_version = row[6]
-                current_version = row[7]
+                latest_recipe = row['latest_recipe_id']
+                current_recipe = row['recipe_id']
+                latest_version = row['latest_version']
+                current_version = row['current_version']
                 state = result.state
-                if current_recipe != latest_recipe:
+                if (latest_recipe is not None and
+                        current_recipe != latest_recipe):
                     state += ' stale_recipe'
                 if current_version != latest_version:
                     state += ' stale_content'
                 states.append({
-                    'version': row[7],
-                    'recipe': row[5],
-                    'created': str(row[-2]),
+                    'version': row['current_version'],
+                    'recipe': row['recipe'],
+                    'created': str(row['created']),
                     'state': state,
                     'state_message': message,
                 })
 
-    return {'uuid': str(collection_info[2]),
-            'title': collection_info[0].decode('utf-8'),
-            'authors': format_authors(collection_info[1]),
-            'print_style': collection_info[3],
-            'current_recipe': collection_info[4],
-            'current_ident': collection_info[8],
+    return {'uuid': str(collection_info['uuid']),
+            'title': collection_info['name'].decode('utf-8'),
+            'authors': format_authors(collection_info['authors']),
+            'print_style': collection_info['print_style'],
+            'current_recipe': collection_info['recipe_id'],
+            'current_ident': collection_info['module_ident'],
             'current_state': states[0]['state'],
             'states': states}
 
