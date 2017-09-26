@@ -6,6 +6,12 @@
 
    - feature message
 
+0.9.3
+-----
+
+- Explicitly close all psycopg2 db connections (#187)
+- Refactor and fix content-status view (#186)
+
 0.9.2
 -----
 
