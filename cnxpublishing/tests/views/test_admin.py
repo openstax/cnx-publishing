@@ -340,8 +340,8 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.assertIn('invalid page', caught_exc.exception.message)
 
     @mock.patch('cnxpublishing.views.admin.AsyncResult')
-    @mock.patch('psycopg2.connect')
-    def test_admin_content_status_state_icons(self, mock_psycopg2_connect,
+    @mock.patch('cnxpublishing.views.admin.db_connect')
+    def test_admin_content_status_state_icons(self, mock_db_connect,
                                               mock_async_result):
         states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
                   'FAILURE', 'REVOKED', 'UNKNOWN']
@@ -372,7 +372,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
              'result_id': 'result-{}'.format(i)}
             for i in range(len(states))]
 
-        db_conn = mock_psycopg2_connect.return_value.__enter__()
+        db_conn = mock_db_connect.return_value.__enter__()
         db_conn.cursor().__enter__.return_value = cursor
 
         request = testing.DummyRequest()

@@ -6,14 +6,12 @@
 # See LICENCE.txt for details.
 # ###
 import cnxepub
-import psycopg2
 from cnxarchive.scripts import export_epub
 from cnxarchive.utils.ident_hash import IdentHashError
 from pyramid import httpexceptions
 from pyramid.settings import asbool
 from pyramid.view import view_config
 
-from .. import config
 from ..bake import remove_baked
 from ..db import (
     accept_publication_license,
@@ -21,6 +19,7 @@ from ..db import (
     add_publication,
     check_publication_state,
     poke_publication_state,
+    db_connect,
     )
 from ..utils import split_ident_hash
 
@@ -39,11 +38,10 @@ def publish(request):
     except:
         raise httpexceptions.HTTPBadRequest('Format not recognized.')
 
-    settings = request.registry.settings
     # Make a publication entry in the database for status checking
     # the publication. This also creates publication entries for all
     # of the content in the EPUB.
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             epub_upload.seek(0)
             publication_id, publications = add_publication(
@@ -84,13 +82,12 @@ def get_accept_license(request):
     """
     publication_id = request.matchdict['id']
     user_id = request.matchdict['uid']
-    settings = request.registry.settings
 
     # FIXME Is this an active publication?
     # TODO Verify the accepting user is the one making the request.
 
     # For each pending document, accept the license.
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
 SELECT row_to_json(combined_rows) FROM (
@@ -121,7 +118,6 @@ def post_accept_license(request):
     """
     publication_id = request.matchdict['id']
     uid = request.matchdict['uid']
-    settings = request.registry.settings
 
     # TODO Verify the accepting user is the one making the request.
     #      They could be authenticated but not be the license acceptor.
@@ -142,7 +138,7 @@ def post_accept_license(request):
         raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             accept_publication_license(cursor, publication_id, uid,
                                        accepted, True)
@@ -164,13 +160,12 @@ def get_accept_role(request):
     """
     publication_id = request.matchdict['id']
     user_id = request.matchdict['uid']
-    settings = request.registry.settings
 
     # TODO Verify the accepting user is the one making the request.
     # FIXME Is this an active publication?
 
     # For each pending document, accept/deny the role.
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
 SELECT row_to_json(combined_rows) FROM (
@@ -204,7 +199,6 @@ def post_accept_role(request):
     """
     publication_id = request.matchdict['id']
     uid = request.matchdict['uid']
-    settings = request.registry.settings
 
     # TODO Verify the accepting user is the one making the request.
     #      They could be authenticated but not be the license acceptor.
@@ -225,7 +219,7 @@ def post_accept_role(request):
         raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             accept_publication_role(cursor, publication_id, uid,
                                     accepted, True)
@@ -245,7 +239,6 @@ def post_accept_role(request):
              renderer='json', permission='publish')
 def bake_content(request):
     """Invoke the baking process - trigger post-publication"""
-    settings = request.registry.settings
     ident_hash = request.matchdict['ident_hash']
     try:
         id, version = split_ident_hash(ident_hash)
@@ -255,7 +248,7 @@ def bake_content(request):
     if not version:
         raise httpexceptions.HTTPBadRequest('must specify the version')
 
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT bool(portal_type = 'Collection')

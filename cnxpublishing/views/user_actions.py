@@ -8,16 +8,15 @@
 # ################ #
 #   User Actions   #
 # ################ #
-import psycopg2
 from pyramid import httpexceptions
 from pyramid.settings import asbool
 from pyramid.view import view_config
 
-from .. import config
 from ..exceptions import (
     UserFetchError,
     )
 from ..db import (
+    db_connect,
     remove_acl,
     remove_license_requests,
     remove_role_requests,
@@ -35,7 +34,6 @@ def get_license_request(request):
     """Returns a list of those accepting the license."""
     uuid_ = request.matchdict['uuid']
     user_id = request.matchdict.get('uid')
-    settings = request.registry.settings
 
     args = [uuid_]
     if user_id is not None:
@@ -44,7 +42,7 @@ def get_license_request(request):
     else:
         fmt_conditional = ""
 
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT l.url
@@ -80,12 +78,11 @@ ORDER BY user_id ASC
 def post_license_request(request):
     """Submission to create a license acceptance request."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted_data = request.json
     license_url = posted_data.get('license_url')
     licensors = posted_data.get('licensors', [])
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT TRUE, l.url
@@ -128,10 +125,9 @@ RETURNING dc.licenseid""",
 def delete_license_request(request):
     """Submission to remove a license acceptance request."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted_uids = [x['uid'] for x in request.json.get('licensors', [])]
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             remove_license_requests(cursor, uuid_, posted_uids)
 
@@ -147,7 +143,6 @@ def get_roles_request(request):
     """Returns a list of accepting roles."""
     uuid_ = request.matchdict['uuid']
     user_id = request.matchdict.get('uid')
-    settings = request.registry.settings
 
     args = [uuid_]
     if user_id is not None:
@@ -156,7 +151,7 @@ def get_roles_request(request):
     else:
         fmt_conditional = ""
 
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
@@ -190,10 +185,9 @@ SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
 def post_roles_request(request):
     """Submission to create a role acceptance request."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted_roles = request.json
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
@@ -222,10 +216,9 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 def delete_roles_request(request):
     """Submission to remove a role acceptance request."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted_roles = request.json
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             remove_role_requests(cursor, uuid_, posted_roles)
 
@@ -240,9 +233,8 @@ def delete_roles_request(request):
 def get_acl(request):
     """Returns the ACL for the given content identified by ``uuid``."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
@@ -268,11 +260,10 @@ ORDER BY user_id ASC, permission ASC
 def post_acl_request(request):
     """Submission to create an ACL."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted = request.json
     permissions = [(x['uid'], x['permission'],) for x in posted]
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
@@ -297,11 +288,10 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 def delete_acl_request(request):
     """Submission to remove an ACL."""
     uuid_ = request.matchdict['uuid']
-    settings = request.registry.settings
 
     posted = request.json
     permissions = [(x['uid'], x['permission'],) for x in posted]
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             remove_acl(cursor, uuid_, permissions)
 
