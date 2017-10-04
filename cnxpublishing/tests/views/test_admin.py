@@ -6,21 +6,24 @@
 # See LICENCE.txt for details.
 # ###
 import pytest
+import uuid
 import unittest
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from datetime import datetime
 
-from cnxdb.init import init_db
 from pyramid import testing
-from pyramid import httpexceptions
-import pytest
 import psycopg2
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound
 
 from .. import use_cases
 from ..testing import (
     integration_test_settings,
     db_connection_factory,
+    init_db,
     )
 
 
@@ -109,7 +112,7 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         self.config.add_route('get-content', '/contents/{ident_hash}')
         self.config.add_route('admin-print-style-single',
                               '/a/print-style/{style}')
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""INSERT INTO files
@@ -173,7 +176,7 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         request.matchdict['style'] = print_style
 
         from ...views.admin import admin_print_styles_single
-        with self.assertRaises(httpexceptions.HTTPNotFound) as cm:
+        with self.assertRaises(HTTPNotFound) as cm:
             admin_print_styles_single(request)
 
         self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")
@@ -191,7 +194,7 @@ class SiteMessageViewsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
-        init_db(self.db_conn_str, True)
+        init_db(self.db_conn_str)
         self.create_post_args = {
             'message': 'test message',
             'priority': 1,
@@ -330,6 +333,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.config.add_route('admin-content-status-single',
                               '/a/content-status/{uuid}')
         self.config.add_route('get-content', '/contents/{ident_hash}')
+        self.config.add_route('get-resource', '/resources/{hash}')
 
         add_data(self)
 
@@ -421,6 +425,59 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             admin_content_status(request)
         self.assertIn('invalid page', caught_exc.exception.message)
 
+    @mock.patch('cnxpublishing.views.admin.AsyncResult')
+    @mock.patch('cnxpublishing.views.admin.db_connect')
+    def test_admin_content_status_state_icons(self, mock_db_connect,
+                                              mock_async_result):
+        states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
+                  'FAILURE', 'REVOKED', 'UNKNOWN']
+
+        def round_robin_states(*args, **kwargs):
+            result = mock.Mock(
+                state=states[mock_async_result.call_count - 1 % len(states)])
+            result.failed.return_value = False
+            return result
+
+        mock_async_result.side_effect = round_robin_states
+
+        cursor = mock.MagicMock()
+        uuid_ = uuid.uuid4(),
+        cursor.fetchall.return_value = [
+            {'name': 'Just some random module {} for testing'.format(i),
+             'authors': ['authors'],
+             'uuid': uuid_,
+             'print_style': 'print-style',
+             'latest_recipe_id': 'latest-recipe',
+             'recipe_id': 'latest-recipe',
+             'recipe': '093979b0ca430454e4a1dedb409f186b66c7494e',
+             'latest_version': '1.1',
+             'current_version': '1.1',
+             'module_ident': 'm0000',
+             'ident_hash': '{}@1.1'.format(uuid_),
+             'created': datetime.now().isoformat(),
+             'result_id': 'result-{}'.format(i)}
+            for i in range(len(states))]
+
+        db_conn = mock_db_connect.return_value.__enter__()
+        db_conn.cursor().__enter__.return_value = cursor
+
+        request = testing.DummyRequest()
+        from ...views.admin import admin_content_status
+
+        content = admin_content_status(request)
+        state_icons = [(i['state'], i['state_icon'])
+                       for i in content['states']]
+
+        self.assertEqual([
+            ('PENDING', 'fa fa-exclamation-triangle'),
+            ('QUEUED', 'fa fa-exclamation-triangle'),
+            ('STARTED', 'fa fa-exclamation-triangle'),
+            ('RETRY', 'fa fa-close'),
+            ('SUCCESS', 'fa fa-check-square'),
+            ('FAILURE', 'fa fa-close'),
+            ('REVOKED', 'fa fa-exclamation-triangle'),
+            ('UNKNOWN', 'fa fa-exclamation-triangle')], state_icons)
+
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()
 
@@ -491,10 +548,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         request.GET = {'page': 1,
                        'number': 1}
-        from ...views.admin import admin_content_status
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
-        self.assertEqual('PENDING stale_recipe stale_content',
+        self.assertEqual('PENDING stale_content',
                          content['states'][0]['state'])
 
     def test_admin_content_status_single_page_POST_already_baking(self):
@@ -546,5 +602,5 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
         request.matchdict['uuid'] = uuid
         with self.assertRaises(HTTPBadRequest) as caught_exc:
-            content = admin_content_status_single_POST(request)
+            _content = admin_content_status_single_POST(request)  # noqa
         self.assertIn('not a book', caught_exc.exception.message)

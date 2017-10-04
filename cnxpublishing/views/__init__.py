@@ -56,11 +56,11 @@ def declare_browsable_routes(config):
     add_route('admin-edit-site-message-POST', '/a/site-messages/{id}/',
               request_method='POST')
 
-    add_route('admin-print-style', '/a/print-style/')
-    add_route('admin-print-style-single', '/a/print-style/{style}')
-
     add_route('admin-content-status', '/a/content-status/')
     add_route('admin-content-status-single', '/a/content-status/{uuid}')
+
+    add_route('admin-print-style', '/a/print-style/')
+    add_route('admin-print-style-single', '/a/print-style/{style}')
 
 
 def includeme(config):

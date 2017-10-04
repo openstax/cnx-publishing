@@ -5,12 +5,10 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import psycopg2
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
-from .. import config
-from ..db import poke_publication_state
+from ..db import poke_publication_state, db_connect
 
 
 @view_config(route_name='moderation', request_method='GET',
@@ -18,9 +16,7 @@ from ..db import poke_publication_state
              renderer='json', permission='moderate')
 def get_moderation(request):
     """Return the list of publications that need moderation."""
-    settings = request.registry.settings
-
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT row_to_json(combined_rows) FROM (
@@ -38,8 +34,6 @@ SELECT row_to_json(combined_rows) FROM (
 @view_config(route_name='moderate', request_method='POST',
              accept="application/json", permission='moderate')
 def post_moderation(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
     publication_id = request.matchdict['id']
     posted = request.json
     if 'is_accepted' not in posted \
@@ -48,7 +42,7 @@ def post_moderation(request):
             "Missing or invalid 'is_accepted' value.")
     is_accepted = posted['is_accepted']
 
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             if is_accepted:
                 # Give the publisher moderation approval.

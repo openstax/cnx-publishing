@@ -9,14 +9,12 @@ from __future__ import absolute_import
 from datetime import datetime, timedelta
 from uuid import UUID
 
-import psycopg2
 from celery.result import AsyncResult
+from psycopg2.extras import DictCursor
 from pyramid import httpexceptions
 from pyramid.view import view_config
 
-from cnxarchive.utils.ident_hash import IdentHashError
-
-from .. import config
+from ..db import db_connect
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
@@ -27,10 +25,11 @@ STATE_ICONS = {
                 'style': 'font-size:20px;color:gold'},
     "PENDING": {'class': 'fa fa-exclamation-triangle',
                 'style': 'font-size:20px;color:gold'},
-    "RETRY": {'class': 'a fa-close',
+    "RETRY": {'class': 'fa fa-close',
               'style': 'font-size:20px;color:red'},
     "FAILURE": {'class': 'fa fa-close',
                 'style': 'font-size:20px;color:red'}}
+DEFAULT_ICON = STATE_ICONS['PENDING']
 SORTS_DICT = {
     "bpsa.created": 'created',
     "m.name": 'name',
@@ -57,9 +56,6 @@ def admin_index(request):  # pragma: no cover
              },
             {'name': 'Message Banners',
              'uri': request.route_url('admin-add-site-messages'),
-             },
-            {'name': 'Print Styles',
-             'uri': request.route_url('admin-print-style'),
              },
             {'name': 'Content Status',
              'uri': request.route_url('admin-content-status'),
@@ -95,11 +91,8 @@ def admin_api_keys(request):  # pragma: no cover
              renderer='cnxpublishing.views:templates/post-publications.html',
              permission='administer')
 def admin_post_publications(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     states = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
 SELECT ident_hash(m.uuid, m.major_version, m.minor_version),
@@ -128,11 +121,8 @@ ORDER BY bpsa.created DESC LIMIT 100""")
              renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer')
 def admin_add_site_message(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     banners = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 SELECT id, service_state_id, starts, ends, priority, message
@@ -185,10 +175,6 @@ def parse_message_args(request):
              renderer='templates/site-messages.html',
              permission='administer')
 def admin_add_site_message_POST(request):
-
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     # # If it was a post request to delete
     # if 'delete' in request.POST.keys():
     #     message_id = request.POST.get('delete', -1)
@@ -204,7 +190,7 @@ def admin_add_site_message_POST(request):
 
     # otherwise it was an post request to add an message banner
     args = parse_message_args(request)
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 INSERT INTO service_state_messages
@@ -222,11 +208,8 @@ def admin_add_site_message_POST(request):
              renderer='templates/site-messages.html',
              permission='administer')
 def admin_delete_site_message(request):
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
     message_id = request.body.split("=")[1]
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 DELETE FROM service_state_messages WHERE id=%s;
@@ -244,10 +227,7 @@ def admin_edit_site_message(request):
     message_id = request.matchdict['id']
     args = {'id': message_id}
 
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 SELECT id, service_state_id, starts, ends, priority, message
@@ -280,10 +260,7 @@ def admin_edit_site_message_POST(request):
     args = parse_message_args(request)
     args['id'] = message_id
 
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
-
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 UPDATE service_state_messages
@@ -308,10 +285,8 @@ def admin_print_styles(request):
     Returns a dictionary of all unique print_styles, and their latest tag,
     revision, and recipe_type.
     """
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
     styles = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 WITH latest AS (
@@ -351,11 +326,9 @@ def admin_print_styles_single(request):
     along with a dictionary of the book, author, revision date, recipie,
     tag of the print_style, and a link to the content.
     """
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
     style = request.matchdict['style']
     # do db search to get file id and other info on the print_style
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""
                 SELECT fileid, recipe_type
@@ -443,11 +416,12 @@ def get_baking_statuses_sql(get_request):
 
     statement = """
                 SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recipe,  m.recipe,
+                       ps.fileid as latest_recipe_id,  m.recipe as recipe_id,
+                       f.sha1 as recipe,
                        module_version(lm.major_version, lm.minor_version)
                         as latest_version,
                        module_version(m.major_version, m.minor_version)
-                        as cur_version,
+                        as current_version,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
                        bpsa.created, bpsa.result_id::text
@@ -457,6 +431,7 @@ def get_baking_statuses_sql(get_request):
                     ON ps.print_style=m.print_style
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
+                LEFT JOIN files f on m.recipe = f.fileid
                 {}
                 ORDER BY {};
                 """.format(sql_filters, sort)
@@ -472,52 +447,56 @@ def format_authors(authors):
 
 @view_config(route_name='admin-content-status', request_method='GET',
              renderer='cnxpublishing.views:templates/content-status.html',
-             permission='administer')
+             permission='view')
 def admin_content_status(request):
     """
     Returns a dictionary with the states and info of baking books,
     and the filters from the GET request to pre-populate the form.
     """
-    settings = request.registry.settings
-    db_conn_str = settings[config.CONNECTION_STRING]
     statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
-    with psycopg2.connect(db_conn_str) as db_conn:
+    with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
                 message = ''
-                result_id = row[-1]
+                result_id = row['result_id']
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
-                    message = result.traceback.split("\n")[-2]
-                latest_recipe = row[4]
-                current_recipe = row[5]
-                latest_version = row[6]
-                current_version = row[7]
+                    if result.traceback is not None:
+                        message = result.traceback.split("\n")[-2]
+                latest_recipe = row['latest_recipe_id']
+                current_recipe = row['recipe_id']
+                latest_version = row['latest_version']
+                current_version = row['current_version']
                 state = str(result.state)
                 if current_version != latest_version:
                     state += ' stale_content'
-                if current_recipe != latest_recipe:
+                if (current_recipe is not None and
+                        current_recipe != latest_recipe):
                     state += ' stale_recipe'
                 state_icon = result.state
                 if state[:7] == "SUCCESS" and len(state) > 7:
                     state_icon = 'PENDING'
                 states.append({
-                    'title': row[0].decode('utf-8'),
-                    'authors': format_authors(row[1]),
-                    'uuid': row[2],
-                    'print_style': row[3],
-                    'recipe': row[4],
-                    'created': row[-2],
+                    'title': row['name'].decode('utf-8'),
+                    'authors': format_authors(row['authors']),
+                    'uuid': row['uuid'],
+                    'print_style': row['print_style'],
+                    'recipe': row['recipe'],
+                    'recipe_link': request.route_path(
+                        'get-resource', hash=row['recipe']),
+                    'created': row['created'],
                     'state': state,
                     'state_message': message,
-                    'state_icon': STATE_ICONS[state_icon]['class'],
-                    'state_icon_style': STATE_ICONS[state_icon]['style'],
+                    'state_icon': STATE_ICONS.get(
+                        state_icon, DEFAULT_ICON)['class'],
+                    'state_icon_style': STATE_ICONS.get(
+                        state_icon, DEFAULT_ICON)['style'],
                     'status_link': request.route_path(
-                        'admin-content-status-single', uuid=row[2]),
+                        'admin-content-status-single', uuid=row['uuid']),
                     'content_link': request.route_path(
-                        'get-content', ident_hash=row[-3])
+                        'get-content', ident_hash=row['ident_hash'])
                 })
     status_filters = [request.GET.get('pending_filter', ''),
                       request.GET.get('started_filter', ''),
@@ -569,7 +548,7 @@ def admin_content_status(request):
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
              renderer='templates/content-status-single.html',
-             permission='administer')
+             permission='view')
 def admin_content_status_single(request):
     """
     Returns a dictionary with all the past baking statuses of a single book.
@@ -581,9 +560,8 @@ def admin_content_status_single(request):
         raise httpexceptions.HTTPBadRequest(
             '{} is not a valid uuid'.format(uuid))
 
-    settings = request.registry.settings
     statement, sql_args = get_baking_statuses_sql({'uuid': uuid})
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, sql_args)
             modules = cursor.fetchall()
@@ -596,33 +574,34 @@ def admin_content_status_single(request):
 
             for row in modules:
                 message = ''
-                result_id = row[-1]
+                result_id = row['result_id']
                 result = AsyncResult(id=result_id)
                 if result.failed():  # pragma: no cover
                     message = result.traceback
-                latest_recipe = row[4]
-                current_recipe = row[5]
-                latest_version = row[6]
-                current_version = row[7]
+                latest_recipe = row['latest_recipe_id']
+                current_recipe = row['recipe_id']
+                latest_version = row['latest_version']
+                current_version = row['current_version']
                 state = result.state
-                if current_recipe != latest_recipe:
+                if (latest_recipe is not None and
+                        current_recipe != latest_recipe):
                     state += ' stale_recipe'
                 if current_version != latest_version:
                     state += ' stale_content'
                 states.append({
-                    'version': row[7],
-                    'recipe': row[5],
-                    'created': str(row[-2]),
+                    'version': row['current_version'],
+                    'recipe': row['recipe'],
+                    'created': str(row['created']),
                     'state': state,
                     'state_message': message,
                 })
 
-    return {'uuid': str(collection_info[2]),
-            'title': collection_info[0].decode('utf-8'),
-            'authors': format_authors(collection_info[1]),
-            'print_style': collection_info[3],
-            'current_recipe': collection_info[4],
-            'current_ident': collection_info[8],
+    return {'uuid': str(collection_info['uuid']),
+            'title': collection_info['name'].decode('utf-8'),
+            'authors': format_authors(collection_info['authors']),
+            'print_style': collection_info['print_style'],
+            'current_recipe': collection_info['recipe_id'],
+            'current_ident': collection_info['module_ident'],
             'current_state': states[0]['state'],
             'states': states}
 
@@ -638,8 +617,7 @@ def admin_content_status_single_POST(request):
         args['response'] = title + ' is not stale, no need to bake'
         return args
 
-    settings = request.registry.settings
-    with psycopg2.connect(settings[config.CONNECTION_STRING]) as db_conn:
+    with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("SELECT stateid FROM modules WHERE module_ident=%s",
                            vars=(args['current_ident'],))

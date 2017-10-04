@@ -59,9 +59,15 @@
           <i class="{{state.state_icon}}" style="{{state.state_icon_style}}"></i>{{ state.state }}
         </td>
         <td>{{ state.print_style }}</td>
-        <td>{{ state.recipie }}</td>
         <td>
-          <a href='{{ state.content_link }}'>{{ state.content_link }}</a>
+          {% if state.recipe %}
+          <a href="{{ state.recipe_link }}">{{ state.recipe }}</a>
+          {% else %}
+          None
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ state.content_link }}">{{ state.content_link }}</a>
         </td>
         <td>{{ state.state_message }}</td>
       </tr>

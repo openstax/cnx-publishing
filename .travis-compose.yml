@@ -1,0 +1,9 @@
+version: "2"
+services:
+  db:
+    build: https://github.com/Connexions/cnx-db.git
+    ports:
+      - "5432:5432"
+    environment:
+      - DB_USER=cnxarchive
+      - DB_NAME=cnxarchive-testing
