@@ -1432,7 +1432,8 @@ def update_module_state(cursor, module_ident,
 UPDATE modules
 SET stateid = (
     SELECT stateid FROM modulestates WHERE statename = %s
-), recipe = %s WHERE module_ident = %s""", (state_name, recipe, module_ident))
+), recipe = %s, baked = now() WHERE module_ident = %s""",
+                   (state_name, recipe, module_ident))
 
 
 __all__ = (
