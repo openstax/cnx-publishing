@@ -7,7 +7,6 @@
 # ###
 from __future__ import print_function
 import contextlib
-import os
 import sys
 import io
 import functools
@@ -20,7 +19,6 @@ from cnxarchive.utils import IdentHashSyntaxError, IdentHashShortId
 from cnxepub import ATTRIBUTED_ROLE_KEYS
 from openstax_accounts.interfaces import IOpenstaxAccounts
 from psycopg2.extras import register_uuid
-from pyramid.security import has_permission
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
     )
@@ -336,7 +334,7 @@ def _validate_derived_from(cursor, model):
     cursor.execute("""SELECT 't' FROM {} WHERE uuid::text = %s{}"""
                    .format(table, version_condition), args)
     try:
-        exists = cursor.fetchone()[0]
+        _exists = cursor.fetchone()[0]  # noqa
     except TypeError:  # None type
         raise exceptions.InvalidMetadata('derived_from_uri', derived_from_uri)
 
@@ -973,7 +971,7 @@ WHERE hash = %s""", (hash,))
                 document.resources.append(cnxepub.Resource(
                     hash, io.BytesIO(data[:]), media_type, filename=hash))
 
-        ident_hash = publish_model(cursor, document, publisher, message)
+        _ident_hash = publish_model(cursor, document, publisher, message)  # noqa
         all_models.append(document)
 
     # And now the binders, one at a time...
@@ -995,17 +993,18 @@ JOIN pending_documents d ON a.document_id = d.id
 WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                        (binder.ident_hash,))
         binder.resources = [
-            cnxepub.Resource(hash,
-                             io.BytesIO(data[:]),
-                             media_type,
-                             filename=filename)
-            for (hash, data, media_type, filename) in cursor.fetchall()]
-        ident_hash = publish_model(cursor, binder, publisher, message)
+            cnxepub.Resource(r_hash,
+                             io.BytesIO(r_data[:]),
+                             r_media_type,
+                             filename=r_filename)
+            for (r_hash, r_data, r_media_type, r_filename)
+            in cursor.fetchall()]
+        _ident_hash = publish_model(cursor, binder, publisher, message)  # noqa
         all_models.append(binder)
 
     # Republish binders containing shared documents.
     from .publish import republish_binders
-    republished_ident_hashes = republish_binders(cursor, all_models)
+    _republished_ident_hashes = republish_binders(cursor, all_models)  # noqa
 
     # Lastly, update the publication status.
     cursor.execute("""\
