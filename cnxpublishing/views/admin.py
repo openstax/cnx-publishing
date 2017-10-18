@@ -19,7 +19,6 @@ from .moderation import get_moderation
 from .api_keys import get_api_keys
 
 STATE_ICONS = [
-    ("PENDING", 'fa fa-hourglass-1 state-icon pending'),
     ("QUEUED", 'fa fa-hourglass-1 state-icon queued'),
     ("STARTED", 'fa fa-hourglass-2 state-icon started'),
     ("RETRY", 'fa fa-repeat state-icon retry'),
@@ -377,7 +376,7 @@ def admin_content_status(request):
                     state += ' stale_recipe'
                 state_icon = result.state
                 if state[:7] == "SUCCESS" and len(state) > 7:
-                    state_icon = 'PENDING'
+                    state_icon = 'unknown'
                 states.append({
                     'title': row['name'].decode('utf-8'),
                     'authors': format_authors(row['authors']),

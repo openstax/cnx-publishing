@@ -259,13 +259,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         content = admin_content_status(request)
         self.assertEqual({
             'STATE_ICONS': [
-                ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
                 ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
                 ('STARTED', 'fa fa-hourglass-2 state-icon started'),
                 ('RETRY', 'fa fa-repeat state-icon retry'),
                 ('FAILURE', 'fa fa-close state-icon failure'),
                 ('SUCCESS', 'fa fa-check-square state-icon success')],
-            'status_filters': ['PENDING', 'QUEUED', 'STARTED', 'RETRY',
+            'status_filters': ['QUEUED', 'STARTED', 'RETRY',
                                'FAILURE', 'SUCCESS'],
             'domain': 'example.com:80',
             'start_entry': 0,
@@ -293,7 +292,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         content = admin_content_status(request)
         self.assertEqual({
             'STATE_ICONS': [
-                ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
                 ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
                 ('STARTED', 'fa fa-hourglass-2 state-icon started'),
                 ('RETRY', 'fa fa-repeat state-icon retry'),
@@ -399,7 +397,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        for i in content['states']]
 
         self.assertEqual([
-            ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
+            ('PENDING', 'fa fa-exclamation-triangle state-icon unknown'),
             ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
             ('STARTED', 'fa fa-hourglass-2 state-icon started'),
             ('RETRY', 'fa fa-repeat state-icon retry'),
