@@ -258,8 +258,14 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
-            'status_filters': ['PENDING', 'STARTED', 'RETRY', 'FAILURE',
-                               'SUCCESS'],
+            'STATE_ICONS': [
+                ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
+                ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+                ('RETRY', 'fa fa-repeat state-icon retry'),
+                ('FAILURE', 'fa fa-close state-icon failure'),
+                ('SUCCESS', 'fa fa-check-square state-icon success')],
+            'status_filters': ['PENDING', 'STARTED', 'RETRY',
+                               'FAILURE', 'SUCCESS'],
             'start_entry': 0,
             'page': 1,
             'num_entries': 100,
@@ -284,6 +290,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
+            'STATE_ICONS': [
+                ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
+                ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+                ('RETRY', 'fa fa-repeat state-icon retry'),
+                ('FAILURE', 'fa fa-close state-icon failure'),
+                ('SUCCESS', 'fa fa-check-square state-icon success')],
             'status_filters': ['PENDING'],
             'start_entry': 0,
             'page': 1,
@@ -383,14 +395,15 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        for i in content['states']]
 
         self.assertEqual([
-            ('PENDING', 'fa fa-exclamation-triangle'),
-            ('QUEUED', 'fa fa-exclamation-triangle'),
-            ('STARTED', 'fa fa-exclamation-triangle'),
-            ('RETRY', 'fa fa-close'),
-            ('SUCCESS', 'fa fa-check-square'),
-            ('FAILURE', 'fa fa-close'),
-            ('REVOKED', 'fa fa-exclamation-triangle'),
-            ('UNKNOWN', 'fa fa-exclamation-triangle')], state_icons)
+            ('PENDING', 'fa fa-hourglass-1 state-icon pending'),
+            ('QUEUED', 'fa fa-exclamation-triangle state-icon unknown'),
+            ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+            ('RETRY', 'fa fa-repeat state-icon retry'),
+            ('SUCCESS', 'fa fa-check-square state-icon success'),
+            ('FAILURE', 'fa fa-close state-icon failure'),
+            ('REVOKED', 'fa fa-exclamation-triangle state-icon unknown'),
+            ('UNKNOWN', 'fa fa-exclamation-triangle state-icon unknown')
+            ], state_icons)
 
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()

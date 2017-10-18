@@ -18,18 +18,14 @@ from ..db import db_connect
 from .moderation import get_moderation
 from .api_keys import get_api_keys
 
-STATE_ICONS = {
-    "SUCCESS": {'class': 'fa fa-check-square',
-                'style': 'font-size:20px;color:limeGreen'},
-    "STARTED": {'class': 'fa fa-exclamation-triangle',
-                'style': 'font-size:20px;color:gold'},
-    "PENDING": {'class': 'fa fa-exclamation-triangle',
-                'style': 'font-size:20px;color:gold'},
-    "RETRY": {'class': 'fa fa-close',
-              'style': 'font-size:20px;color:red'},
-    "FAILURE": {'class': 'fa fa-close',
-                'style': 'font-size:20px;color:red'}}
-DEFAULT_ICON = STATE_ICONS['PENDING']
+STATE_ICONS = [
+    ("PENDING", 'fa fa-hourglass-1 state-icon pending'),
+    ("STARTED", 'fa fa-hourglass-2 state-icon started'),
+    ("RETRY", 'fa fa-repeat state-icon retry'),
+    ("FAILURE", 'fa fa-close state-icon failure'),
+    ("SUCCESS", 'fa fa-check-square state-icon success'),
+    ]
+DEFAULT_ICON = 'fa fa-exclamation-triangle state-icon unknown'
 SORTS_DICT = {
     "bpsa.created": 'created',
     "m.name": 'name',
@@ -355,6 +351,7 @@ def admin_content_status(request):
     statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
     status_filters = request.params.getall('status_filter') or []
+    state_icons = dict(STATE_ICONS)
     with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, vars=sql_args)
@@ -391,10 +388,8 @@ def admin_content_status(request):
                     'created': row['created'],
                     'state': state,
                     'state_message': message,
-                    'state_icon': STATE_ICONS.get(
-                        state_icon, DEFAULT_ICON)['class'],
-                    'state_icon_style': STATE_ICONS.get(
-                        state_icon, DEFAULT_ICON)['style'],
+                    'state_icon': state_icons.get(
+                        state_icon, DEFAULT_ICON),
                     'status_link': request.route_path(
                         'admin-content-status-single', uuid=row['uuid']),
                     'content_link': request.route_path(
@@ -429,8 +424,9 @@ def admin_content_status(request):
                     'states': states,
                     'sort_' + sort_match: sort_arrow,
                     'sort': sort,
+                    'STATE_ICONS': STATE_ICONS,
                     'status_filters': status_filters or [
-                        "PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]})
+                        i[0] for i in STATE_ICONS]})
     return returns
 
 
