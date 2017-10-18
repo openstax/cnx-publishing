@@ -354,6 +354,7 @@ def admin_content_status(request):
     """
     statement, sql_args = get_baking_statuses_sql(request.GET)
     states = []
+    status_filters = request.params.getall('status_filter') or []
     with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute(statement, vars=sql_args)
@@ -364,6 +365,8 @@ def admin_content_status(request):
                 if result.failed():  # pragma: no cover
                     if result.traceback is not None:
                         message = result.traceback.split("\n")[-2]
+                if status_filters and result.state not in status_filters:
+                    continue
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
                 latest_version = row['latest_version']
@@ -397,31 +400,16 @@ def admin_content_status(request):
                     'content_link': request.route_path(
                         'get-content', ident_hash=row['ident_hash'])
                 })
-    status_filters = [request.GET.get('pending_filter', ''),
-                      request.GET.get('started_filter', ''),
-                      request.GET.get('retry_filter', ''),
-                      request.GET.get('failure_filter', ''),
-                      request.GET.get('success_filter', '')]
-    status_filters = [x for x in status_filters if x != '']
-    if not status_filters:
-        status_filters = ["PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]
-        final_states = states
-    else:
-        final_states = []
-        for state in states:
-            if state['state'].split(' ')[0] in status_filters:
-                final_states.append(state)
-    sort = request.GET.get('sort', 'bpsa.created DESC')
+    sort = request.params.get('sort', 'bpsa.created DESC')
     sort_match = SORTS_DICT[sort.split(' ')[0]]
     sort_arrow = ARROW_MATCH[sort.split(' ')[1]]
     if sort == "STATE ASC":
-        final_states = sorted(final_states, key=lambda x: x['state'])
+        states.sort(key=lambda x: x['state'])
     if sort == "STATE DESC":
-        final_states = sorted(final_states,
-                              key=lambda x: x['state'], reverse=True)
+        states.sort(key=lambda x: x['state'], reverse=True)
 
-    num_entries = request.GET.get('number', 100)
-    page = request.GET.get('page', 1)
+    num_entries = request.params.get('number', 100)
+    page = request.params.get('page', 1)
     try:
         page = int(page)
         num_entries = int(num_entries)
@@ -430,18 +418,19 @@ def admin_content_status(request):
         raise httpexceptions.HTTPBadRequest(
             'invalid page({}) or entries per page({})'.
             format(page, num_entries))
-    final_states = final_states[start_entry: start_entry + num_entries]
+    total_entries = len(states)
+    states = states[start_entry: start_entry + num_entries]
 
     returns = sql_args
     returns.update({'start_entry': start_entry,
                     'num_entries': num_entries,
                     'page': page,
-                    'total_entries': len(final_states),
-                    'states': final_states,
+                    'total_entries': total_entries,
+                    'states': states,
                     'sort_' + sort_match: sort_arrow,
-                    'sort': sort})
-    for f in status_filters:
-        returns[f] = "checked"
+                    'sort': sort,
+                    'status_filters': status_filters or [
+                        "PENDING", "STARTED", "RETRY", "FAILURE", "SUCCESS"]})
     return returns
 
 
