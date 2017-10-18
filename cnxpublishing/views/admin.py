@@ -20,6 +20,7 @@ from .api_keys import get_api_keys
 
 STATE_ICONS = [
     ("PENDING", 'fa fa-hourglass-1 state-icon pending'),
+    ("QUEUED", 'fa fa-hourglass-1 state-icon queued'),
     ("STARTED", 'fa fa-hourglass-2 state-icon started'),
     ("RETRY", 'fa fa-repeat state-icon retry'),
     ("FAILURE", 'fa fa-close state-icon failure'),
