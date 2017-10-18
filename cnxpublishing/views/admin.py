@@ -424,6 +424,7 @@ def admin_content_status(request):
                     'states': states,
                     'sort_' + sort_match: sort_arrow,
                     'sort': sort,
+                    'domain': request.host,
                     'STATE_ICONS': STATE_ICONS,
                     'status_filters': status_filters or [
                         i[0] for i in STATE_ICONS]})
