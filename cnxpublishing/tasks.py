@@ -26,7 +26,7 @@ class PyramidAwareTask(celery.Task):
         # Prepare the pyramid environment.
         if 'pyramid_config' in self.app.conf:
             pyramid_config = self.app.conf['pyramid_config']
-            env = prepare(registry=pyramid_config.registry)
+            env = prepare(registry=pyramid_config.registry)  # noqa
         # Now run the original...
         return super(PyramidAwareTask, self).__call__(*args, **kwargs)
 
@@ -70,6 +70,7 @@ def includeme(config):
         broker_url=settings['celery.broker'],
         result_backend=settings['celery.backend'],
         result_persistent=True,
+        task_track_started=True,
         task_default_queue='default',
         task_queues=(
             Queue('default'),
