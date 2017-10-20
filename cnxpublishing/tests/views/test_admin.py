@@ -18,6 +18,7 @@ from datetime import datetime
 from pyramid import testing
 import psycopg2
 from pyramid.httpexceptions import HTTPBadRequest
+from webob.multidict import MultiDict
 
 from .. import use_cases
 from ..testing import (
@@ -252,16 +253,20 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         add_data(self)
 
     def test_admin_content_status_no_filters(self):
-        request = testing.DummyRequest()
+        request = testing.DummyRequest(params=MultiDict([]))
 
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
-            'SUCCESS': 'checked',
-            'PENDING': 'checked',
-            'STARTED': 'checked',
-            'RETRY': 'checked',
-            'FAILURE': 'checked',
+            'STATE_ICONS': [
+                ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
+                ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+                ('RETRY', 'fa fa-repeat state-icon retry'),
+                ('FAILURE', 'fa fa-close state-icon failure'),
+                ('SUCCESS', 'fa fa-check-square state-icon success')],
+            'status_filters': ['QUEUED', 'STARTED', 'RETRY',
+                               'FAILURE', 'SUCCESS'],
+            'domain': 'example.com:80',
             'start_entry': 0,
             'page': 1,
             'num_entries': 100,
@@ -275,17 +280,25 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             sorted(content['states'], key=lambda x: x['created'], reverse=True))
 
     def test_admin_content_status_w_filters(self):
-        request = testing.DummyRequest()
+        request = testing.DummyRequest(params=MultiDict([
+            ('page', 1),
+            ('number', 2),
+            ('sort', 'STATE ASC'),
+            ('author', 'charrose'),
+            ('status_filter', 'PENDING'),
+            ]))
 
-        request.GET = {'page': 1,
-                       'number': 2,
-                       'sort': 'STATE ASC',
-                       'author': 'charrose',
-                       'pending_filter': 'PENDING'}
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual({
-            'PENDING': 'checked',
+            'STATE_ICONS': [
+                ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
+                ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+                ('RETRY', 'fa fa-repeat state-icon retry'),
+                ('FAILURE', 'fa fa-close state-icon failure'),
+                ('SUCCESS', 'fa fa-check-square state-icon success')],
+            'status_filters': ['PENDING'],
+            'domain': 'example.com:80',
             'start_entry': 0,
             'page': 1,
             'num_entries': 2,
@@ -312,12 +325,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                     WHERE uuid=%s;
                     """, (uuid, ))
 
-        request = testing.DummyRequest()
-        request.GET = {'page': 1,
-                       'number': 1}
+        request = testing.DummyRequest(params=MultiDict([
+            ('page', 1),
+            ('number', 1),
+            ]))
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
-        print [x['state'] for x in content['states']]
         self.assertEqual('PENDING stale_content stale_recipe',
                          content['states'][0]['state'])
 
@@ -331,9 +344,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.assertIn('invalid sort', caught_exc.exception.message)
 
     def test_admin_content_status_bad_page_number(self):
-        request = testing.DummyRequest()
+        request = testing.DummyRequest(params=MultiDict([
+            ('page', 'abc'),
+            ]))
 
-        request.GET = {'page': 'abc'}
         from ...views.admin import admin_content_status
         with self.assertRaises(HTTPBadRequest) as caught_exc:
             admin_content_status(request)
@@ -375,7 +389,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         db_conn = mock_db_connect.return_value.__enter__()
         db_conn.cursor().__enter__.return_value = cursor
 
-        request = testing.DummyRequest()
+        request = testing.DummyRequest(params=MultiDict([]))
         from ...views.admin import admin_content_status
 
         content = admin_content_status(request)
@@ -383,14 +397,15 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        for i in content['states']]
 
         self.assertEqual([
-            ('PENDING', 'fa fa-exclamation-triangle'),
-            ('QUEUED', 'fa fa-exclamation-triangle'),
-            ('STARTED', 'fa fa-exclamation-triangle'),
-            ('RETRY', 'fa fa-close'),
-            ('SUCCESS', 'fa fa-check-square'),
-            ('FAILURE', 'fa fa-close'),
-            ('REVOKED', 'fa fa-exclamation-triangle'),
-            ('UNKNOWN', 'fa fa-exclamation-triangle')], state_icons)
+            ('PENDING', 'fa fa-exclamation-triangle state-icon unknown'),
+            ('QUEUED', 'fa fa-hourglass-1 state-icon queued'),
+            ('STARTED', 'fa fa-hourglass-2 state-icon started'),
+            ('RETRY', 'fa fa-repeat state-icon retry'),
+            ('SUCCESS', 'fa fa-check-square state-icon success'),
+            ('FAILURE', 'fa fa-close state-icon failure'),
+            ('REVOKED', 'fa fa-exclamation-triangle state-icon unknown'),
+            ('UNKNOWN', 'fa fa-exclamation-triangle state-icon unknown')
+            ], state_icons)
 
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()

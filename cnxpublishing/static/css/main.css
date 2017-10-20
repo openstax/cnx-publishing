@@ -135,6 +135,22 @@ td {
     *zoom: 1;
 }
 
+.left {
+    float: left;
+}
+
+.right {
+    float: right;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
 /* ==========================================================================
    Print styles
    ========================================================================== */
@@ -197,4 +213,50 @@ td {
     h3 {
         page-break-after: avoid;
     }
+}
+
+/* ==========================================================================
+   Admin pages
+   ========================================================================== */
+
+.content-status .state-icon {
+    font-size: 20px;
+}
+
+.content-status .pending, .content-status .queued, .content-status .retry {
+    color: gray;
+}
+
+.content-status .started {
+    color: orange;
+}
+
+.content-status .failure {
+    color: red;
+}
+
+.content-status .success {
+    color: green;
+}
+
+.content-status td, .content-status th {
+    padding: 5px 10px;
+}
+
+.content-status .form-field, .content-status .form-input {
+    padding: 5px 10px;
+}
+
+.content-status .form-field {
+    width: 180px;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.content-status .form-input input {
+    padding: 5px;
+}
+
+.content-status .form-input label {
+    margin-right: 25px;
 }
