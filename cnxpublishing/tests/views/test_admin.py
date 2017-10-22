@@ -8,7 +8,6 @@
 import pytest
 import uuid
 import unittest
-import StringIO
 try:
     from unittest import mock
 except ImportError:
@@ -478,7 +477,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         request.GET = {'page': 1,
                        'number': 1}
-        from ...views.admin import admin_content_status
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
         self.assertEqual('PENDING stale_content',
