@@ -17,7 +17,7 @@
             <a href={{style.link}}>{{ style.print_style }}</a>
         </td>
         <td>{{ style.title }}</td>
-        <td>{{ style.number }}</td>
+        <td>{{ style.number }}{%if style.bad %} ({{ style.bad }}){% endif %}</td>
         <td>{{ style.tag }}</td>
         <td>{{ style.commit_id }}</td>
         <td>

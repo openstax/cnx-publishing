@@ -110,16 +110,19 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
         self.config.add_route('get-content', '/contents/{ident_hash}')
+        self.config.add_route('admin-content-status-single',
+                              '/a/content-status/{uuid}')
         self.config.add_route('admin-print-style-single',
                               '/a/print-style/{style}')
+        self.config.add_route('get-resource', '/resources/{hash}')
         init_db(self.db_conn_str)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""INSERT INTO files
                                   (file, media_type) VALUES ('file', 'css');""")
                 cursor.execute("""INSERT INTO print_style_recipes
-                                  (print_style, fileid, tag)
-                                  VALUES ('ccap-physics', 1, '1.0');""")
+                                  (print_style, title, fileid, tag)
+                                  VALUES ('ccap-physics', 'CCAP Physics', 1, '1.0');""")
 
     def tearDown(self):
         with self.db_connect() as db_conn:
@@ -139,6 +142,9 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                           'type': 'web',
                           'revised': content['styles'][0]['revised'],
                           'number': 0,
+                          'bad': 0,
+                          'commit_id': None,
+                          'title': 'CCAP Physics',
                           'tag': '1.0',
                           'link': '/a/print-style/ccap-physics'})
 
@@ -146,7 +152,7 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         request = testing.DummyRequest()
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("""INSERT INTO latest_modules
+                cursor.execute("""INSERT INTO modules
                                   (print_style, portal_type, name, licenseid,
                                         doctype, uuid, created, revised, recipe)
                                   VALUES ('ccap-physics', 'Collection', 'test', 1,
@@ -164,11 +170,14 @@ class PrintStyleViewsTestCase(unittest.TestCase):
                          {'title': 'test',
                           'authors': None,
                           'revised': content['collections'][0]['revised'],
-                          'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
+                          'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@1.1',
+                          'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@1.1',
                           'tag': '1.0',
-                          'recipe': 1,
-                          'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@',
-                          'status': 'current'})
+                          'recipe': '971c419dd609331343dee105fffd0f4608dc0bf2',
+                          'recipe_link': '/resources/971c419dd609331343dee105fffd0f4608dc0bf2',
+                          'status': 'current',
+                          'status_link': '/a/content-status/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+                          })
 
     def test_print_style_single_no_style(self):
         request = testing.DummyRequest()
@@ -332,6 +341,8 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         self.config.include('cnxpublishing.tasks')
         self.config.add_route('admin-content-status-single',
                               '/a/content-status/{uuid}')
+        self.config.add_route('admin-print-style-single',
+                              '/a/print-style/{style}')
         self.config.add_route('get-content', '/contents/{ident_hash}')
         self.config.add_route('get-resource', '/resources/{hash}')
 
@@ -404,8 +415,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         print [x['state'] for x in content['states']]
-        self.assertEqual('PENDING stale_content stale_recipe',
+        self.assertEqual('PENDING stale_content',
                          content['states'][0]['state'])
+        self.assertEqual('(custom)',
+                         content['states'][0]['print_style'])
+        self.assertEqual('8d539366a39af1715bdf4154d0907d4a5360ba29',
+                         content['states'][0]['recipe'])
 
     def test_admin_content_status_bad_sort(self):
         request = testing.DummyRequest()
@@ -425,20 +440,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             admin_content_status(request)
         self.assertIn('invalid page', caught_exc.exception.message)
 
-    @mock.patch('cnxpublishing.views.admin.AsyncResult')
     @mock.patch('cnxpublishing.views.admin.db_connect')
-    def test_admin_content_status_state_icons(self, mock_db_connect,
-                                              mock_async_result):
+    def test_admin_content_status_state_icons(self, mock_db_connect):
         states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
                   'FAILURE', 'REVOKED', 'UNKNOWN']
-
-        def round_robin_states(*args, **kwargs):
-            result = mock.Mock(
-                state=states[mock_async_result.call_count - 1 % len(states)])
-            result.failed.return_value = False
-            return result
-
-        mock_async_result.side_effect = round_robin_states
 
         cursor = mock.MagicMock()
         uuid_ = uuid.uuid4(),
@@ -455,8 +460,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
              'module_ident': 'm0000',
              'ident_hash': '{}@1.1'.format(uuid_),
              'created': datetime.now().isoformat(),
+             'state': state,
              'result_id': 'result-{}'.format(i)}
-            for i in range(len(states))]
+            for (i, state) in enumerate(states)]
 
         db_conn = mock_db_connect.return_value.__enter__()
         db_conn.cursor().__enter__.return_value = cursor

@@ -288,16 +288,24 @@ def admin_print_styles(request):
     styles = []
     # This fetches all recipes that have been used to successfully bake a
     # current book plus all default recipes that have not yet been used
+    # as well as "bad" books that are not "current" state, but would otherwise
+    # be the latest/current for that book
     with db_connect(cursor_factory=DictCursor) as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
                 WITH latest AS (SELECT print_style, recipe,
-                    count(*), count(nullif(stateid=1)) as bad,
+                    count(*), count(nullif(stateid, 1)) as bad
                 FROM all_current_modules
-                WHERE portal_type = 'Collection' AND baked IS NOT NULL
+                WHERE portal_type = 'Collection'
+                      AND recipe IS NOT NULL
+                      AND (
+                          baked IS NOT NULL OR (
+                              baked IS NULL AND stateid != 1
+                              )
+                          )
                 GROUP BY print_style, recipe
                 ),
-                defaults AS (SELECT print_style, fileid AS recipe, 0 AS count
+                defaults AS (SELECT print_style, fileid AS recipe
                 FROM default_print_style_recipes d
                 WHERE not exists (SELECT 1
                                   FROM latest WHERE latest.recipe = d.fileid)
@@ -310,7 +318,7 @@ def admin_print_styles(request):
                                     la.recipe = ps.fileid
                 UNION ALL
                 SELECT ps.print_style, ps.title, ps.recipe_type,
-                       ps.revised, ps.tag, ps.commit_id, de.count
+                       ps.revised, ps.tag, ps.commit_id, 0 AS count, 0 AS bad
                 FROM defaults de JOIN print_style_recipes ps ON
                                     de.print_style = ps.print_style AND
                                     de.recipe = ps.fileid
@@ -383,7 +391,7 @@ def admin_print_styles_single(request):
                     SELECT name, authors, lm.revised, lm.recipe, NULL as tag,
                         f.sha1 as hash, NULL as commit_id, uuid,
                         ident_hash(uuid, major_version, minor_version)
-                    FROM latest_modules as lm
+                    FROM all_current_modules as lm
                     JOIN files f ON lm.recipe = f.fileid
                     WHERE portal_type='Collection'
                     AND NOT EXISTS (
@@ -474,7 +482,7 @@ def get_baking_statuses_sql(get_request):
                        bpsa.created, ctm.status as state, ctm.traceback
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
-                JOIN celery_taskmeta AS ctm
+                LEFT JOIN celery_taskmeta AS ctm
                     ON bpsa.result_id = ctm.task_id::uuid
                 LEFT JOIN default_print_style_recipes as ps
                     ON ps.print_style=m.print_style
@@ -509,7 +517,7 @@ def admin_content_status(request):
             cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
                 message = ''
-                state = row['state']
+                state = row['state'] or 'PENDING'
                 if state == 'FAILED':  # pragma: no cover
                     if row['traceback'] is not None:
                         message = row['traceback'].split("\n")[-2]
@@ -623,7 +631,7 @@ def admin_content_status_single(request):
 
             for row in modules:
                 message = ''
-                state = row['state']
+                state = row['state'] or 'PENDING'
                 if state == 'FAILED':  # pragma: no cover
                     if row['traceback'] is not None:
                         message = row['traceback']
