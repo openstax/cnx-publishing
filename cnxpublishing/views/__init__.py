@@ -65,7 +65,7 @@ def includeme(config):
     config.include('pyramid_jinja2')
     config.add_jinja2_renderer('.html')
     config.add_jinja2_renderer('.rss')
-    config.add_static_view(name='static', path="cnxpublishing:static/")
+    config.add_static_view(name='/a/static', path="cnxpublishing:static/")
 
     # Commit the configuration otherwise the jija2_env won't have
     # a `globals` assignment.
