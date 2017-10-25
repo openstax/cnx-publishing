@@ -5,20 +5,27 @@
   <table>
     <tr>
       <th>Style</th>
-      <th>Number of Books</th>
-      <th>Type</th>
+      <th>Title</th>
+      <th>Books</th>
       <th>Version</th>
-      <th>Time Stamp</th>
+      <th>cnx-recipes commit</th>
+      <th>Deployed</th>
     </tr>
     {% for style in styles %}
       <tr>
         <td>
-          <a href={{style.link}}>{{ style.print_style }}</a>
+            <a href={{style.link}}>{{ style.print_style }}</a>
         </td>
+        <td>{{ style.title }}</td>
         <td>{{ style.number }}</td>
-        <td>{{ style.type }}</td>
         <td>{{ style.tag }}</td>
-        <td>{{ style.revised }}</td>
+        <td>{{ style.commit_id }}</td>
+        <td>
+        {% if style.revised %}
+          {{ style.revised.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        {% else %}
+          None
+        {% endif %}
       </tr>
     {% endfor %}
   </table>
