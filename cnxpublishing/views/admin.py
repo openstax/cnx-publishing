@@ -670,8 +670,8 @@ def admin_add_featured_books(request):
                 fileid = cursor.fetchall()[0][0]
                 cursor.execute("""\
                     INSERT INTO module_files (module_ident, fileid, filename)
-                    VALUES (%s, %s, 'featured-cover.png')
-                    """, vars=(module_ident, fileid, ))
+                    VALUES (%s, %s, %s)
+                    """, vars=(module_ident, fileid, filename, ))
                 response += "Image added. "
 
             cursor.execute("""\
