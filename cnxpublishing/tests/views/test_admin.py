@@ -428,8 +428,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ]))
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
-        self.assertEqual('PENDING stale_content stale_recipe',
+        self.assertEqual('PENDING stale_content',
                          content['states'][0]['state'])
+        self.assertEqual('(custom)',
+                         content['states'][0]['print_style'])
+        self.assertEqual('8d539366a39af1715bdf4154d0907d4a5360ba29',
+                         content['states'][0]['recipe'])
 
     def test_admin_content_status_bad_sort(self):
         request = testing.DummyRequest()
@@ -574,7 +578,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         request.GET = {'page': 1,
                        'number': 1}
-        from ...views.admin import admin_content_status
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
         self.assertEqual('PENDING stale_content',
@@ -629,5 +632,5 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
         request.matchdict['uuid'] = uuid
         with self.assertRaises(HTTPBadRequest) as caught_exc:
-            content = admin_content_status_single_POST(request)
+            _content = admin_content_status_single_POST(request)  # noqa
         self.assertIn('not a book', caught_exc.exception.message)

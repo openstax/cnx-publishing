@@ -66,7 +66,7 @@
       <th onclick='sortBooks("m.name")'>Title<i class="{{sort_name}}"></i></th>
       <th>Authors</th>
       <th onclick='sortBooks("STATE")'>State<i class="{{sort_state}}"></i></th>
-      <th>Print Style</th>
+      <th>Recipe Id</th>
       <th>Recipe</th>
       <th>Link to book</th>
       <th>Message</th>
@@ -81,7 +81,13 @@
         <td>
           <i class="{{state.state_icon}}"></i> {{ state.state }}
         </td>
-        <td>{{ state.print_style }}</td>
+        <td>
+          {% if state.print_style %}
+          <a href={{ state.print_style_link }}>{{ state.print_style }}</a>
+          {% else %}
+          None
+          {% endif %}
+        </td>
         <td>
           {% if state.recipe %}
           <a href="{{ state.recipe_link }}">{{ state.recipe }}</a>

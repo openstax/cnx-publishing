@@ -461,8 +461,13 @@ def get_baking_statuses_sql(get_request):
         sql_filters = ""
 
     statement = """
-                SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recipe_id,  m.recipe as recipe_id,
+                SELECT m.name, m.authors, m.uuid,
+                       CASE WHEN f.sha1 IS NOT NULL
+                       THEN coalesce(ps.print_style,'(custom)')
+                       ELSE ps.print_style
+                       END AS print_style,
+                       coalesce(ps.fileid, m.recipe) as latest_recipe_id,
+                       m.recipe as recipe_id,
                        f.sha1 as recipe,
                        module_version(lm.major_version, lm.minor_version)
                         as latest_version,
@@ -533,6 +538,8 @@ def admin_content_status(request):
                     'authors': format_authors(row['authors']),
                     'uuid': row['uuid'],
                     'print_style': row['print_style'],
+                    'print_style_link': request.route_path(
+                        'admin-print-style-single', style=row['print_style']),
                     'recipe': row['recipe'],
                     'recipe_link': request.route_path(
                         'get-resource', hash=row['recipe']),
