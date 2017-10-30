@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Print Style: {{print_style}}</h1>
+  <p> Recipie type: {{recipe_type}} </p>
+  <p> Number of Books Using this Style: {{number}}</p>
+  <table>
+    <tr>
+      <th>Title</th>
+      <th>Authors</th>
+      <th>Status</th>
+      <th>Tag</th>
+      <th>Recipe</th>
+      <th>ident_hash</th>
+      <th>Revised</th>
+    </tr>
+    {% for collection in collections %}
+      <tr>
+        <td><a href={{collection.status_link}}>{{ collection.title }}</a></td>
+        <td>{{ collection.authors }}</td>
+        <td>{{ collection.status }}</td>
+        <td>{{ collection.tag }}</td>
+        <td><a href={{ collection.recipe_link }}>{{ collection.recipe }}</a></td>
+        <td><a href={{ collection.link }}>{{ collection.ident_hash }}</a></td>
+        <td>{{ collection.revised }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
