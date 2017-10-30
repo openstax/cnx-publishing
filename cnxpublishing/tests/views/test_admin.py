@@ -562,10 +562,6 @@ class FeaturedBooksViewsTestCase(unittest.TestCase):
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
                 cursor.execute("""\
-                    CREATE TABLE featured_books (
-                        "uuid" UUID, "major_version" INT, "minor_version" INT);
-                """)
-                cursor.execute("""\
                 INSERT INTO modules (uuid, major_version, minor_version,
                     name, licenseid, doctype)
                 VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 1,
@@ -579,13 +575,13 @@ class FeaturedBooksViewsTestCase(unittest.TestCase):
                 VALUES ('94919e72-7573-4ed4-828e-673c1fe0cf9b', 1, 2,
                     'Biology', 1, 'Module');
 
-                INSERT INTO featured_books (uuid, major_version, minor_version)
-                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 1);
-                INSERT INTO featured_books (uuid, major_version, minor_version)
-                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 2);
-
                 INSERT INTO tags (tagid, tag, scheme)
                 VALUES (9, 'CNX Featured', 'featured');
+
+                INSERT INTO featured_books (uuid, major_version, minor_version, tagid)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 1, 9);
+                INSERT INTO featured_books (uuid, major_version, minor_version, tagid)
+                VALUES ('d5dbbd8e-d137-4f89-9d0a-3ac8db53d8ee', 1, 2, 9);
 
                 """)
 
@@ -606,9 +602,12 @@ class FeaturedBooksViewsTestCase(unittest.TestCase):
 
         featured = content["featured_books"]
         self.assertEqual(len(featured), 2)
-        self.assertEqual(featured,
-                         [{'uuid': uuid + "@1.1", 'title': 'Physics'},
-                          {'uuid': uuid + "@1.2", 'title': 'Physics'}])
+        self.assertEqual(featured[0]['uuid'], uuid + "@1.1")
+        self.assertEqual(featured[0]['title'], 'Physics')
+        self.assertIn(featured[0]['cover'], "https://archive.cnx.org/resources/")
+        self.assertEqual(featured[1]['uuid'], uuid + "@1.1")
+        self.assertEqual(featured[1]['title'], 'Physics')
+        self.assertIn(featured[1]['cover'], "https://archive.cnx.org/resources/")
 
     def test_admin_delete_featured_book(self):
         request = testing.DummyRequest()

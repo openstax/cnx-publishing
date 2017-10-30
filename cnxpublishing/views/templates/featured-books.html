@@ -21,12 +21,14 @@ Featured Books:
   <tr>
     <th>ident_hash</th>
     <th>title</th>
+    <th>cover link</th>
     <th>REMOVE</th>
   </tr>
   {% for book in featured_books %}
     <tr>
       <td>{{ book.uuid }}</td>
       <td>{{ book.title }}</td>
+      <td><a href="{{ book.cover }}">{{ book.cover }}</a></td>
       <td>
         <button class="delete" value="{{ book.uuid }}">Delete</button>
       </td>

@@ -544,16 +544,17 @@ def admin_featured_books(request):
                          f.major_version is NULL)
                     and (f.minor_version=m.minor_version OR
                          f.minor_version is NULL)
-                ORDER by revised DESC LIMIT 1)
+                ORDER by revised DESC LIMIT 1),
+                (SELECT sha1 from files WHERE f.fileid=files.fileid)
                 FROM featured_books as f;""")
             data = cursor.fetchall()
             featured_books = []
             for row in data:
-                title = row[1]
-                if title is None:
-                    title = ""
                 featured_books.append({'uuid': row[0],
-                                       'title': title.decode('utf-8')})
+                                       'title': row[1].decode('utf-8'),
+                                       'cover': "https://archive.cnx.org" +
+                                                request.route_path(
+                                                'get-resource', hash=row[2])})
 
     return {'featured_books': featured_books}
 
@@ -609,6 +610,7 @@ def admin_add_featured_books(request):
         with db_conn.cursor() as cursor:
 
             module_ident = ""
+            tagid = ""
             if (major and minor):
                 cursor.execute("""\
                     SELECT module_ident from modules as m
@@ -623,13 +625,16 @@ def admin_add_featured_books(request):
                     ;""", vars=(uuid, major))
             else:  # just uuid
                 cursor.execute("""\
-                    SELECT module_ident, major_version, minor_version
-                    from modules as m WHERE m.uuid =%s
+                    SELECT m.module_ident, major_version, minor_version, tagid
+                    from modules as m
+                    JOIN moduletags ON moduletags.module_ident = m.module_ident
+                    WHERE m.uuid =%s
                     ORDER BY revised desc LIMIT 1;
                     ;""", vars=(uuid, ))
             modules_found = cursor.fetchall()
             try:
                 module_ident = modules_found[0][0]
+                tagid = modules_found[0][3]
             except IndexError:
                 raise httpexceptions.HTTPBadRequest(
                     '{} is not an existing module'.format(ident_hash))
@@ -645,13 +650,16 @@ def admin_add_featured_books(request):
             file_bytes = bytearray(f)
             file_sha1 = hashlib.new('sha1', file_bytes).hexdigest()
 
-            cursor.execute("""SELECT sha1 from files WHERE sha1 = %s;""",
+            cursor.execute("""\
+                SELECT sha1, fileid from files WHERE sha1 = %s;""",
                            vars=(file_sha1, ))
-            files_found = len(cursor.fetchall())
+            files_found = cursor.fetchall()
+            fileid = None
             response = ""
-            if files_found > 0:
+            if len(files_found) > 0:
                 # the file is already in the database
                 response += "Image file already in the databse. "
+                fileid = files_found[0][1]
             else:
                 # have to add the file
                 cursor.execute("""\
@@ -678,9 +686,11 @@ def admin_add_featured_books(request):
             else:
                 cursor.execute("""\
                     INSERT INTO featured_books
-                    (uuid, major_version, minor_version)
-                    VALUES (%(uuid)s, %(major)s, %(minor)s);
-                    """, vars={'uuid': uuid, 'major': major, 'minor': minor})
+                    (uuid, major_version, minor_version, tagid, fileid)
+                    VALUES (%(uuid)s, %(major)s, %(minor)s,
+                        %(tagid)s, %(fileid)s);
+                    """, vars={'uuid': uuid, 'major': major, 'minor': minor,
+                               'tagid': tagid, 'fileid': fileid})
                 cursor.execute("""\
                     INSERT INTO moduletags (module_ident, tagid)
                     VALUES (%s, 9);
