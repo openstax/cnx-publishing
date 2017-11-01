@@ -291,14 +291,18 @@ def admin_print_styles(request):
             cursor.execute("""\
                 WITH latest AS (SELECT print_style, recipe,
                     count(*), count(nullif(stateid, 1)) as bad
-                FROM all_current_modules
+                FROM modules m
                 WHERE portal_type = 'Collection'
                       AND recipe IS NOT NULL
                       AND (
                           baked IS NOT NULL OR (
-                              baked IS NULL AND stateid != 1
+                              baked IS NULL AND stateid not in (1,8)
                               )
                           )
+                      AND ARRAY [major_version, minor_version] = (
+                          SELECT max(ARRAY[major_version,minor_version]) FROM
+                              modules where m.uuid= uuid)
+
                 GROUP BY print_style, recipe
                 ),
                 defaults AS (SELECT print_style, fileid AS recipe
@@ -371,13 +375,17 @@ def admin_print_styles_single(request):
                     SELECT name, authors, lm.revised, lm.recipe, psr.tag,
                         f.sha1 as hash, psr.commit_id, uuid,
                         ident_hash(uuid, major_version, minor_version)
-                    FROM all_current_modules as lm
+                    FROM modules as lm
                     JOIN print_style_recipes as psr
                     ON (psr.print_style = lm.print_style and
                         psr.fileid = lm.recipe)
                     JOIN files f ON psr.fileid = f.fileid
                     WHERE lm.print_style=%s
                     AND portal_type='Collection'
+                    AND ARRAY [major_version, minor_version] = (
+                        SELECT max(ARRAY[major_version,minor_version])
+                        FROM modules WHERE lm.uuid = uuid)
+
                     ORDER BY psr.tag DESC;
                     """, vars=(style,))
             else:
@@ -387,12 +395,15 @@ def admin_print_styles_single(request):
                     SELECT name, authors, lm.revised, lm.recipe, NULL as tag,
                         f.sha1 as hash, NULL as commit_id, uuid,
                         ident_hash(uuid, major_version, minor_version)
-                    FROM all_current_modules as lm
+                    FROM modules as lm
                     JOIN files f ON lm.recipe = f.fileid
                     WHERE portal_type='Collection'
                     AND NOT EXISTS (
                         SELECT 1 from print_style_recipes psr
                         WHERE psr.fileid = lm.recipe)
+                    AND ARRAY [major_version, minor_version] = (
+                        SELECT max(ARRAY[major_version,minor_version])
+                        FROM modules WHERE lm.uuid = uuid)
                     ORDER BY uuid, recipe, revised DESC;
                     """, vars=(style,))
                 status = '(custom)'
@@ -445,14 +456,20 @@ def get_baking_statuses_sql(get_request):
         sort = 'bpsa.created DESC'
     uuid_filter = get_request.get('uuid', '').strip()
     author_filter = get_request.get('author', '').strip()
+    latest_filter = get_request.get('latest', False)
 
     sql_filters = "WHERE"
+    if latest_filter:
+        print latest_filter
+        sql_filters += """ ARRAY [m.major_version, m.minor_version] = (
+         SELECT max(ARRAY[major_version,minor_version]) FROM
+                   modules where m.uuid= uuid) AND """
     if uuid_filter != '':
         args['uuid'] = uuid_filter
         sql_filters += " m.uuid=%(uuid)s AND "
     if author_filter != '':
         author_filter = author_filter.decode('utf-8')
-        sql_filters += "%(author)s=ANY(m.authors) "
+        sql_filters += " %(author)s=ANY(m.authors) "
         args["author"] = author_filter
 
     if sql_filters.endswith("AND "):
@@ -585,6 +602,7 @@ def admin_content_status(request):
                     'sort_' + sort_match: sort_arrow,
                     'sort': sort,
                     'domain': request.host,
+                    'latest_only': request.GET.get('latest', False),
                     'STATE_ICONS': STATE_ICONS,
                     'status_filters': status_filters or [
                         i[0] for i in STATE_ICONS]})

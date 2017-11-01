@@ -364,6 +364,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'status_filters': ['QUEUED', 'STARTED', 'RETRY',
                                'FAILURE', 'SUCCESS'],
             'domain': 'example.com:80',
+            'latest_only': False,
             'start_entry': 0,
             'page': 1,
             'num_entries': 100,
@@ -396,6 +397,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                 ('SUCCESS', 'fa fa-check-square state-icon success')],
             'status_filters': ['PENDING'],
             'domain': 'example.com:80',
+            'latest_only': False,
             'start_entry': 0,
             'page': 1,
             'num_entries': 2,
@@ -428,10 +430,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ]))
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
-        self.assertEqual('PENDING stale_content',
+        self.assertEqual('PENDING',
                          content['states'][0]['state'])
         self.assertEqual('(custom)',
-                         content['states'][0]['print_style'])
+                         content['states'][0]['recipe_name'])
         self.assertEqual('8d539366a39af1715bdf4154d0907d4a5360ba29',
                          content['states'][0]['recipe'])
 
@@ -478,7 +480,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
              'print_style': 'print-style',
              'latest_recipe_id': 'latest-recipe',
              'recipe_id': 'latest-recipe',
+             'recipe_name': 'the-latest-recipe',
              'recipe': '093979b0ca430454e4a1dedb409f186b66c7494e',
+             'recipe_tag': 'v0.0.1',
              'latest_version': '1.1',
              'current_version': '1.1',
              'module_ident': 'm0000',
@@ -523,17 +527,17 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'print_style': None,
             'current_recipe': None,
             'current_ident': 2,
-            'current_state': u'PENDING stale_content',
+            'current_state': u'PENDING',
             'states': [
                 {'version': '1.1',
                  'recipe': None,
                  'created': content['states'][0]['created'],
-                 'state': 'PENDING stale_content',
+                 'state': 'PENDING',
                  'state_message': ''},
                 {'version': '1.1',
                  'recipe': None,
                  'created': content['states'][1]['created'],
-                 'state': 'PENDING stale_content',
+                 'state': 'PENDING',
                  'state_message': ''}
             ]
         }, content)
@@ -580,7 +584,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                        'number': 1}
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
-        self.assertEqual('PENDING stale_content',
+        self.assertEqual('PENDING',
                          content['states'][0]['state'])
 
     def test_admin_content_status_single_page_POST_already_baking(self):
