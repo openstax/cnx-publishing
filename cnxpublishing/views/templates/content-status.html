@@ -63,10 +63,10 @@
   <table>
     <tr>
       <th onclick='sortBooks("bpsa.created")'>Created<i class="{{sort_created}}"></i></th>
-      <th onclick='sortBooks("m.name")'>Title<i class="{{sort_name}}"></i></th>
+      <th onclick='sortBooks("m.name")'>Status Link<i class="{{sort_name}}"></i></th>
       <th>Authors</th>
       <th onclick='sortBooks("STATE")'>State<i class="{{sort_state}}"></i></th>
-      <th>Recipe Id</th>
+      <th>Print Style</th>
       <th>Recipe</th>
       <th>Link to book</th>
       <th>Message</th>
@@ -90,7 +90,7 @@
         </td>
         <td>
           {% if state.recipe %}
-          <a href="{{ state.recipe_link }}">{{ state.recipe }}</a>
+          <a href="{{ state.recipe_link }}">{{ state.recipe_name }} ({{ state.recipe_tag }})</a>
           {% else %}
           None
           {% endif %}

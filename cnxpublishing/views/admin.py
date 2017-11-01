@@ -443,8 +443,8 @@ def get_baking_statuses_sql(get_request):
             'invalid sort: {}'.format(sort))
     if sort == "STATE ASC" or sort == "STATE DESC":
         sort = 'bpsa.created DESC'
-    uuid_filter = get_request.get('uuid', '')
-    author_filter = get_request.get('author', '')
+    uuid_filter = get_request.get('uuid', '').strip()
+    author_filter = get_request.get('author', '').strip()
 
     sql_filters = "WHERE"
     if uuid_filter != '':
@@ -462,17 +462,17 @@ def get_baking_statuses_sql(get_request):
 
     statement = """
                 SELECT m.name, m.authors, m.uuid,
+                       module_version(m.major_version,m.minor_version)
+                          as current_version,
+                       m.print_style,
                        CASE WHEN f.sha1 IS NOT NULL
                        THEN coalesce(ps.print_style,'(custom)')
                        ELSE ps.print_style
-                       END AS print_style,
-                       coalesce(ps.fileid, m.recipe) as latest_recipe_id,
+                       END AS recipe_name,
+                       ps.tag as recipe_tag,
+                       coalesce(dps.fileid, m.recipe) as latest_recipe_id,
                        m.recipe as recipe_id,
                        f.sha1 as recipe,
-                       module_version(lm.major_version, lm.minor_version)
-                        as latest_version,
-                       module_version(m.major_version, m.minor_version)
-                        as current_version,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
                        bpsa.created, bpsa.result_id::text
@@ -480,6 +480,10 @@ def get_baking_statuses_sql(get_request):
                 INNER JOIN modules AS m USING (module_ident)
                 LEFT JOIN print_style_recipes as ps
                     ON ps.print_style=m.print_style
+                LEFT JOIN default_print_style_recipes as dps
+                    ON dps.print_style = m.print_style
+                LEFT JOIN print_style_recipes as ps
+                    ON ps.print_style=m.print_style and ps.fileid =m.recipe
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
                 LEFT JOIN files f on m.recipe = f.fileid
@@ -522,11 +526,7 @@ def admin_content_status(request):
                     continue
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                latest_version = row['latest_version']
-                current_version = row['current_version']
                 state = str(result.state)
-                if current_version != latest_version:
-                    state += ' stale_content'
                 if (current_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'
@@ -541,6 +541,8 @@ def admin_content_status(request):
                     'print_style_link': request.route_path(
                         'admin-print-style-single', style=row['print_style']),
                     'recipe': row['recipe'],
+                    'recipe_name': row['recipe_name'],
+                    'recipe_tag': row['recipe_tag'],
                     'recipe_link': request.route_path(
                         'get-resource', hash=row['recipe']),
                     'created': row['created'],
@@ -561,8 +563,8 @@ def admin_content_status(request):
     if sort == "STATE DESC":
         states.sort(key=lambda x: x['state'], reverse=True)
 
-    num_entries = request.params.get('number', 100)
-    page = request.params.get('page', 1)
+    num_entries = request.params.get('number', 100) or 100
+    page = request.params.get('page', 1) or 1
     try:
         page = int(page)
         num_entries = int(num_entries)
@@ -623,14 +625,10 @@ def admin_content_status_single(request):
                     message = result.traceback
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                latest_version = row['latest_version']
-                current_version = row['current_version']
                 state = result.state
                 if (latest_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'
-                if current_version != latest_version:
-                    state += ' stale_content'
                 states.append({
                     'version': row['current_version'],
                     'recipe': row['recipe'],
