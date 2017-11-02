@@ -7,3 +7,5 @@ services:
     environment:
       - DB_USER=cnxarchive
       - DB_NAME=cnxarchive-testing
+      - DB_URL=postgresql://cnxarchive@localhost/cnxarchive-testing
+      - DB_SUPER_URL=postgresql://postgres@localhost/cnxarchive-testing

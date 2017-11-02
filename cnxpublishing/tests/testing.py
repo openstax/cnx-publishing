@@ -70,4 +70,6 @@ def db_connect(method):
 
 def init_db(db_conn_str):
     venv = os.getenv('AS_VENV_IMPORTABLE', 'true').lower() == 'true'
-    _init_db(db_conn_str, venv)
+    from sqlalchemy import create_engine
+    engine = create_engine(db_conn_str)
+    _init_db(engine, venv)
