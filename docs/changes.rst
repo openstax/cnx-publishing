@@ -6,6 +6,14 @@
 
    - feature message
 
+0.9.4
+-----
+
+- Expose STARTED state for baking on content status view (#191)
+- Enable filter for QUEUED state (#193)
+- Improve appearance of content status view
+- Track time of baking (#194)
+
 0.9.3
 -----
 
