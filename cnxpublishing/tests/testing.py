@@ -68,6 +68,38 @@ def db_connect(method):
     return wrapped
 
 
+def _dsn_to_args(dsn):
+    """Translates a libpq DSN to dict
+    to be used with ``sqlalchemy.engine.url.URL``.
+
+    """
+    args = {'query': {}}
+    import inspect
+    from sqlalchemy.engine.url import URL
+    url_args = inspect.getargspec(URL.__init__).args
+    for item in dsn.split():
+        name, value = item.split('=')
+        if name == 'user':
+            name = 'username'
+        elif name == 'dbname':
+            name = 'database'
+        if name in url_args:
+            args[name] = value
+        else:
+            args['query'][name] = value
+    return args
+
+
+def libpq_dsn_to_url(dsn):
+    """Translate a libpq DSN to URL"""
+    args = _dsn_to_args(dsn)
+    from sqlalchemy.engine.url import URL
+    url = URL('postgresql', **args)
+    return str(url)
+
+
 def init_db(db_conn_str):
     venv = os.getenv('AS_VENV_IMPORTABLE', 'true').lower() == 'true'
-    _init_db(db_conn_str, venv)
+    from sqlalchemy import create_engine
+    engine = create_engine(libpq_dsn_to_url(db_conn_str))
+    _init_db(engine, venv)

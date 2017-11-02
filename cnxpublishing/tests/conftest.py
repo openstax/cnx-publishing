@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
 
-import pytest
 import cnxepub
+import psycopg2
+import pytest
 from pyramid import testing
 
 from . import use_cases
-from .testing import config_uri, integration_test_settings
+from .testing import config_uri, integration_test_settings, libpq_dsn_to_url
 
 
 @pytest.fixture(autouse=True, scope='session')
@@ -14,12 +15,32 @@ def assign_testing_env_vars():
     os.environ['PYRAMID_INI'] = config_uri()
 
 
-# Override cnx-db's connection_string fixture.
+# Override cnx-db's fixture.
+@pytest.fixture
+def db_init_and_wipe(db_engines, db_wipe, db_init):
+    """Combination of the initialization and wiping procedures."""
+    # The argument order, 'wipe' then 'init' is important, because
+    #   db_wipe assumes you want to start with a clean database.
+    # This closes any existing connections, which is sometimes necessary
+    #   because previous connections may not be virtualenv initialized.
+    for engine in db_engines.values():
+        engine.dispose()
+
+
+# Override cnx-db's settings fixture.
 @pytest.fixture(scope='session')
-def db_connection_string():
-    """Returns a connection string"""
+def db_settings():
+    """Returns database connection settings. These settings are provided
+    in a similar format to that of `cnxdb.config.discover_settings`.
+
+    """
     from cnxpublishing.config import CONNECTION_STRING
-    return integration_test_settings()[CONNECTION_STRING]
+    conn_str = integration_test_settings()[CONNECTION_STRING]
+    url = libpq_dsn_to_url(conn_str)
+    return {
+        'db.common.url': url,
+        'db.super.url': url,
+    }
 
 
 @pytest.fixture
