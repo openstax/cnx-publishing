@@ -122,7 +122,7 @@ to the deferred (low priority) queue"""
     recipe_ids = _get_recipe_ids(module_ident, cursor)
 
     state = 'current'
-    if recipe_ids == (None, None):
+    if recipe_ids[0] is None:
         remove_baked(ident_hash, cursor=cursor)
         logger.debug('Finished unbaking module_ident={} ident_hash={} '
                      'with a final state of \'{}\'.'
