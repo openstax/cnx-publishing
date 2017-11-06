@@ -51,7 +51,12 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql', 'views/templates/*.*'],
+        'cnxpublishing': ['sql/*.sql', 'sql/*/*.sql',
+                          'views/templates/*.*',
+                          'static/css/*.*',
+                          'static/js/*.*',
+                          'static/js/vendor/*.*',
+                          ],
         'cnxpublishing.tests': ['data/*.*'],
         },
     cmdclass=versioneer.get_cmdclass(),
