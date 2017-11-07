@@ -3,5 +3,9 @@ recursive-include cnxpublishing/sql *.sql
 recursive-include cnxpublishing/sql/migrations *.py
 recursive-include cnxpublishing/tests/data *.*
 recursive-include cnxpublishing/views/templates *.*
+recursive-include cnxpublishing/static *.css
+recursive-include cnxpublishing/static/css *.*
+recursive-include cnxpublishing/static/js *.*
+recursive-include cnxpublishing/static/js/vendor *.*
 include versioneer.py
 include cnxpublishing/_version.py
