@@ -110,12 +110,7 @@ class PrintStyleViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
-        self.config.add_route('get-content', '/contents/{ident_hash}')
-        self.config.add_route('admin-content-status-single',
-                              '/a/content-status/{uuid}')
-        self.config.add_route('admin-print-style-single',
-                              '/a/print-style/{style}')
-        self.config.add_route('get-resource', '/resources/{hash}')
+        self.config.include('cnxpublishing.views')
         init_db(self.db_conn_str)
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:
@@ -340,12 +335,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
-        self.config.add_route('admin-content-status-single',
-                              '/a/content-status/{uuid}')
-        self.config.add_route('admin-print-style-single',
-                              '/a/print-style/{style}')
-        self.config.add_route('get-content', '/contents/{ident_hash}')
-        self.config.add_route('get-resource', '/resources/{hash}')
+        self.config.include('cnxpublishing.views')
 
         add_data(self)
 

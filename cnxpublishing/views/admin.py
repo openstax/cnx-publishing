@@ -460,7 +460,6 @@ def get_baking_statuses_sql(get_request):
 
     sql_filters = "WHERE"
     if latest_filter:
-        print latest_filter
         sql_filters += """ ARRAY [m.major_version, m.minor_version] = (
          SELECT max(ARRAY[major_version,minor_version]) FROM
                    modules where m.uuid= uuid) AND """
@@ -495,8 +494,6 @@ def get_baking_statuses_sql(get_request):
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
-                LEFT JOIN print_style_recipes as ps
-                    ON ps.print_style=m.print_style
                 LEFT JOIN default_print_style_recipes as dps
                     ON dps.print_style = m.print_style
                 LEFT JOIN print_style_recipes as ps
