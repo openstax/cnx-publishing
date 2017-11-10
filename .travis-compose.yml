@@ -1,7 +1,7 @@
 version: "2"
 services:
   db:
-    build: https://github.com/Connexions/cnx-db.git
+    build: https://github.com/Connexions/cnx-db.git#9c77526e4b9015c88332e7e6a22c46ce76d3f7be
     ports:
       - "5432:5432"
     environment:
