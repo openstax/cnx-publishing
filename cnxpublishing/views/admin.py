@@ -481,6 +481,13 @@ def get_baking_statuses_sql(get_request):
     if sql_filters == "WHERE":
         sql_filters = ""
 
+    # FIXME  celery AsyncResult API is soooo sloow that this page takes
+    # 2 min. or more to load on production.  As an workaround, this code
+    # accesses the celery_taskmeta table directly. Need to remove that access
+    # once we track enough state info ourselves. Want to track when queued,
+    # started, ended, etc. for future monitoring of baking system performance
+    # as well.
+
     statement = """
                 SELECT m.name, m.authors, m.uuid,
                        module_version(m.major_version,m.minor_version)
@@ -496,9 +503,11 @@ def get_baking_statuses_sql(get_request):
                        f.sha1 as recipe,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
-                       bpsa.created, bpsa.result_id::text
+                       bpsa.created, ctm.status as state, ctm.traceback
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
+                LEFT JOIN celery_taskmeta AS ctm
+                    ON bpsa.result_id = ctm.task_id::uuid
                 LEFT JOIN default_print_style_recipes as dps
                     ON dps.print_style = m.print_style
                 LEFT JOIN print_style_recipes as ps
@@ -536,20 +545,18 @@ def admin_content_status(request):
             cursor.execute(statement, vars=sql_args)
             for row in cursor.fetchall():
                 message = ''
-                result_id = row['result_id']
-                result = AsyncResult(id=result_id)
-                if result.failed():  # pragma: no cover
-                    if result.traceback is not None:
-                        message = result.traceback.split("\n")[-2]
-                if status_filters and result.state not in status_filters:
+                state = row['state'] or 'PENDING'
+                if status_filters and state not in status_filters:
                     continue
+                if state == 'FAILURE':  # pragma: no cover
+                    if row['traceback'] is not None:
+                        message = row['traceback'].split("\n")[-2]
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                state = str(result.state)
                 if (current_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'
-                state_icon = result.state
+                state_icon = state
                 if state[:7] == "SUCCESS" and len(state) > 7:
                     state_icon = 'unknown'
                 states.append({
@@ -639,13 +646,12 @@ def admin_content_status_single(request):
 
             for row in modules:
                 message = ''
-                result_id = row['result_id']
-                result = AsyncResult(id=result_id)
-                if result.failed():  # pragma: no cover
-                    message = result.traceback
+                state = row['state'] or 'PENDING'
+                if state == 'FAILED':  # pragma: no cover
+                    if row['traceback'] is not None:
+                        message = row['traceback']
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                state = result.state
                 if (latest_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'

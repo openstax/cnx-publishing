@@ -452,21 +452,15 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             admin_content_status(request)
         self.assertIn('invalid page', caught_exc.exception.message)
 
-    @mock.patch('cnxpublishing.views.admin.AsyncResult')
     @mock.patch('cnxpublishing.views.admin.db_connect')
-    def test_admin_content_status_state_icons(self, mock_db_connect,
-                                              mock_async_result):
+    def test_admin_content_status_state_icons(self, mock_db_connect):
         states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
                   'FAILURE', 'REVOKED', 'UNKNOWN']
+        fail_message = """This failed
+Traceback:
+Hi there!
 
-        def round_robin_states(*args, **kwargs):
-            result = mock.Mock(
-                state=states[mock_async_result.call_count - 1 % len(states)])
-            result.failed.return_value = False
-            return result
-
-        mock_async_result.side_effect = round_robin_states
-
+"""  # Traceback is always multiline, with an extra newline at the end.
         cursor = mock.MagicMock()
         uuid_ = uuid.uuid4(),
         cursor.fetchall.return_value = [
@@ -484,8 +478,10 @@ class ContentStatusViewsTestCase(unittest.TestCase):
              'module_ident': 'm0000',
              'ident_hash': '{}@1.1'.format(uuid_),
              'created': datetime.now().isoformat(),
+             'state': state,
+             'traceback': (state == 'FAILURE') and fail_message or None,
              'result_id': 'result-{}'.format(i)}
-            for i in range(len(states))]
+            for (i, state) in enumerate(states)]
 
         db_conn = mock_db_connect.return_value.__enter__()
         db_conn.cursor().__enter__.return_value = cursor
@@ -579,7 +575,6 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         request.GET = {'page': 1,
                        'number': 1}
         content = admin_content_status_single(request)
-        print [x['state'] for x in content['states']]
         self.assertEqual('PENDING',
                          content['states'][0]['state'])
 
