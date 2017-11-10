@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import
+
 import logging
 
 from cnxarchive.scripts import export_epub
@@ -46,7 +48,8 @@ def post_publication_processing(event, cursor):
 
     logger.debug('Queued for processing module_ident={} ident_hash={}'.format(
         module_ident, ident_hash))
-    update_module_state(cursor, module_ident, 'processing', None)
+    recipe_ids = _get_recipe_ids(module_ident, cursor)
+    update_module_state(cursor, module_ident, 'processing', recipe_ids[0])
     # Commit the state change before preceding.
     cursor.connection.commit()
 
@@ -164,7 +167,7 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                 logger.exception('Uncaught exception during baking')
                 update_module_state(cursor, module_ident, state, recipe_id)
                 raise
-        finally:
+        else:
             logger.debug('Finished baking module_ident={} ident_hash={} '
                          'with a final state of \'{}\'.'
                          .format(module_ident, ident_hash, state))

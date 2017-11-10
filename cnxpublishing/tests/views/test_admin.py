@@ -17,7 +17,7 @@ from datetime import datetime
 
 from pyramid import testing
 import psycopg2
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound
 from webob.multidict import MultiDict
 
 from .. import use_cases
@@ -95,6 +95,96 @@ class PostPublicationsViewsTestCase(unittest.TestCase):
                  'state_message': '',
                  'title': 'Book of Infinity'},
                 ]}, resp_data)
+
+
+class PrintStyleViewsTestCase(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = integration_test_settings()
+        from cnxpublishing.config import CONNECTION_STRING
+        cls.db_conn_str = cls.settings[CONNECTION_STRING]
+        cls.db_connect = staticmethod(db_connection_factory())
+
+    def setUp(self):
+        self.config = testing.setUp(settings=self.settings)
+        self.config.include('cnxpublishing.tasks')
+        self.config.include('cnxpublishing.views')
+        init_db(self.db_conn_str)
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""INSERT INTO files
+                                  (file, media_type) VALUES ('file', 'css');""")
+                cursor.execute("""INSERT INTO print_style_recipes
+                                  (print_style, title, fileid, tag)
+                                  VALUES ('ccap-physics', 'CCAP Physics', 1, '1.0');""")
+
+    def tearDown(self):
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("DROP SCHEMA public CASCADE")
+                cursor.execute("CREATE SCHEMA public")
+        testing.tearDown()
+
+    def test_print_styles(self):
+        request = testing.DummyRequest()
+
+        from ...views.admin import admin_print_styles
+        content = admin_print_styles(request)
+        self.assertEqual(1, len(content['styles']))
+        self.assertEqual(content['styles'][0],
+                         {'print_style': 'ccap-physics',
+                          'type': 'web',
+                          'revised': content['styles'][0]['revised'],
+                          'number': 0,
+                          'bad': 0,
+                          'commit_id': None,
+                          'title': 'CCAP Physics',
+                          'tag': '1.0',
+                          'link': '/a/print-style/ccap-physics'})
+
+    def test_print_style_single(self):
+        request = testing.DummyRequest()
+        with self.db_connect() as db_conn:
+            with db_conn.cursor() as cursor:
+                cursor.execute("""INSERT INTO modules
+                                  (print_style, portal_type, name, licenseid,
+                                        doctype, uuid, created, revised, recipe)
+                                  VALUES ('ccap-physics', 'Collection', 'test', 1,
+                                        'doc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', now(), now(), 1);""")
+
+        print_style = 'ccap-physics'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        content = admin_print_styles_single(request)
+        self.assertEqual(content['print_style'], 'ccap-physics')
+        self.assertEqual(content['recipe_type'], 'web')
+        self.assertEqual(len(content['collections']), 1)
+        self.assertEqual(content['collections'][0],
+                         {'title': 'test',
+                          'authors': None,
+                          'revised': content['collections'][0]['revised'],
+                          'ident_hash': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@1.1',
+                          'link': '/contents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa@1.1',
+                          'tag': '1.0',
+                          'recipe': '971c419dd609331343dee105fffd0f4608dc0bf2',
+                          'recipe_link': '/resources/971c419dd609331343dee105fffd0f4608dc0bf2',
+                          'status': 'current',
+                          'status_link': '/a/content-status/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+                          })
+
+    def test_print_style_single_no_style(self):
+        request = testing.DummyRequest()
+        print_style = 'fake-print-style'
+        request.matchdict['style'] = print_style
+
+        from ...views.admin import admin_print_styles_single
+        with self.assertRaises(HTTPNotFound) as cm:
+            admin_print_styles_single(request)
+
+        self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")
 
 
 class SiteMessageViewsTestCase(unittest.TestCase):
@@ -245,10 +335,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp(settings=self.settings)
         self.config.include('cnxpublishing.tasks')
-        self.config.add_route('admin-content-status-single',
-                              '/a/content-status/{uuid}')
-        self.config.add_route('get-content', '/contents/{ident_hash}')
-        self.config.add_route('get-resource', '/resources/{hash}')
+        self.config.include('cnxpublishing.views')
 
         add_data(self)
 
@@ -267,6 +354,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'status_filters': ['QUEUED', 'STARTED', 'RETRY',
                                'FAILURE', 'SUCCESS'],
             'domain': 'example.com:80',
+            'latest_only': False,
             'start_entry': 0,
             'page': 1,
             'num_entries': 100,
@@ -299,6 +387,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
                 ('SUCCESS', 'fa fa-check-square state-icon success')],
             'status_filters': ['PENDING'],
             'domain': 'example.com:80',
+            'latest_only': False,
             'start_entry': 0,
             'page': 1,
             'num_entries': 2,
@@ -331,8 +420,12 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ]))
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
-        self.assertEqual('PENDING stale_content stale_recipe',
+        self.assertEqual('PENDING',
                          content['states'][0]['state'])
+        self.assertEqual('(custom)',
+                         content['states'][0]['recipe_name'])
+        self.assertEqual('8d539366a39af1715bdf4154d0907d4a5360ba29',
+                         content['states'][0]['recipe'])
 
     def test_admin_content_status_bad_sort(self):
         request = testing.DummyRequest()
@@ -377,7 +470,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
              'print_style': 'print-style',
              'latest_recipe_id': 'latest-recipe',
              'recipe_id': 'latest-recipe',
+             'recipe_name': 'the-latest-recipe',
              'recipe': '093979b0ca430454e4a1dedb409f186b66c7494e',
+             'recipe_tag': 'v0.0.1',
              'latest_version': '1.1',
              'current_version': '1.1',
              'module_ident': 'm0000',
@@ -422,17 +517,17 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             'print_style': None,
             'current_recipe': None,
             'current_ident': 2,
-            'current_state': u'PENDING stale_content',
+            'current_state': u'PENDING',
             'states': [
                 {'version': '1.1',
                  'recipe': None,
                  'created': content['states'][0]['created'],
-                 'state': 'PENDING stale_content',
+                 'state': 'PENDING',
                  'state_message': ''},
                 {'version': '1.1',
                  'recipe': None,
                  'created': content['states'][1]['created'],
-                 'state': 'PENDING stale_content',
+                 'state': 'PENDING',
                  'state_message': ''}
             ]
         }, content)
@@ -477,10 +572,9 @@ class ContentStatusViewsTestCase(unittest.TestCase):
 
         request.GET = {'page': 1,
                        'number': 1}
-        from ...views.admin import admin_content_status
         content = admin_content_status_single(request)
         print [x['state'] for x in content['states']]
-        self.assertEqual('PENDING stale_content',
+        self.assertEqual('PENDING',
                          content['states'][0]['state'])
 
     def test_admin_content_status_single_page_POST_already_baking(self):
@@ -532,5 +626,5 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         uuid = 'd5dbbd8e-d137-4f89-9d0a-eeeeeeeeeeee'
         request.matchdict['uuid'] = uuid
         with self.assertRaises(HTTPBadRequest) as caught_exc:
-            content = admin_content_status_single_POST(request)
+            _content = admin_content_status_single_POST(request)  # noqa
         self.assertIn('not a book', caught_exc.exception.message)

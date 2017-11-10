@@ -273,10 +273,172 @@ def admin_edit_site_message_POST(request):
     return args
 
 
+@view_config(route_name='admin-print-style', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style.html',
+             permission='view')
+def admin_print_styles(request):
+    """
+    Returns a dictionary of all unique print_styles, and their latest tag,
+    revision, and recipe_type.
+    """
+    styles = []
+    # This fetches all recipes that have been used to successfully bake a
+    # current book plus all default recipes that have not yet been used
+    # as well as "bad" books that are not "current" state, but would otherwise
+    # be the latest/current for that book
+    with db_connect(cursor_factory=DictCursor) as db_conn:
+        with db_conn.cursor() as cursor:
+            cursor.execute("""\
+                WITH latest AS (SELECT print_style, recipe,
+                    count(*), count(nullif(stateid, 1)) as bad
+                FROM modules m
+                WHERE portal_type = 'Collection'
+                      AND recipe IS NOT NULL
+                      AND (
+                          baked IS NOT NULL OR (
+                              baked IS NULL AND stateid not in (1,8)
+                              )
+                          )
+                      AND ARRAY [major_version, minor_version] = (
+                          SELECT max(ARRAY[major_version,minor_version]) FROM
+                              modules where m.uuid= uuid)
+
+                GROUP BY print_style, recipe
+                ),
+                defaults AS (SELECT print_style, fileid AS recipe
+                FROM default_print_style_recipes d
+                WHERE not exists (SELECT 1
+                                  FROM latest WHERE latest.recipe = d.fileid)
+                )
+                SELECT coalesce(ps.print_style, '(custom)') as print_style,
+                       ps.title, coalesce(ps.recipe_type, 'web') as type,
+                       ps.revised, ps.tag, ps.commit_id, la.count, la.bad
+                FROM latest la LEFT JOIN print_style_recipes ps ON
+                                    la.print_style = ps.print_style AND
+                                    la.recipe = ps.fileid
+                UNION ALL
+                SELECT ps.print_style, ps.title, ps.recipe_type,
+                       ps.revised, ps.tag, ps.commit_id, 0 AS count, 0 AS bad
+                FROM defaults de JOIN print_style_recipes ps ON
+                                    de.print_style = ps.print_style AND
+                                    de.recipe = ps.fileid
+
+            ORDER BY revised desc NULLS LAST, print_style
+
+                """)
+            for row in cursor.fetchall():
+                styles.append({
+                    'print_style': row['print_style'],
+                    'title': row['title'],
+                    'type': row['type'],
+                    'revised': row['revised'],
+                    'tag': row['tag'],
+                    'commit_id': row['commit_id'],
+                    'number': row['count'],
+                    'bad': row['bad'],
+                    'link': request.route_path('admin-print-style-single',
+                                               style=row['print_style'])
+                })
+    return {'styles': styles}
+
+
+@view_config(route_name='admin-print-style-single', request_method='GET',
+             renderer='cnxpublishing.views:templates/print-style-single.html',
+             permission='view')
+def admin_print_styles_single(request):
+    """ Returns all books with any version of the given print style.
+
+    Returns the print_style, recipe type, num books using the print_style,
+    along with a dictionary of the book, author, revision date, recipe,
+    tag of the print_style, and a link to the content.
+    """
+    style = request.matchdict['style']
+    # do db search to get file id and other info on the print_style
+    with db_connect(cursor_factory=DictCursor) as db_conn:
+        with db_conn.cursor() as cursor:
+
+            if style != '(custom)':
+                cursor.execute("""
+                    SELECT fileid, recipe_type, title
+                    FROM default_print_style_recipes
+                    WHERE print_style=%s
+                    """, vars=(style,))
+                info = cursor.fetchall()
+                if len(info) < 1:
+                    raise httpexceptions.HTTPNotFound(
+                        'Invalid Print Style: {}'.format(style))
+                current_recipe = info[0]['fileid']
+                recipe_type = info[0]['recipe_type']
+                status = 'current'
+
+                cursor.execute("""\
+                    SELECT name, authors, lm.revised, lm.recipe, psr.tag,
+                        f.sha1 as hash, psr.commit_id, uuid,
+                        ident_hash(uuid, major_version, minor_version)
+                    FROM modules as lm
+                    JOIN print_style_recipes as psr
+                    ON (psr.print_style = lm.print_style and
+                        psr.fileid = lm.recipe)
+                    JOIN files f ON psr.fileid = f.fileid
+                    WHERE lm.print_style=%s
+                    AND portal_type='Collection'
+                    AND ARRAY [major_version, minor_version] = (
+                        SELECT max(ARRAY[major_version,minor_version])
+                        FROM modules WHERE lm.uuid = uuid)
+
+                    ORDER BY psr.tag DESC;
+                    """, vars=(style,))
+            else:
+                current_recipe = '(custom)'
+                recipe_type = '(custom)'
+                cursor.execute("""\
+                    SELECT name, authors, lm.revised, lm.recipe, NULL as tag,
+                        f.sha1 as hash, NULL as commit_id, uuid,
+                        ident_hash(uuid, major_version, minor_version)
+                    FROM modules as lm
+                    JOIN files f ON lm.recipe = f.fileid
+                    WHERE portal_type='Collection'
+                    AND NOT EXISTS (
+                        SELECT 1 from print_style_recipes psr
+                        WHERE psr.fileid = lm.recipe)
+                    AND ARRAY [major_version, minor_version] = (
+                        SELECT max(ARRAY[major_version,minor_version])
+                        FROM modules WHERE lm.uuid = uuid)
+                    ORDER BY uuid, recipe, revised DESC;
+                    """, vars=(style,))
+                status = '(custom)'
+
+            collections = []
+            for row in cursor.fetchall():
+                recipe = row['recipe']
+                if status == 'current' and recipe != current_recipe:
+                    status = 'stale'
+                collections.append({
+                    'title': row['name'].decode('utf-8'),
+                    'authors': row['authors'],
+                    'revised': row['revised'],
+                    'recipe': row['hash'],
+                    'recipe_link': request.route_path('get-resource',
+                                                      hash=row['hash']),
+                    'tag': row['tag'],
+                    'ident_hash': row['ident_hash'],
+                    'link': request.route_path('get-content',
+                                               ident_hash=row['ident_hash']),
+                    'status': status,
+                    'status_link': request.route_path(
+                        'admin-content-status-single', uuid=row['uuid']),
+
+                })
+    return {'number': len(collections),
+            'collections': collections,
+            'print_style': style,
+            'recipe_type': recipe_type}
+
+
 def get_baking_statuses_sql(get_request):
     """ Creates SQL to get info on baking books filtered from GET request.
 
-    All books that have ever attmenpted to bake will be retured if they
+    All books that have ever attempted to bake will be retured if they
     pass the filters in the GET request.
     If a single book has been requested to bake multiple times there will
     be a row for each of the baking attempts.
@@ -292,16 +454,21 @@ def get_baking_statuses_sql(get_request):
             'invalid sort: {}'.format(sort))
     if sort == "STATE ASC" or sort == "STATE DESC":
         sort = 'bpsa.created DESC'
-    uuid_filter = get_request.get('uuid', '')
-    author_filter = get_request.get('author', '')
+    uuid_filter = get_request.get('uuid', '').strip()
+    author_filter = get_request.get('author', '').strip()
+    latest_filter = get_request.get('latest', False)
 
     sql_filters = "WHERE"
+    if latest_filter:
+        sql_filters += """ ARRAY [m.major_version, m.minor_version] = (
+         SELECT max(ARRAY[major_version,minor_version]) FROM
+                   modules where m.uuid= uuid) AND """
     if uuid_filter != '':
         args['uuid'] = uuid_filter
         sql_filters += " m.uuid=%(uuid)s AND "
     if author_filter != '':
         author_filter = author_filter.decode('utf-8')
-        sql_filters += "%(author)s=ANY(m.authors) "
+        sql_filters += " %(author)s=ANY(m.authors) "
         args["author"] = author_filter
 
     if sql_filters.endswith("AND "):
@@ -310,20 +477,27 @@ def get_baking_statuses_sql(get_request):
         sql_filters = ""
 
     statement = """
-                SELECT m.name, m.authors, m.uuid, m.print_style,
-                       ps.fileid as latest_recipe_id,  m.recipe as recipe_id,
+                SELECT m.name, m.authors, m.uuid,
+                       module_version(m.major_version,m.minor_version)
+                          as current_version,
+                       m.print_style,
+                       CASE WHEN f.sha1 IS NOT NULL
+                       THEN coalesce(ps.print_style,'(custom)')
+                       ELSE ps.print_style
+                       END AS recipe_name,
+                       ps.tag as recipe_tag,
+                       coalesce(dps.fileid, m.recipe) as latest_recipe_id,
+                       m.recipe as recipe_id,
                        f.sha1 as recipe,
-                       module_version(lm.major_version, lm.minor_version)
-                        as latest_version,
-                       module_version(m.major_version, m.minor_version)
-                        as current_version,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
                        bpsa.created, bpsa.result_id::text
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
+                LEFT JOIN default_print_style_recipes as dps
+                    ON dps.print_style = m.print_style
                 LEFT JOIN print_style_recipes as ps
-                    ON ps.print_style=m.print_style
+                    ON ps.print_style=m.print_style and ps.fileid =m.recipe
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
                 LEFT JOIN files f on m.recipe = f.fileid
@@ -366,11 +540,7 @@ def admin_content_status(request):
                     continue
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                latest_version = row['latest_version']
-                current_version = row['current_version']
                 state = str(result.state)
-                if current_version != latest_version:
-                    state += ' stale_content'
                 if (current_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'
@@ -382,7 +552,11 @@ def admin_content_status(request):
                     'authors': format_authors(row['authors']),
                     'uuid': row['uuid'],
                     'print_style': row['print_style'],
+                    'print_style_link': request.route_path(
+                        'admin-print-style-single', style=row['print_style']),
                     'recipe': row['recipe'],
+                    'recipe_name': row['recipe_name'],
+                    'recipe_tag': row['recipe_tag'],
                     'recipe_link': request.route_path(
                         'get-resource', hash=row['recipe']),
                     'created': row['created'],
@@ -403,8 +577,8 @@ def admin_content_status(request):
     if sort == "STATE DESC":
         states.sort(key=lambda x: x['state'], reverse=True)
 
-    num_entries = request.params.get('number', 100)
-    page = request.params.get('page', 1)
+    num_entries = request.params.get('number', 100) or 100
+    page = request.params.get('page', 1) or 1
     try:
         page = int(page)
         num_entries = int(num_entries)
@@ -425,6 +599,7 @@ def admin_content_status(request):
                     'sort_' + sort_match: sort_arrow,
                     'sort': sort,
                     'domain': request.host,
+                    'latest_only': request.GET.get('latest', False),
                     'STATE_ICONS': STATE_ICONS,
                     'status_filters': status_filters or [
                         i[0] for i in STATE_ICONS]})
@@ -465,14 +640,10 @@ def admin_content_status_single(request):
                     message = result.traceback
                 latest_recipe = row['latest_recipe_id']
                 current_recipe = row['recipe_id']
-                latest_version = row['latest_version']
-                current_version = row['current_version']
                 state = result.state
                 if (latest_recipe is not None and
                         current_recipe != latest_recipe):
                     state += ' stale_recipe'
-                if current_version != latest_version:
-                    state += ' stale_content'
                 states.append({
                     'version': row['current_version'],
                     'recipe': row['recipe'],
@@ -502,7 +673,6 @@ def admin_content_status_single_POST(request):
         args['response'] = title + ' is not stale, no need to bake'
         return args
 
-    settings = request.registry.settings
     with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("SELECT stateid FROM modules WHERE module_ident=%s",

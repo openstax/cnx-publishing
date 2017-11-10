@@ -17,6 +17,13 @@
     </div>
 
     <div class="clearfix">
+      <div class="left text-right form-field"><label for="latest">Latest Only:</label></div>
+      <div class="left text-left form-input">
+          <input type="checkbox" name="latest" id="latest" {%if latest_only %}checked="checked"{% endif %} value="latest">
+      </div>
+    </div>
+
+    <div class="clearfix">
       <div class="left text-right form-field"><label for="author">Author:</label></div>
       <div class="left text-left form-input">
         <input type="text" name="author" id="author" value="{{ author }}">
@@ -63,7 +70,7 @@
   <table>
     <tr>
       <th onclick='sortBooks("bpsa.created")'>Created<i class="{{sort_created}}"></i></th>
-      <th onclick='sortBooks("m.name")'>Title<i class="{{sort_name}}"></i></th>
+      <th onclick='sortBooks("m.name")'>Status Link<i class="{{sort_name}}"></i></th>
       <th>Authors</th>
       <th onclick='sortBooks("STATE")'>State<i class="{{sort_state}}"></i></th>
       <th>Print Style</th>
@@ -81,10 +88,16 @@
         <td>
           <i class="{{state.state_icon}}"></i> {{ state.state }}
         </td>
-        <td>{{ state.print_style }}</td>
+        <td>
+          {% if state.print_style %}
+          <a href={{ state.print_style_link }}>{{ state.print_style }}</a>
+          {% else %}
+          None
+          {% endif %}
+        </td>
         <td>
           {% if state.recipe %}
-          <a href="{{ state.recipe_link }}">{{ state.recipe }}</a>
+          <a href="{{ state.recipe_link }}">{{ state.recipe_name }} ({{ state.recipe_tag }})</a>
           {% else %}
           None
           {% endif %}
