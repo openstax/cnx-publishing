@@ -47,7 +47,7 @@ install:
   - pip install ".[test]"
 before_script:
   # Give cnxarchive superuser privileges on postgres
-  - docker exec cnxpublishing_db_1 /bin/bash -c "echo 'ALTER USER cnxarchive WITH SUPERUSER' | psql -U postgres postgres"
+  - docker exec cnxpublishing_db_1 /bin/bash -c "echo 'ALTER USER cnxarchive WITH LOGIN SUPERUSER' | psql -U postgres postgres"
   # Stop init_venv from doing anything
   - docker exec cnxpublishing_db_1 /bin/bash -c "echo 'CREATE SCHEMA venv' | psql -U cnxarchive cnxarchive-testing"
   - pip install -U pytest pytest-runner pytest-cov
