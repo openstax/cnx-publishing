@@ -365,11 +365,14 @@ def admin_print_styles_single(request):
                     """, vars=(style,))
                 info = cursor.fetchall()
                 if len(info) < 1:
-                    raise httpexceptions.HTTPNotFound(
-                        'Invalid Print Style: {}'.format(style))
-                current_recipe = info[0]['fileid']
-                recipe_type = info[0]['recipe_type']
-                status = 'current'
+                    current_recipe = None
+                    recipe_type = None
+                    status = '(custom)'
+
+                else:
+                    current_recipe = info[0]['fileid']
+                    recipe_type = info[0]['recipe_type']
+                    status = 'current'
 
                 cursor.execute("""\
                     SELECT name, authors, lm.revised, lm.recipe, psr.tag,
@@ -411,7 +414,9 @@ def admin_print_styles_single(request):
             collections = []
             for row in cursor.fetchall():
                 recipe = row['recipe']
-                if status == 'current' and recipe != current_recipe:
+                if (status != '(custom)' and
+                        current_recipe is not None and
+                        recipe != current_recipe):
                     status = 'stale'
                 collections.append({
                     'title': row['name'].decode('utf-8'),
