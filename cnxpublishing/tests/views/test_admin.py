@@ -17,7 +17,7 @@ from datetime import datetime
 
 from pyramid import testing
 import psycopg2
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound
+from pyramid.httpexceptions import HTTPBadRequest
 from webob.multidict import MultiDict
 
 from .. import use_cases
@@ -181,10 +181,16 @@ class PrintStyleViewsTestCase(unittest.TestCase):
         request.matchdict['style'] = print_style
 
         from ...views.admin import admin_print_styles_single
-        with self.assertRaises(HTTPNotFound) as cm:
-            admin_print_styles_single(request)
 
-        self.assertEqual(cm.exception.message, "Invalid Print Style: fake-print-style")
+        content = admin_print_styles_single(request)
+
+        self.assertEqual(content,
+                         {'collections': [],
+                          'number': 0,
+                          'print_style':
+                          'fake-print-style',
+                          'recipe_type': None
+                          })
 
 
 class SiteMessageViewsTestCase(unittest.TestCase):
