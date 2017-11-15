@@ -6,6 +6,20 @@
 
    - feature message
 
+0.10.0
+------
+
+- Fix link to display None for print-styles without a recipe (#209 & #210)
+- Add print style view recipe information. (#201)
+- Add ability to unbake even in the presence of previous succcessful bake.
+  (#204)
+- Change config files db settings to use postgresql:// urls. (#203)
+
+0.9.5
+-----
+
+- Fix distribution to include static files for the admin interface. (#205)
+
 0.9.4
 -----
 
