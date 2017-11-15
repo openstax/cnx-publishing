@@ -19,7 +19,12 @@
         <td>{{ collection.authors }}</td>
         <td>{{ collection.status }}</td>
         <td>{{ collection.tag }}</td>
-        <td><a href={{ collection.recipe_link }}>{{ collection.recipe }}</a></td>
+        <td>{% if collection.recipe %}
+            <a href={{ collection.recipe_link }}>{{ collection.recipe }}</a>
+            {%else %}
+            None
+            {% endif %}
+        </td>
         <td><a href={{ collection.link }}>{{ collection.ident_hash }}</a></td>
         <td>{{ collection.revised }}</td>
       </tr>
