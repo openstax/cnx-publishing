@@ -367,7 +367,7 @@ def admin_print_styles_single(request):
                 if len(info) < 1:
                     current_recipe = None
                     recipe_type = None
-                    status = '(custom)'
+                    status = None
 
                 else:
                     current_recipe = info[0]['fileid']
@@ -379,10 +379,10 @@ def admin_print_styles_single(request):
                         f.sha1 as hash, psr.commit_id, uuid,
                         ident_hash(uuid, major_version, minor_version)
                     FROM modules as lm
-                    JOIN print_style_recipes as psr
+                    LEFT JOIN print_style_recipes as psr
                     ON (psr.print_style = lm.print_style and
                         psr.fileid = lm.recipe)
-                    JOIN files f ON psr.fileid = f.fileid
+                    LEFT JOIN files f ON psr.fileid = f.fileid
                     WHERE lm.print_style=%s
                     AND portal_type='Collection'
                     AND ARRAY [major_version, minor_version] = (
