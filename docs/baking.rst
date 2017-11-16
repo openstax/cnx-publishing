@@ -34,8 +34,7 @@ AMQP broker (RabbitMQ) for task management. The steps involved in baking are:
 
 There are 3 possible sources for a recipe for a given book:
   1. A recipe associated with the `print_style` that has been set on the book
-  2. A custom recipe attached to the book, named to match the `print_style` set
-  on that book
+  2. A custom recipe attached to the book, named to match the `print_style` set on that book
   3. A custom recipe attached to the book, name "ruleset.css"
   (for historical reasons).
 
