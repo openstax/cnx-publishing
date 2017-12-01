@@ -647,7 +647,7 @@ def admin_content_status_single(request):
             for row in modules:
                 message = ''
                 state = row['state'] or 'PENDING'
-                if state == 'FAILED':  # pragma: no cover
+                if state == 'FAILURE':  # pragma: no cover
                     if row['traceback'] is not None:
                         message = row['traceback']
                 latest_recipe = row['latest_recipe_id']
