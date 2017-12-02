@@ -10,6 +10,7 @@ import io
 import hashlib
 import json
 from copy import deepcopy
+from psycopg2 import Binary
 
 import cnxepub
 
@@ -20,13 +21,18 @@ here = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_DIR = os.path.join(here, 'data')
 RESOURCE_ONE_FILENAME = "e3d625fe.png"
 RESOURCE_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RESOURCE_ONE_FILENAME)
-RECIPE_ONE_FILENAME = "ruleset.css"
+RULESET_ONE_FILENAME = "ruleset.css"
+RULESET_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RULESET_ONE_FILENAME)
+RECIPE_ONE_FILENAME = "recipe_1.css"
 RECIPE_ONE_FILEPATH = os.path.join(TEST_DATA_DIR, RECIPE_ONE_FILENAME)
+RECIPE_TWO_FILENAME = "recipe_2.css"
+RECIPE_TWO_FILEPATH = os.path.join(TEST_DATA_DIR, RECIPE_TWO_FILENAME)
 
 
 def _read_file(filepath, mode='rb'):
     with open(filepath, mode) as fb:
         return io.BytesIO(fb.read())
+
 
 # ############# #
 #   Use cases   #
@@ -419,10 +425,10 @@ PAGE_FIVE = cnxepub.Document(
 COMPLEX_BOOK_ONE = cnxepub.Binder(
     id='94f4d0f5@draft',
     resources=[
-        cnxepub.Resource(RECIPE_ONE_FILENAME,
-                         _read_file(RECIPE_ONE_FILEPATH, 'rb'),
+        cnxepub.Resource(RULESET_ONE_FILENAME,
+                         _read_file(RULESET_ONE_FILEPATH, 'rb'),
                          'text/css',
-                         filename=RECIPE_ONE_FILENAME)],
+                         filename=RULESET_ONE_FILENAME)],
     metadata={
         u'title': u'Book of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -788,6 +794,31 @@ def _insert_user_info(model, cursor):
         cursor.execute("""\
 INSERT INTO users (username, is_moderated)
 VALUES (%s, 't')""", (user_id,))
+
+
+def _insert_file(file_bytes, media_type, cursor):
+    """Insert a file, with media_type, into the files table. Returns fileid"""
+    cursor.execute('INSERT INTO files (file, media_type)'
+                   ' VALUES (%s, %s)'
+                   ' RETURNING fileid',
+                   (Binary(file_bytes), media_type))
+    return cursor.fetchone()[0]
+
+
+def setup_RECIPES_in_archive(test_case, cursor):
+    """Setup RECIPES"""
+    recipe_ids = (
+        _insert_file(_read_file(RECIPE_ONE_FILEPATH).read(),
+                     'text/css', cursor),
+        _insert_file(_read_file(RECIPE_TWO_FILEPATH).read(),
+                     'text/css', cursor)
+        )
+    cursor.execute("INSERT INTO print_style_recipes "
+                   "(print_style, tag, fileid)"
+                   " VALUES (%s, 'v1.0', %s), (%s, 'v1.0', %s)",
+                   ('style_with_recipe_one', recipe_ids[0],
+                    'style_with_recipe_two', recipe_ids[1]))
+    return recipe_ids
 
 
 def setup_BOOK_in_archive(test_case, cursor):

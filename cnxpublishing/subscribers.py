@@ -67,19 +67,28 @@ def post_publication_processing(event, cursor):
 def _get_recipe_ids(module_ident, cursor):
     """Returns a tuple of length 2 of primary and fallback recipe ids.
 
-    The primary will be based on the print_style of the book. The fallback
-    is the recipe used for last successful bake of this book, if different
-    than the primary. Either value or both values may be None"""
-    cursor.execute("""select coalesce(psf.fileid, mf.fileid, mf2.fileid),
+    The primary will be based on the print_style of the book. It is the first
+    of:
+        1. default recipe currently associated with the print_style of the book
+           being baked (defined by module_ident)
+        2. A CSS file associated with this book that is named the same as the
+           print_style
+        3. A CSS file associated with this book that is named 'ruleset.css'
+
+        The fallback is the recipe used for last successful bake of this book,
+        if different than the primary. Either value or both values may be
+        None"""
+
+    cursor.execute("""select coalesce(dpsf.fileid, mf.fileid, mf2.fileid),
                          CASE
-                           WHEN lm.recipe != coalesce(psf.fileid,
+                           WHEN lm.recipe != coalesce(dpsf.fileid,
                                                       mf.fileid,
                                                       mf2.fileid,0)
                              THEN lm.recipe
                              ELSE NULL
                          END
-                      FROM modules m LEFT JOIN print_style_recipes psf
-                                         ON m.print_style = psf.print_style
+                      FROM modules m LEFT JOIN default_print_style_recipes dpsf
+                                         ON m.print_style = dpsf.print_style
                                      LEFT JOIN module_files mf
                                          ON m.module_ident = mf.module_ident
                                          AND m.print_style = mf.filename
