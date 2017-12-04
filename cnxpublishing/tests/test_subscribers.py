@@ -42,13 +42,74 @@ def test_startup_event(db_cursor, complex_book_one,
     assert ident_mapping[book_one.ident_hash] == payload['module_ident']
 
 
+def test_recipe_selection(db_cursor, complex_book_one, recipes):
+    book_one, ident_mapping = complex_book_one
+    module_ident = ident_mapping[book_one.ident_hash]
+
+    from cnxpublishing.subscribers import _get_recipe_ids as target
+
+    # Get ruleset recipe fileid
+    db_cursor.execute("SELECT fileid "
+                      "FROM module_files "
+                      "WHERE module_ident = %s"
+                      "AND filename = 'ruleset.css'",
+                      (module_ident,))
+    ruleset_id = db_cursor.fetchone()[0]
+
+    recipe_ids = target(module_ident, db_cursor)
+
+    assert recipe_ids == (ruleset_id, None)
+
+    # Delete the ruleset, to the no-recipe unbake
+
+    db_cursor.execute("DELETE FROM module_files "
+                      "WHERE filename = 'ruleset.css' "
+                      "AND  module_ident = %s ", (module_ident,))
+
+    recipe_ids = target(module_ident, db_cursor)
+
+    assert recipe_ids == (None, None)
+
+    # Set a print_style w/ linked recipe
+    db_cursor.execute("UPDATE modules "
+                      "SET print_style = %s "
+                      "WHERE module_ident = %s",
+                      ('style_with_recipe_one', module_ident))
+
+    recipe_ids = target(module_ident, db_cursor)
+
+    assert recipe_ids == (recipes[0], None)
+
+    # Fake successful baking, to see fallback
+
+    db_cursor.execute("UPDATE modules "
+                      "SET recipe = %s, stateid = 1 "
+                      "WHERE module_ident = %s",
+                      (recipes[1], module_ident))
+
+    recipe_ids = target(module_ident, db_cursor)
+
+    assert recipe_ids == recipes
+
+    # Set a print_style w/o linked recipe
+    db_cursor.execute("UPDATE modules "
+                      "SET print_style = %s "
+                      "WHERE module_ident = %s",
+                      ('style_with_no_recipe', module_ident))
+
+    recipe_ids = target(module_ident, db_cursor)
+
+    assert recipe_ids == (None, recipes[1])
+
+
 class TestPostPublicationProcessing(object):
     @pytest.fixture(autouse=True)
     def suite_fixture(self, scoped_pyramid_app, complex_book_one,
-                      celery_worker):
+                      recipes, celery_worker):
         self.binder, ident_mapping = complex_book_one
         self.ident_hash = self.binder.ident_hash
         self.module_ident = ident_mapping[self.binder.ident_hash]
+        self.recipes = recipes
 
     @property
     def target(self):

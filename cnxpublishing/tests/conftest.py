@@ -3,7 +3,6 @@ import os
 
 import cnxepub
 import pytest
-from pyramid import testing
 
 from . import use_cases
 from .testing import config_uri, integration_test_settings
@@ -77,6 +76,12 @@ def complex_book_one_v2(db_cursor):
         module_ident = ident_hash_to_module_ident_mapping[m.ident_hash]
         ident_hash_to_module_ident_mapping[m.ident_hash] = module_ident
     return (binder, ident_hash_to_module_ident_mapping,)
+
+
+@pytest.fixture
+def recipes(db_cursor):
+    # FIXME This uses `None` as the test_case argument.
+    return use_cases.setup_RECIPES_in_archive(None, db_cursor)
 
 
 @pytest.fixture(scope='session')
