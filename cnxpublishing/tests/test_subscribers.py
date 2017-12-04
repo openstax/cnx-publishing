@@ -391,3 +391,74 @@ class TestPostPublicationProcessing(object):
 
         assert mock_bake.call_count == 1
         assert mock_bake.call_args[0][0].ident_hash == binder_v2.ident_hash
+
+    def test_recipe_fallback(self, db_cursor, recipes, mocker):
+        exc_msg = 'something failed during baking'
+        from cnxpublishing.subscribers import bake
+
+        # Set up mock to fail on initial bake, else pass through
+
+        def my_bake(*args, **kwargs):
+            if args[1] != recipes[1]:  # recipe_id
+                raise Exception(exc_msg)
+            else:
+                bake(*args, **kwargs)
+
+        mock_bake = mocker.patch('cnxpublishing.subscribers.bake')
+        mock_bake.side_effect = my_bake
+
+        # Delete the ruleset
+        db_cursor.execute("DELETE FROM module_files "
+                          "WHERE filename = 'ruleset.css' "
+                          "AND  module_ident = %s ", (self.module_ident,))
+
+        # Set a print_style w/ linked recipe
+        db_cursor.execute("UPDATE modules "
+                          "SET print_style = %s "
+                          "WHERE module_ident = %s",
+                          ('style_with_recipe_one', self.module_ident))
+
+        # Fake successful baking, to setup fallback
+        db_cursor.execute("UPDATE modules "
+                          "SET recipe = %s, stateid = 1 "
+                          "WHERE module_ident = %s",
+                          (recipes[1], self.module_ident))
+
+        # Put post-publication state back
+        db_cursor.execute("UPDATE modules "
+                          "SET stateid = 5 "
+                          "WHERE module_ident = %s",
+                          (self.module_ident,))
+
+        db_cursor.connection.commit()
+
+        # Set up (setUp) creates the content, thus putting it in the
+        # post-publication state. We simply create the event associated
+        # with that state change.
+        event = self.make_event()
+
+        self.target(event)
+
+        # Rather than time.sleep for some arbitrary amount of time,
+        # let's check the result, since we'll need to do that anyway.
+        db_cursor.execute("SELECT result_id::text "
+                          "FROM document_baking_result_associations "
+                          "WHERE module_ident = %s "
+                          "ORDER BY created DESC",
+                          (self.module_ident,))
+        result_id = db_cursor.fetchone()[0]
+
+        from celery.result import AsyncResult
+        result = AsyncResult(id=result_id)
+        with pytest.raises(Exception) as exc_info:
+            result.get()  # blocking operation
+            assert exc_info.exception.args[0] == exc_msg
+
+        # Make sure it is marked as 'fallback'.
+        db_cursor.execute("SELECT ms.statename, m.recipe "
+                          "FROM modules AS m NATURAL JOIN modulestates AS ms "
+                          "WHERE module_ident = %s",
+                          (self.module_ident,))
+        res = db_cursor.fetchone()
+        assert res[0] == 'fallback'
+        assert res[1] == recipes[1]
