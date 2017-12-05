@@ -6,6 +6,13 @@
 
    - feature message
 
+0.11.0
+------
+
+- Remove celery ``AsyncResult`` calls from the content-status view because
+  they were causing performance issues. (#212, #213)
+- Add the concept of a 'fallback' state for baked content (#211, #214, #215)
+
 0.10.0
 ------
 
