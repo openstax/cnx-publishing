@@ -489,15 +489,18 @@ def get_baking_statuses_sql(get_request):
     # as well.
 
     statement = """
-                SELECT m.name, m.authors, m.uuid,
+                       SELECT m.name, m.authors, m.uuid,
                        module_version(m.major_version,m.minor_version)
                           as current_version,
                        m.print_style,
                        CASE WHEN f.sha1 IS NOT NULL
-                       THEN coalesce(ps.print_style,'(custom)')
-                       ELSE ps.print_style
+                       THEN coalesce(dps.print_style,'(custom)')
+                       ELSE dps.print_style
                        END AS recipe_name,
-                       ps.tag as recipe_tag,
+                       (select tag from print_style_recipes
+                            where print_style = m.print_style
+                                and fileid = m.recipe
+                                order by revised asc limit 1) as recipe_tag,
                        coalesce(dps.fileid, m.recipe) as latest_recipe_id,
                        m.recipe as recipe_id,
                        f.sha1 as recipe,
@@ -510,8 +513,6 @@ def get_baking_statuses_sql(get_request):
                     ON bpsa.result_id = ctm.task_id::uuid
                 LEFT JOIN default_print_style_recipes as dps
                     ON dps.print_style = m.print_style
-                LEFT JOIN print_style_recipes as ps
-                    ON ps.print_style=m.print_style and ps.fileid =m.recipe
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
                 LEFT JOIN files f on m.recipe = f.fileid
