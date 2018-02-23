@@ -5,7 +5,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - DB_USER=cnxarchive
-      - DB_NAME=cnxarchive-testing
-      - DB_URL=postgresql://cnxarchive@localhost/cnxarchive-testing
-      - DB_SUPER_URL=postgresql://postgres@localhost/cnxarchive-testing
+      - "DB_USER=cnxarchive"
+      - "POSTGRES_DB=cnxarchive-testing"
+      - "DB_URL=postgresql://cnxarchive@localhost/cnxarchive-testing"
+      - "DB_SUPER_URL=postgresql://postgres@localhost/cnxarchive-testing"
