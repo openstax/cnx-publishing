@@ -449,6 +449,13 @@ def get_baking_statuses_sql(get_request):
     be a row for each of the baking attempts.
     By default the results are sorted in descending order of when they were
     requested to bake.
+
+    N.B. The version reported for a print-style linked recipe will the the
+    lowest cnx-recipes release installed that contains the exact recipe
+    used to bake that book, regardless of when the book was baked relative
+    to recipe releases. E.g. if a book uses the 'physics' recipe, and it is
+    identical for versions 1.1, 1.2, 1.3, and 1.4, then it will be reported
+    as version 1.1, even if the most recent release is tagged 1.4.
     """
     args = {}
     sort = get_request.get('sort', 'bpsa.created DESC')
@@ -487,6 +494,9 @@ def get_baking_statuses_sql(get_request):
     # once we track enough state info ourselves. Want to track when queued,
     # started, ended, etc. for future monitoring of baking system performance
     # as well.
+    # The 'limit 1' subselect is to ensure the "oldest identical version"
+    # for recipes released as part of cnx-recipes (avoids one line per
+    # identical recipe file in different releases, for a single baking job)
 
     statement = """
                        SELECT m.name, m.authors, m.uuid,
