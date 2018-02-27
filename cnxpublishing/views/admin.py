@@ -449,6 +449,13 @@ def get_baking_statuses_sql(get_request):
     be a row for each of the baking attempts.
     By default the results are sorted in descending order of when they were
     requested to bake.
+
+    N.B. The version reported for a print-style linked recipe will the the
+    lowest cnx-recipes release installed that contains the exact recipe
+    used to bake that book, regardless of when the book was baked relative
+    to recipe releases. E.g. if a book uses the 'physics' recipe, and it is
+    identical for versions 1.1, 1.2, 1.3, and 1.4, then it will be reported
+    as version 1.1, even if the most recent release is tagged 1.4.
     """
     args = {}
     sort = get_request.get('sort', 'bpsa.created DESC')
@@ -487,17 +494,23 @@ def get_baking_statuses_sql(get_request):
     # once we track enough state info ourselves. Want to track when queued,
     # started, ended, etc. for future monitoring of baking system performance
     # as well.
+    # The 'limit 1' subselect is to ensure the "oldest identical version"
+    # for recipes released as part of cnx-recipes (avoids one line per
+    # identical recipe file in different releases, for a single baking job)
 
     statement = """
-                SELECT m.name, m.authors, m.uuid,
+                       SELECT m.name, m.authors, m.uuid,
                        module_version(m.major_version,m.minor_version)
                           as current_version,
                        m.print_style,
                        CASE WHEN f.sha1 IS NOT NULL
-                       THEN coalesce(ps.print_style,'(custom)')
-                       ELSE ps.print_style
+                       THEN coalesce(dps.print_style,'(custom)')
+                       ELSE dps.print_style
                        END AS recipe_name,
-                       ps.tag as recipe_tag,
+                       (select tag from print_style_recipes
+                            where print_style = m.print_style
+                                and fileid = m.recipe
+                                order by revised asc limit 1) as recipe_tag,
                        coalesce(dps.fileid, m.recipe) as latest_recipe_id,
                        m.recipe as recipe_id,
                        f.sha1 as recipe,
@@ -510,8 +523,6 @@ def get_baking_statuses_sql(get_request):
                     ON bpsa.result_id = ctm.task_id::uuid
                 LEFT JOIN default_print_style_recipes as dps
                     ON dps.print_style = m.print_style
-                LEFT JOIN print_style_recipes as ps
-                    ON ps.print_style=m.print_style and ps.fileid =m.recipe
                 LEFT JOIN latest_modules as lm
                     ON lm.uuid=m.uuid
                 LEFT JOIN files f on m.recipe = f.fileid
