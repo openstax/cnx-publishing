@@ -6,6 +6,10 @@
 
    - feature message
 
+0.11.1
+------
+- Bugfix for content-status admin page - show one, oldest recipe version
+
 0.11.0
 ------
 
