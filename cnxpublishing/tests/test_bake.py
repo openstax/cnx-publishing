@@ -5,11 +5,14 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import os
+import inspect
 import unittest
 try:
     from unittest import mock
 except ImportError:
     import mock
+from vcr_unittest import VCRMixin
 
 import cnxepub
 
@@ -196,3 +199,51 @@ WHERE
                        "WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (self.ident_hash,))
         with self.assertRaises(TypeError):
             rows = cursor.fetchone()[0]
+
+
+class BakedExercisesTestCase(VCRMixin, BaseDatabaseIntegrationTestCase):
+
+    @property
+    def target(self):
+        from cnxpublishing.bake import bake
+        return bake
+
+    # https://github.com/agriffis/vcrpy-unittest/blob/8850debf5928b34a41e2f9f537fb0ba319008ed3/vcr_unittest/testcase.py#L34
+    def _get_cassette_library_dir(self):
+        testdir = os.path.dirname(inspect.getfile(self.__class__))
+        return os.path.join(testdir, 'data', 'cassettes')
+
+    @db_connect
+    def test(self, cursor):
+        recipes = use_cases.setup_RECIPES_in_archive(self, cursor)
+        binder = use_cases.setup_EXERCISES_BOOK_in_archive(self, cursor)
+        cursor.connection.commit()
+        publisher = 'ream'
+        msg = 'part of collated publish'
+
+        # Call bake but store the result of collate_models for later inspection
+        collate_results = []
+        from cnxpublishing.bake import collate_models
+
+        def cnxepub_collate(binder, ruleset=None, includes=None):
+            composite_doc = collate_models(binder, ruleset=ruleset, includes=includes)
+            collate_results.append(composite_doc)
+            return composite_doc
+        with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
+            mock_collate.side_effect = cnxepub_collate
+            errors = self.target(binder, recipes[1], publisher, msg, cursor=cursor)
+        composite_doc = collate_results[0]
+
+        # Ensure the tree has been stamped.
+        cursor.execute("SELECT tree_to_json(%s, %s, TRUE)::json;",
+                       (binder.id, binder.metadata['version'],))
+        baked_tree = cursor.fetchone()[0]
+        self.assertIn(composite_doc.ident_hash,
+                      cnxepub.flatten_tree_to_ident_hashes(baked_tree))
+
+        # Ensure the exercises were pulled into the content.
+        content = composite_doc[0].content
+        self.assertIn('<div>What is kinematics?</div>', content)
+        self.assertIn('No, the gravitational force is a field force and does not', content)
+        self.assertIn('<div>What kind of physical quantity is force?</div>', content)
+        self.assertIn('<li>Both internal and external forces</li>', content)

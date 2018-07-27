@@ -422,6 +422,80 @@ PAGE_FIVE = cnxepub.Document(
         }
     )
 
+EXERCISES_PAGE = cnxepub.Document(
+    id=u'01234567@draft',
+    data=u"""
+    <p class="para">
+        <section>
+            <div data-type="exercise" class="os-exercise">
+                <section>
+                    <div data-type="problem">
+                        <p><a class="os-embed" href="#ost/api/ex/k12phys-ch04-ex001">[link]</a></p>
+                    </div>
+                </section>
+            </div>
+        </section>
+        <section>
+            <div data-type="exercise" class="os-exercise">
+                <section>
+                    <div data-type="problem">
+                        <p><a class="os-embed" href="#ost/api/ex/k12phys-ch04-ex002">[link]</a></p>
+                    </div>
+                </section>
+            </div>
+        </section>
+        <section>
+            <div data-type="exercise" class="os-exercise">
+                <section>
+                    <div data-type="problem">
+                        <p><a class="os-embed" href="#exercise/some_nickname">[link]</a></p>
+                    </div>
+                </section>
+            </div>
+        </section>
+        <section>
+            <div data-type="exercise" class="os-exercise grasp-check">
+                <section>
+                    <div data-type="problem">
+                        <p><a class="os-embed" href="#exercise/Another Nickname">[link]</a></p>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </p>
+    """,
+    metadata={
+        u'title': u'Exercises Page',
+        u'created': u'2018/07/26 17:52:00 -0500',
+        u'revised': u'2018/07/26 17:52:00 -0500',
+        u'keywords': [u'Exercises'],
+        u'subjects': [u'Physics'],
+        u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>A bunch of exercises</span>",
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'authors': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'translators': [],
+        u'print_style': None,
+        }
+    )
+
 COMPLEX_BOOK_ONE = cnxepub.Binder(
     id='94f4d0f5@draft',
     resources=[
@@ -545,6 +619,42 @@ COMPLEX_BOOK_THREE = cnxepub.Binder(
         },
     title_overrides=['D One', 'D Two'],
     nodes=[PAGE_TWO, PAGE_FOUR],
+    )
+
+EXERCISES_BOOK = cnxepub.Binder(
+    id='89abcdef@draft',
+    metadata={
+        u'title': u'Book of Exercises',
+        u'created': u'2018/07/26 17:52:00 -0500',
+        u'revised': u'2018/07/26 17:52:00 -0500',
+        u'keywords': ['Physics'],
+        u'language': u'en',
+        u'license_text': u'CC-By 4.0',
+        u'license_url': u'http://creativecommons.org/licenses/by/4.0/',
+        u'subjects': ['Biology'],
+        u'authors': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'copyright_holders': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'editors': [],
+        u'illustrators': [],
+        u'publishers': [
+            {u'id': u'ream',
+             u'name': u'Ream',
+             u'type': u'cnx-id'}
+        ],
+        u'translators': [],
+        u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
+        u'print_style': None
+        },
+    title_overrides=['E Only'],
+    nodes=[EXERCISES_PAGE],
     )
 
 
@@ -746,9 +856,11 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
 
 
 def _set_uri(model):
-    """Set the system uri on the model."""
-    uri = "https://archive.cnx.org/contents/{}".format(model.ident_hash)
-    model.set_uri('cnx-archive', uri)
+    """Set the model's cnx-archive-uri to the model's ident_hash."""
+    # Even though the field ends in -uri, we use the ident_hash here
+    # Baking fails if the full uri is stored here
+    # because this field is overwrites the module id in collate_models
+    model.set_uri('cnx-archive', model.ident_hash)
 
 
 def _insert_control_id(uuid_, cursor):
@@ -929,6 +1041,26 @@ def setup_PAGE_FOUR_in_archive(test_case, cursor):
     return model
 
 
+def setup_EXERCISES_PAGE_in_archive(test_case, cursor):
+    """Set up EXERCISES_PAGE"""
+    model = deepcopy(EXERCISES_PAGE)
+
+    publisher = 'someone'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = '3602af96-7f0d-4ce0-828d-cc0a1bcfab59'
+    model.metadata['version'] = '1'
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
+        publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
+    _set_uri(model)
+    return model
+
+
 def setup_COMPLEX_BOOK_ONE_in_archive(test_case, cursor):
     """Set up COMPLEX_BOOK_ONE"""
     model = deepcopy(COMPLEX_BOOK_ONE)
@@ -1024,6 +1156,29 @@ def setup_COMPLEX_BOOK_THREE_in_archive(test_case, cursor):
     model[0] = doc
     doc = setup_PAGE_FOUR_in_archive(test_case, cursor)
     model[1] = doc
+
+    from ..publish import publish_model
+    if not _is_published(model.ident_hash, cursor):
+        _insert_control_id(model.id, cursor)
+        _insert_user_info(model, cursor)
+        publish_model(cursor, model, publisher, publication_message)
+        _insert_acl_for_model(model, cursor)
+    _set_uri(model)
+    return model
+
+
+def setup_EXERCISES_BOOK_in_archive(test_case, cursor):
+    """Set up EXERCISES_BOOK"""
+    model = deepcopy(EXERCISES_BOOK)
+
+    publisher = 'ream'
+    publication_message = 'published via test setup'
+    # FIXME Use the REVISED_* id when it exists.
+    model.id = 'c7cef66f-2715-47ef-afb1-16e9a07212f1'
+    model.metadata['version'] = '1.1'
+
+    doc = setup_EXERCISES_PAGE_in_archive(test_case, cursor)
+    model[0] = doc
 
     from ..publish import publish_model
     if not _is_published(model.ident_hash, cursor):

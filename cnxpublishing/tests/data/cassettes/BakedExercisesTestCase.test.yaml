@@ -1,0 +1,143 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.19.1]
+    method: GET
+    uri: https://exercises.openstax.org/api/exercises?q=tag:"k12phys-ch04-ex001"
+  response:
+    body: {string: !!python/unicode '{"total_count":1,"items":[{"tags":["inbook-yes","k12phys","os-practice-concepts","k12phys-ch04","k12phys-ch04-s01","k12phys-ch04-s01-lo01","k12phys-ch04-ex001","dok:1","blooms:1","time:short","book:stax-phys","lo:stax-phys:4-2-2","exid:k12phys-ch04-ex001","context-cnxmod:144d12ac-66f8-49b3-99f3-034118d0c858","filter-type:import:hs","book:stax-k12phys","type:conceptual-or-recall","context-cnxmod:b0ffd0a2-9c83-4d73-b899-7f2ade2acda6"],"uuid":"0e540352-e98d-49e0-bda2-38736954d97a","group_uuid":"17140a07-5142-4988-95b2-fb1a5526394a","number":2060,"version":4,"uid":"2060@4","published_at":"2016-06-08T01:06:41.509Z","authors":[{"user_id":1,"name":"openstax"}],"copyright_holders":[{"user_id":2,"name":"Rice
+        University"}],"derived_from":[],"is_vocab":false,"stimulus_html":"","questions":[{"id":50257,"is_answer_order_important":true,"stimulus_html":"","stem_html":"What
+        is kinematics?","answers":[{"id":209685,"content_html":"Kinematics is the
+        study of motion."},{"id":209684,"content_html":"Kinematics is the study of
+        the cause of motion."},{"id":209683,"content_html":"Kinematics is the study
+        of dimensions."},{"id":209682,"content_html":"Kinematics is the study of atomic
+        structures."}],"hints":[],"formats":["free-response","multiple-choice"],"combo_choices":[]}],"versions":[4,3,2,1]}]}'}
+    headers:
+      cache-control: ['max-age=0, private, must-revalidate']
+      connection: [keep-alive]
+      content-length: ['1293']
+      content-type: [application/json; charset=utf-8]
+      date: ['Fri, 27 Jul 2018 16:51:03 GMT']
+      etag: [W/"f93f8c938ea765e42b9153fbd48c31fa"]
+      server: [nginx]
+      set-cookie: [_exercises_session=MnE2b0FjbldMRE1NcGFudnFZQW5MUndkN0lzU1gwUWw4dUdRcmlCQzJJa0Z4M1VNb21qMnhOemJ3YzFEOGdDWE9iMFhMYnFaQ2Q4LzNJbGpnMDNUWmc9PS0tcSsvZVBlRnlFZ3VPQmJSenNRMDhqZz09--942669d39ca8b83b6ee46686cdc1f26fd3ed038e;
+          path=/; HttpOnly]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains]
+      x-content-type-options: [nosniff]
+      x-frame-options: [SAMEORIGIN]
+      x-request-id: [9f7451db-2bc9-4a67-9fd8-4429c6376357]
+      x-runtime: ['0.045899']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.19.1]
+    method: GET
+    uri: https://exercises.openstax.org/api/exercises?q=tag:"k12phys-ch04-ex002"
+  response:
+    body: {string: !!python/unicode '{"total_count":1,"items":[{"tags":["inbook-yes","k12phys","os-practice-concepts","k12phys-ch04","k12phys-ch04-s01","k12phys-ch04-s01-lo01","k12phys-ch04-ex002","time:short","dok:2","blooms:2","book:stax-phys","lo:stax-phys:4-8-1","exid:k12phys-ch04-ex002","context-cnxmod:144d12ac-66f8-49b3-99f3-034118d0c858","filter-type:import:hs","book:stax-k12phys","type:conceptual-or-recall","context-cnxmod:ce493e8c-2791-42ac-a25a-13a31a7972aa"],"uuid":"48734f81-1509-47cb-b00b-aaceada8296d","group_uuid":"bac1daf3-d8ef-458a-9fd6-77d4944e27a5","number":2061,"version":4,"uid":"2061@4","published_at":"2016-06-08T01:06:41.765Z","authors":[{"user_id":1,"name":"openstax"}],"copyright_holders":[{"user_id":2,"name":"Rice
+        University"}],"derived_from":[],"is_vocab":false,"stimulus_html":"","questions":[{"id":50258,"is_answer_order_important":true,"stimulus_html":"","stem_html":"Do
+        two bodies have to be in physical contact to exert a force upon one another?
+        Explain with an example.","answers":[{"id":209689,"content_html":"No, the
+        gravitational force is a field force and does not require physical contact
+        to exert a force."},{"id":209688,"content_html":"No, the gravitational force
+        is a contact force and does not require physical contact to exert a force."},{"id":209687,"content_html":"Yes,
+        the gravitational force is a field force and requires physical contact to
+        exert a force."},{"id":209686,"content_html":"Yes, the gravitational force
+        is a contact force and requires physical contact to exert a force."}],"hints":[],"formats":["free-response","multiple-choice"],"combo_choices":[]}],"versions":[4,3,2,1]}]}'}
+    headers:
+      cache-control: ['max-age=0, private, must-revalidate']
+      connection: [keep-alive]
+      content-length: ['1604']
+      content-type: [application/json; charset=utf-8]
+      date: ['Fri, 27 Jul 2018 16:51:03 GMT']
+      etag: [W/"4c1ceee0fdf31effd1fb0e4a86d7f28f"]
+      server: [nginx]
+      set-cookie: [_exercises_session=RmdkNC9NVHpwTVRQQ0sxZG1MSVEreUFzeUpYR0xmOGNnNzYvN1lKODM3QWZVZlU2S3NqR2tmUzR4R0dSQnNDTEJTK3hlV0UyUUN0STNPaU9IRTBib0E9PS0tRFROSFR4aE1vRys1TnhjN0tISjU4Zz09--f44a16e9a82570a177503e639016981ae78a34e4;
+          path=/; HttpOnly]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains]
+      x-content-type-options: [nosniff]
+      x-frame-options: [SAMEORIGIN]
+      x-request-id: [8915b464-8359-44a3-9066-440b6ceed8cc]
+      x-runtime: ['0.039585']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.19.1]
+    method: GET
+    uri: https://exercises.openstax.org/api/exercises?q=nickname:"some_nickname"
+  response:
+    body: {string: !!python/unicode '{"total_count":1,"items":[{"tags":["inbook-yes","k12phys","os-practice-concepts","k12phys-ch04","k12phys-ch04-s01","k12phys-ch04-s01-lo02","k12phys-ch04-ex003","dok:1","blooms:1","time:short","book:stax-phys","lo:stax-phys:4-1-1","exid:k12phys-ch04-ex003","context-cnxmod:144d12ac-66f8-49b3-99f3-034118d0c858","filter-type:import:hs","book:stax-k12phys","type:conceptual-or-recall","context-cnxmod:7344986b-3079-4db2-92b9-78e0644c8610"],"uuid":"89e192d9-fd48-4185-958f-05df45b4fc06","group_uuid":"a76456ed-a7cc-4e25-9daa-e500be29ffb5","number":2062,"version":4,"uid":"2062@4","nickname":"some_nickname","published_at":"2016-06-08T01:06:42.007Z","authors":[{"user_id":1,"name":"openstax"}],"copyright_holders":[{"user_id":2,"name":"Rice
+        University"}],"derived_from":[],"is_vocab":false,"stimulus_html":"","questions":[{"id":50259,"is_answer_order_important":true,"stimulus_html":"","stem_html":"What
+        kind of physical quantity is force?","answers":[{"id":209692,"content_html":"Force
+        is a scalar quantity."},{"id":209693,"content_html":"Force is a vector quantity."},{"id":209691,"content_html":"Force
+        is both a vector quantity and a scalar quantity."},{"id":209690,"content_html":"Force
+        is neither a vector nor a scalar quantity."}],"hints":[],"formats":["free-response","multiple-choice"],"combo_choices":[]}],"versions":[4,3,2,1]}]}'}
+    headers:
+      cache-control: ['max-age=0, private, must-revalidate']
+      connection: [keep-alive]
+      content-length: ['1306']
+      content-type: [application/json; charset=utf-8]
+      date: ['Fri, 27 Jul 2018 16:51:03 GMT']
+      etag: [W/"52dfa68d857bd2edf7b7d575be7ba3b9"]
+      server: [nginx]
+      set-cookie: [_exercises_session=N09vYWNCb0xPQ24zbk1RMmpadmZzNS9mRW9IVkI4SjFkc3BjSnRWaDJCaEZ5YmhDNVE2S1pqS0lYTHptQUg4K1dHYlA1Y3d3bzRoQzdsb2ZQSzRwWEE9PS0tYWovYVVyZ2FoQmJJREFnNk9CTkczdz09--f925482d9eba9b1027c5f385c886a693d581779d;
+          path=/; HttpOnly]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains]
+      x-content-type-options: [nosniff]
+      x-frame-options: [SAMEORIGIN]
+      x-request-id: [6806ee14-66c2-427e-bfc5-aedb9ab28827]
+      x-runtime: ['0.070903']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.19.1]
+    method: GET
+    uri: https://exercises.openstax.org/api/exercises?q=nickname:"Another Nickname"
+  response:
+    body: {string: !!python/unicode '{"total_count":1,"items":[{"tags":["inbook-yes","k12phys","os-practice-concepts","k12phys-ch04","k12phys-ch04-s01","k12phys-ch04-s01-lo02","k12phys-ch04-ex004","blooms:1","time:short","dok:2","book:stax-phys","exid:k12phys-ch04-ex004","context-cnxmod:144d12ac-66f8-49b3-99f3-034118d0c858","filter-type:import:hs","book:stax-k12phys","type:conceptual-or-recall","lo:stax-phys:4-3-1","context-cnxmod:920725c6-229b-4f50-870b-b87366ce4f9e"],"uuid":"b35ce7e5-adc2-4f1b-a88e-e4633d223e0b","group_uuid":"afbdbf79-43c7-468f-b875-ffdeb02f9721","number":2063,"version":4,"uid":"2063@4","nickname":"Another Nickname","published_at":"2016-06-08T01:06:42.262Z","authors":[{"user_id":1,"name":"openstax"}],"copyright_holders":[{"user_id":2,"name":"Rice
+        University"}],"derived_from":[],"is_vocab":false,"stimulus_html":"","questions":[{"id":50260,"is_answer_order_important":true,"stimulus_html":"","stem_html":"Which
+        forces can be represented in a free-body diagram?","answers":[{"id":209696,"content_html":"internal
+        forces"},{"id":209697,"content_html":"External forces"},{"id":209695,"content_html":"Both
+        internal and external forces"},{"id":209694,"content_html":"A body that is
+        not influenced by any force"}],"hints":[],"formats":["free-response","multiple-choice"],"combo_choices":[]}],"versions":[4,3,2,1]}]}'}
+    headers:
+      cache-control: ['max-age=0, private, must-revalidate']
+      connection: [keep-alive]
+      content-length: ['1270']
+      content-type: [application/json; charset=utf-8]
+      date: ['Fri, 27 Jul 2018 16:51:03 GMT']
+      etag: [W/"1178adfdd1b9268b9294fc21def09cc3"]
+      server: [nginx]
+      set-cookie: [_exercises_session=Q2E3anB0aTZvY2thdVZCZ3o1VVl1bTQzTWJ5M2R0Tk1tb25hbDVyVmx2djZCTURKRjVIeG16YnhMZTVlcS9lckpDTzh5dVJRMGVVNXJmR1haQU9BaWc9PS0tZnlRbDJldWM3NWVqZk9yRFJ6RGczQT09--42832d43cf62d3cec14b3f2ac607f23dd40427dd;
+          path=/; HttpOnly]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains]
+      x-content-type-options: [nosniff]
+      x-frame-options: [SAMEORIGIN]
+      x-request-id: [a250e043-ec34-4615-bc11-b0e286557b1b]
+      x-runtime: ['0.055014']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+version: 1

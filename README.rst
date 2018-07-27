@@ -48,6 +48,10 @@ Or::
 
     pip install .
 
+Make sure you have the correct version of cssselect2 installed::
+
+    pip install git+https://github.com/Connexions/cssselect2.git#egg=cssselect2
+
 Initialize the database with the archive and publishing schema using the
 following command::
 
@@ -78,11 +82,18 @@ be created using the following commands::
 
 Install the prerequisite testing package::
 
-  pip install pytest pytest-runner pytest-cov
+  pip install pytest pytest-runner pytest-cov testfixtures
 
 The tests can then be run using::
 
   python setup.py test
+
+To run a single test::
+
+  python setup.py test --addopts "-k test_name"
+
+If you receive DBSchemaInitialized errors in tests,
+drop and recreate the cnxarchive-testing database.
 
 Permissions
 -----------
