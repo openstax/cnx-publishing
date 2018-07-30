@@ -141,5 +141,5 @@ def scoped_pyramid_app(celery_app, db_init_and_wipe):
 
     # Force celery to create a new event loop.
     # See https://github.com/celery/celery/issues/4088
-    from kombu.async import set_event_loop
+    from kombu.asynchronous import set_event_loop
     set_event_loop(None)
