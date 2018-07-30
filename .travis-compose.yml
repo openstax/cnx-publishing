@@ -1,7 +1,7 @@
 version: "2"
 services:
   db:
-    build: https://github.com/Connexions/cnx-db.git
+    image: openstax/cnx-db:2.2.1
     ports:
       - "5432:5432"
     environment:
