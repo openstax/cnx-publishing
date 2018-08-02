@@ -25,6 +25,7 @@ tests_require = [
     'pytest',
     'pytest-mock',
     'pytest-runner',
+    'vcrpy-unittest',
     'webtest',
     ]
 extras_require = {
