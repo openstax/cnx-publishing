@@ -6,8 +6,14 @@
 
    - feature message
 
+0.12.0
+------
+
+- Fetch exercises by nickname when baking (#221)
+
 0.11.1
 ------
+
 - Bugfix for content-status admin page - show one, oldest recipe version
 
 0.11.0
