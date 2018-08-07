@@ -33,6 +33,14 @@ System Requirements
 - PostgreSQL >= 9.4
 - RabbitMQ >= 3.6
 - Memcached
+On OSX:
+
+- the specific version of ``pyicu`` required by `cnx-easybase <https://github.com/Connexions/cnx-easybake>`_ (currently 1.9.8) which you can install by running::
+
+    pip install pyicu==1.9.8
+- If you get an ``ImportError`` about ``pyramid_sawing``, run::
+
+    pip install pyramid_sawing
 
 Getting started
 ---------------
