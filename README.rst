@@ -33,6 +33,14 @@ System Requirements
 - PostgreSQL >= 9.4
 - RabbitMQ >= 3.6
 - Memcached
+On OSX:
+
+- the specific version of ``pyicu`` required by `cnx-easybake <https://github.com/Connexions/cnx-easybake>`_ (currently 1.9.8) which you can install by running::
+
+    pip install pyicu==1.9.8
+- If you get an ``ImportError`` about ``pyramid_sawing``, run::
+
+    pip install pyramid_sawing
 
 Getting started
 ---------------
@@ -83,6 +91,15 @@ be created using the following commands::
 Install the prerequisite testing package::
 
   pip install pytest pytest-runner pytest-cov testfixtures
+
+Run RabbitMQ (otherwise, all the tests that use it such as ``test_subscribers.py`` will get hungup with no output message at all) with::
+
+    rabbitmq-server
+
+Or run it in the background with::
+
+    brew services start rabbitmq
+
 
 The tests can then be run using::
 
@@ -508,7 +525,7 @@ This process will listen for events and process them as they come in.
 Queued Operations
 -----------------
 
-This application uses the `Celery framework <celeryproject.org>`_ to queue
+This application uses the `Celery framework <http://celeryproject.org>`_ to queue
 work to be done by a worker process. The worker process is run using::
 
   PYRAMID_INI=<your-config.ini celery worker -A cnxpublishing
