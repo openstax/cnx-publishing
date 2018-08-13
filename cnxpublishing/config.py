@@ -5,6 +5,7 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
+import os
 from cnxarchive.config import CONNECTION_STRING
 from pyramid import security
 from pyramid.config import Configurator
@@ -53,7 +54,18 @@ class RootFactory(object):
         raise KeyError(key)
 
 
+# https://stackoverflow.com/a/16446566
+def expandvars_dict(settings):
+    """Expands all environment variables in a settings dictionary."""
+    return dict(
+        (key, os.path.expandvars(value))
+        for key, value in settings.iteritems()
+    )
+
+
 def configure(settings):
+    # load environment variables
+    settings = expandvars_dict(settings)
     # Check for required settings
     settings['session_key'] = settings.get('session_key', 'itsaseekreet')
     # File uploads size limit in MB
