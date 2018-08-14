@@ -144,7 +144,7 @@ to the deferred (low priority) queue"""
 
     try:
         binder = export_epub.factory(ident_hash)
-    except:
+    except:  # noqa: E722
         logger.exception('Logging an uncaught exception during baking'
                          'ident_hash={} module_ident={}'
                          .format(ident_hash, module_ident))
@@ -165,7 +165,7 @@ WHERE ident_hash(uuid, major_version, minor_version) = %s""",
     for recipe_id in recipe_ids:
         try:
             bake(binder, recipe_id, publisher, message, cursor=cursor)
-        except Exception as exc:
+        except Exception:
             if state == 'current' and recipe_ids[1] is not None:
                 state = 'fallback'
                 continue

@@ -9,12 +9,11 @@
 #   User Actions   #
 # ################ #
 from pyramid import httpexceptions
-from pyramid.settings import asbool
 from pyramid.view import view_config
 
 from ..exceptions import (
     UserFetchError,
-    )
+)
 from ..db import (
     db_connect,
     remove_acl,
@@ -24,7 +23,7 @@ from ..db import (
     upsert_license_requests,
     upsert_role_requests,
     upsert_users,
-    )
+)
 
 
 @view_config(route_name='license-request',
@@ -68,7 +67,7 @@ ORDER BY user_id ASC
     resp_value = {
         'license_url': license_url,
         'licensors': acceptances,
-        }
+    }
     return resp_value
 
 
@@ -85,17 +84,18 @@ def post_license_request(request):
     with db_connect() as db_conn:
         with db_conn.cursor() as cursor:
             cursor.execute("""\
-SELECT TRUE, l.url
+SELECT l.url
 FROM document_controls AS dc
 LEFT JOIN licenses AS l ON (dc.licenseid = l.licenseid)
 WHERE uuid = %s::UUID""", (uuid_,))
             try:
-                exists, existing_license_url = cursor.fetchone()
-            except TypeError:
+                # Check that the license exists
+                existing_license_url = cursor.fetchone()[0]
+            except TypeError:  # NoneType
                 if request.has_permission('publish.create-identifier'):
                     cursor.execute("""\
 INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
-                    exists, existing_license_url = True, None
+                    existing_license_url = None
                 else:
                     raise httpexceptions.HTTPNotFound()
             if existing_license_url is None and license_url is None:
@@ -109,7 +109,8 @@ WHERE url = %s and is_valid_for_publication = 't'
 RETURNING dc.licenseid""",
                                (license_url,))
                 try:
-                    valid_licenseid = cursor.fetchone()[0]
+                    # Check that it is a valid license id
+                    cursor.fetchone()[0]
                 except TypeError:  # None returned
                     raise httpexceptions.HTTPBadRequest("invalid license_url")
             upsert_license_requests(cursor, uuid_, licensors)
@@ -192,7 +193,8 @@ def post_roles_request(request):
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
             try:
-                exists = cursor.fetchone()[0]
+                # Check that it exists
+                cursor.fetchone()[0]
             except TypeError:
                 if request.has_permission('publish.create-identifier'):
                     cursor.execute("""\
@@ -239,7 +241,8 @@ def get_acl(request):
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
             try:
-                exists = cursor.fetchone()[0]
+                # Check that it exists
+                cursor.fetchone()[0]
             except TypeError:
                 raise httpexceptions.HTTPNotFound()
             cursor.execute("""\
@@ -268,7 +271,8 @@ def post_acl_request(request):
             cursor.execute("""\
 SELECT TRUE FROM document_controls WHERE uuid = %s::UUID""", (uuid_,))
             try:
-                exists = cursor.fetchone()[0]
+                # Check that it exists
+                cursor.fetchone()[0]
             except TypeError:
                 if request.has_permission('publish.create-identifier'):
                     cursor.execute("""\

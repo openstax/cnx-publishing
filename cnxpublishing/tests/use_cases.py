@@ -52,7 +52,7 @@ BOOK = cnxepub.Binder(
         u'subjects': [
             u'Mathematics and Statistics',
             u'Science and Technology',
-            ],
+        ],
         u'authors': [
             {u'id': u'marknewlyn', u'name': u'Mark Horner',
              u'type': u'cnx-id'},
@@ -74,7 +74,7 @@ BOOK = cnxepub.Binder(
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None,
-        },
+    },
     nodes=[
         cnxepub.TranslucentBinder(
             metadata={u'title': u'Part One'},
@@ -98,7 +98,7 @@ BOOK = cnxepub.Binder(
                                 u'keywords': [u'South Africa'],
                                 u'subjects': [
                                     u'Mathematics and Statistics',
-                                    ],
+                                ],
                                 u'summary': u"<span xmlns='http://www.w3.org/1999/xhtml'>descriptive text</span>",
                                 u'language': u'en',
                                 u'license_text': u'CC-By 4.0',
@@ -134,10 +134,10 @@ BOOK = cnxepub.Binder(
                                 u'print_style': u'*print style*',
                             }
 
-                            ),
+                        ),
                     ]),
-                ]),
-        ])
+            ]),
+    ])
 
 # EXAMPLE_BOOK is used in README
 EXAMPLE_BOOK = deepcopy(BOOK)
@@ -176,7 +176,7 @@ SPAM = cnxepub.Binder(
         u'subjects': [
             u'Mathematics and Statistics',
             u'Science and Technology',
-            ],
+        ],
         u'authors': [
             {u'id': u'happy', u'name': u'Happy Go Lucky',
              u'type': u'cnx-id'}],
@@ -189,7 +189,7 @@ SPAM = cnxepub.Binder(
         u'translators': [],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None,
-        },
+    },
     nodes=[
         cnxepub.Document(
             id=u'2cf4d7d3@draft',
@@ -265,7 +265,7 @@ PAGE_ONE = cnxepub.Document(
         u'print_style': None,
     },
 
-    )
+)
 
 PAGE_TWO = cnxepub.Document(
     id=u'c24fe396@draft',
@@ -305,7 +305,7 @@ PAGE_TWO = cnxepub.Document(
                           u'type': u'cnx-id'}],
         u'print_style': None, },
 
-    )
+)
 
 PAGE_THREE = cnxepub.Document(
     id=u'e12b72ac@draft',
@@ -345,7 +345,7 @@ PAGE_THREE = cnxepub.Document(
                           u'type': u'cnx-id'}],
         u'print_style': None, },
 
-    )
+)
 
 PAGE_FOUR = cnxepub.Document(
     id=u'deadbeef@draft',
@@ -378,8 +378,8 @@ PAGE_FOUR = cnxepub.Document(
                          u'type': u'cnx-id'}],
         u'translators': [],
         u'print_style': None,
-        }
-    )
+    }
+)
 
 PAGE_FIVE = cnxepub.Document(
     id=u'b3627ba5@draft',
@@ -390,7 +390,7 @@ PAGE_FIVE = cnxepub.Document(
                          io.BytesIO('a ' * 1024 * 1024),
                          'text/plain',
                          filename='big-file.txt'),
-        ],
+    ],
     metadata={
         u'title': u'Document Five',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -419,8 +419,8 @@ PAGE_FIVE = cnxepub.Document(
                          u'type': u'cnx-id'}],
         u'translators': [],
         u'print_style': None,
-        }
-    )
+    }
+)
 
 EXERCISES_PAGE = cnxepub.Document(
     id=u'01234567@draft',
@@ -493,8 +493,8 @@ EXERCISES_PAGE = cnxepub.Document(
         ],
         u'translators': [],
         u'print_style': None,
-        }
-    )
+    }
+)
 
 COMPLEX_BOOK_ONE = cnxepub.Binder(
     id='94f4d0f5@draft',
@@ -533,19 +533,19 @@ COMPLEX_BOOK_ONE = cnxepub.Binder(
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None,
-        },
+    },
     nodes=[
         cnxepub.TranslucentBinder(
             metadata={u'title': u'Part One'},
             title_overrides=['Document One', 'Document Two'],
             nodes=[PAGE_ONE, PAGE_TWO],
-            ),
+        ),
         cnxepub.TranslucentBinder(
             metadata={u'title': u'Part Two'},
             title_overrides=['Document Three', 'Document Four'],
             nodes=[PAGE_THREE, PAGE_FOUR],
-            ),
-        ])
+        ),
+    ])
 
 COMPLEX_BOOK_TWO = cnxepub.Binder(
     id='94f4d0f5@draft',
@@ -579,19 +579,19 @@ COMPLEX_BOOK_TWO = cnxepub.Binder(
                           u'type': u'cnx-id'}],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None
-        },
+    },
     nodes=[
         cnxepub.TranslucentBinder(
             metadata={u'title': u'Part One'},
             title_overrides=['Document One', 'Document Two'],
             nodes=[PAGE_TWO, PAGE_THREE],
-            ),
+        ),
         cnxepub.TranslucentBinder(
             metadata={u'title': u'Part Two'},
             title_overrides=['Document Three'],
             nodes=[PAGE_ONE],
-            ),
-        ])
+        ),
+    ])
 
 COMPLEX_BOOK_THREE = cnxepub.Binder(
     id='defc01ef@draft',
@@ -616,10 +616,10 @@ COMPLEX_BOOK_THREE = cnxepub.Binder(
         u'translators': [],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None
-        },
+    },
     title_overrides=['D One', 'D Two'],
     nodes=[PAGE_TWO, PAGE_FOUR],
-    )
+)
 
 EXERCISES_BOOK = cnxepub.Binder(
     id='89abcdef@draft',
@@ -652,10 +652,10 @@ EXERCISES_BOOK = cnxepub.Binder(
         u'translators': [],
         u'summary': "<span xmlns='http://www.w3.org/1999/xhtml'>Book summary</span>",
         u'print_style': None
-        },
+    },
     title_overrides=['E Only'],
     nodes=[EXERCISES_PAGE],
-    )
+)
 
 
 # ################### #
@@ -718,15 +718,16 @@ WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
 
-    resource_hash = hashlib.new(cnxepub.RESOURCE_HASH_TYPE,
-                                _read_file(RESOURCE_ONE_FILEPATH).read()) \
-                           .hexdigest()
+    hashlib.new(
+        cnxepub.RESOURCE_HASH_TYPE,
+        _read_file(RESOURCE_ONE_FILEPATH).read()
+    ).hexdigest()
     # FIXME Remove and change assertion after cnx-archive switches to
     # ``cnxepub.RESOURCE_HASH_TYPE`` as hash. Use ``resource_hash`` in the
     # check instead of ``file_md5``.
     file_md5 = hashlib.new('md5',
                            _read_file(RESOURCE_ONE_FILEPATH).read()) \
-                      .hexdigest()
+        .hexdigest()
     cursor.execute("""\
 SELECT f.file, f.media_type,
         ident_hash(m.uuid,m.major_version,m.minor_version)
@@ -767,12 +768,12 @@ FROM modules ORDER BY major_version ASC""")
         key_sep.join([binder_uuid, 'col10000']): [
             [1, 1, '1.1'],  # BOOK
             [2, 1, '1.2'],  # REVISED_BOOK
-            ],
+        ],
         key_sep.join([document_uuid, 'm10000']): [
             [1, None, '1.1'],
             [2, None, '1.2'],
-            ],
-        }
+        ],
+    }
     test_case.assertEqual(expected_records, records)
 
     # Check the tree...
@@ -801,15 +802,16 @@ WHERE portal_type = 'Collection'""")
     tree = json.loads(cursor.fetchone()[0])
     test_case.assertEqual(expected_tree, tree)
 
-    resource_hash = hashlib.new(cnxepub.RESOURCE_HASH_TYPE,
-                                _read_file(RESOURCE_ONE_FILEPATH).read()) \
-                           .hexdigest()
+    hashlib.new(
+        cnxepub.RESOURCE_HASH_TYPE,
+        _read_file(RESOURCE_ONE_FILEPATH).read()
+    ).hexdigest()
     # FIXME Remove and change assertion after cnx-archive switches to
     # ``cnxepub.RESOURCE_HASH_TYPE`` as hash. Use ``resource_hash`` in the
     # check instead of ``file_md5``.
     file_md5 = hashlib.new('md5',
                            _read_file(RESOURCE_ONE_FILEPATH).read()) \
-                      .hexdigest()
+        .hexdigest()
     cursor.execute("""\
 SELECT f.file, f.media_type,
         ident_hash(m.uuid,m.major_version,m.minor_version)
@@ -849,7 +851,7 @@ FROM modules
 WHERE ident_hash(uuid, major_version, minor_version) = %s""",
                    (ident_hash,))
     try:
-        ident = cursor.fetchone()[0]
+        cursor.fetchone()[0]
     except TypeError:
         return False
     return True
@@ -924,7 +926,7 @@ def setup_RECIPES_in_archive(test_case, cursor):
                      'text/css', cursor),
         _insert_file(_read_file(RECIPE_TWO_FILEPATH).read(),
                      'text/css', cursor)
-        )
+    )
     cursor.execute("INSERT INTO print_style_recipes "
                    "(print_style, tag, fileid)"
                    " VALUES (%s, 'v1.0', %s), (%s, 'v1.0', %s)",

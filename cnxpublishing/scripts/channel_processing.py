@@ -94,7 +94,7 @@ def processor():  # pragma: no cover
                     event = create_pg_notify_event(notif)
                     try:
                         registry.notify(event)
-                    except Exception as exc:
+                    except Exception:
                         logger.exception('Logging an uncaught exception')
 
 

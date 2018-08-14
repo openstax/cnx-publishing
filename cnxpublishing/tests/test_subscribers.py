@@ -353,8 +353,6 @@ class TestPostPublicationProcessing(object):
         assert result_stateid == 1
 
     def test_priority(self, db_cursor, mocker, complex_book_one_v2):
-        from celery.exceptions import Retry
-
         mock_retry = mocker.patch('celery.app.task.Task.retry')
         mock_retry.return_value = Exception('Task can be retried')
 

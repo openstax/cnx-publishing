@@ -8,17 +8,11 @@
 import os
 import io
 import datetime
-import uuid
 import unittest
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 import cnxepub
 import psycopg2
 from cnxarchive.utils import join_ident_hash
-from webob import Request
 from pyramid import testing
 
 from . import use_cases
@@ -28,7 +22,7 @@ from .testing import (
     db_connection_factory,
     db_connect,
     init_db,
-    )
+)
 from .test_db import BaseDatabaseIntegrationTestCase
 
 
@@ -110,7 +104,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
             'subjects': ['Arts', 'Business', 'Mathematics and Statistics'],
             'keywords': ['bates', 'dilemma', 'dingbat'],
             'print_style': None,
-            }
+        }
         publisher = 'ream'
         message = 'no msg'
         document = self.make_document(metadata=metadata)
@@ -239,7 +233,7 @@ ORDER BY k.word ASC
                          'name': 'Richard Bates'}, ],
             'copyright_holders': [{'id': 'ream', 'type': None}],
             'print_style': None,
-            }
+        }
         publisher = 'ream'
         message = 'no msg'
         document = self.make_document(metadata=metadata)
@@ -301,7 +295,7 @@ WHERE mor.module_ident = %s
             'keywords': ['dingbat', 'bates', 'dilemma'],
             'version': version,
             'print_style': None,
-            }
+        }
         publisher = 'ream'
         message = 'no msg'
         document = self.make_document(id=id, metadata=metadata)
@@ -350,7 +344,7 @@ WHERE ident_hash(m.uuid,m.major_version,m.minor_version) = %s
             'subjects': ['Business', 'Arts', 'Mathematics and Statistics'],
             'keywords': ['dingbat', 'bates', 'dilemma'],
             'print_style': '* first print style* ',
-            }
+        }
         publisher = 'ream'
         message = 'no msg'
         document = self.make_document(id=id, metadata=metadata)
@@ -381,7 +375,7 @@ WHERE ident_hash(m.uuid,m.major_version,m.minor_version) = %s
             'keywords': ['dingbat', 'bates', 'dilemma'],
             'derived_from_uri': 'http://cnx.org/contents/{}'.format(ident_hash),
             'print_style': '* second print style* ',
-            }
+        }
         publisher = 'someone'
         message = 'derived a copy'
         document = self.make_document(metadata=metadata)
@@ -554,7 +548,7 @@ class RepublishTestCase(unittest.TestCase):
                       u'shortId': u'3q2-76kn@2',
                       u'title': u'Document Four'}],
                  }],
-            }
+        }
         self.assertEqual(tree, expected_tree)
         cursor.execute("SELECT tree_to_json(%s, '1.2', FALSE)::json",
                        (book_two.id,))
@@ -583,7 +577,7 @@ class RepublishTestCase(unittest.TestCase):
                       u'shortId': u'LyhY6pM8@1',
                       u'title': u'Document Three'}],
                  }],
-            }
+        }
         self.assertEqual(tree, expected_tree)
 
     @db_connect
@@ -613,7 +607,7 @@ UPDATE trees SET latest = NULL WHERE documentid = (
         page_one = book_one[0][0]
         page_one.metadata['version'] = '2'
         from ..publish import publish_model
-        ident_hash = publish_model(cursor, page_one, 'tester', 'test pub')
+        publish_model(cursor, page_one, 'tester', 'test pub')
 
         # * Invoke the republish logic.
         self.call_target(cursor, [page_one])
@@ -775,8 +769,13 @@ class PublishCollatedTreeTestCase(BaseDatabaseIntegrationTestCase):
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
 
         from cnxpublishing.publish import publish_composite_model
-        ident_hash = publish_composite_model(cursor, composite_doc, binder,
-                                             publisher, message)
+        publish_composite_model(
+            cursor,
+            composite_doc,
+            binder,
+            publisher,
+            message,
+        )
 
         # Shim the composite document into the binder.
         binder.append(composite_doc)

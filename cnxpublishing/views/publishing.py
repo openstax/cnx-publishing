@@ -6,13 +6,11 @@
 # See LICENCE.txt for details.
 # ###
 import cnxepub
-from cnxarchive.scripts import export_epub
 from cnxarchive.utils.ident_hash import IdentHashError
 from pyramid import httpexceptions
 from pyramid.settings import asbool
 from pyramid.view import view_config
 
-from ..bake import remove_baked
 from ..db import (
     accept_publication_license,
     accept_publication_role,
@@ -20,7 +18,7 @@ from ..db import (
     check_publication_state,
     poke_publication_state,
     db_connect,
-    )
+)
 from ..utils import split_ident_hash
 
 
@@ -35,7 +33,7 @@ def publish(request):
     epub_upload = request.POST['epub'].file
     try:
         epub = cnxepub.EPUB.from_file(epub_upload)
-    except:
+    except:  # noqa: E722
         raise httpexceptions.HTTPBadRequest('Format not recognized.')
 
     # Make a publication entry in the database for status checking
@@ -55,7 +53,7 @@ def publish(request):
         'mapping': publications,
         'state': state,
         'messages': messages,
-        }
+    }
     return response_data
 
 
@@ -69,7 +67,7 @@ def get_publication(request):
         'publication': publication_id,
         'state': state,
         'messages': messages,
-        }
+    }
     return response_data
 
 
@@ -134,7 +132,7 @@ def post_accept_license(request):
                 accepted.append(doc_acceptance['id'])
             else:
                 denied.append(doc_acceptance['id'])
-    except:
+    except KeyError:
         raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
@@ -148,7 +146,7 @@ def post_accept_license(request):
     location = request.route_url('publication-license-acceptance',
                                  id=publication_id, uid=uid)
     # Poke publication to change state.
-    state = poke_publication_state(publication_id)
+    poke_publication_state(publication_id)
     return httpexceptions.HTTPFound(location=location)
 
 
@@ -215,7 +213,7 @@ def post_accept_role(request):
                 accepted.append(doc_acceptance['id'])
             else:
                 denied.append(doc_acceptance['id'])
-    except:
+    except KeyError:
         raise httpexceptions.BadRequest("Posted data is invalid.")
 
     # For each pending document, accept/deny the license.
@@ -229,7 +227,7 @@ def post_accept_role(request):
     location = request.route_url('publication-license-acceptance',
                                  id=publication_id, uid=uid)
     # Poke publication to change state.
-    state = poke_publication_state(publication_id)
+    poke_publication_state(publication_id)
     return httpexceptions.HTTPFound(location=location)
 
 

@@ -14,10 +14,10 @@ from pyramid.paster import get_appsettings
 
 
 __all__ = (
-    'TEST_DATA_DIR'
+    'TEST_DATA_DIR',
     'integration_test_settings',
     'db_connection_factory', 'db_connect',
-    )
+)
 
 
 here = os.path.abspath(os.path.dirname(__file__))

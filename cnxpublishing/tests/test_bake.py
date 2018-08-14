@@ -7,7 +7,6 @@
 # ###
 import os
 import inspect
-import unittest
 try:
     from unittest import mock
 except ImportError:
@@ -102,7 +101,7 @@ WHERE
         content_to_check = [
             (binder[0][0], baked_doc_content,),
             (composite_doc, content,),
-            ]
+        ]
         for doc, content in content_to_check:
             self.assertIn(content, self._get_baked_file(cursor, doc, binder))
 
@@ -166,7 +165,7 @@ WHERE
             mock_collate.side_effect = cnxepub_collate
             from cnxpublishing.bake import bake
             fake_recipe_id = 1
-            errors = bake(binder, fake_recipe_id, publisher, msg, cursor=cursor)
+            bake(binder, fake_recipe_id, publisher, msg, cursor=cursor)
 
         self.ident_hash = binder.ident_hash
         self.composite_ident_hash = composite_doc.ident_hash
@@ -198,7 +197,7 @@ WHERE
         cursor.execute("SELECT * FROM collated_file_associations AS cfa NATURAL JOIN modules AS m "
                        "WHERE ident_hash(m.uuid, m.major_version, m.minor_version) = %s", (self.ident_hash,))
         with self.assertRaises(TypeError):
-            rows = cursor.fetchone()[0]
+            cursor.fetchone()[0]
 
 
 class BakedExercisesTestCase(VCRMixin, BaseDatabaseIntegrationTestCase):
@@ -231,7 +230,7 @@ class BakedExercisesTestCase(VCRMixin, BaseDatabaseIntegrationTestCase):
             return composite_doc
         with mock.patch('cnxpublishing.bake.collate_models') as mock_collate:
             mock_collate.side_effect = cnxepub_collate
-            errors = self.target(binder, recipes[1], publisher, msg, cursor=cursor)
+            self.target(binder, recipes[1], publisher, msg, cursor=cursor)
         composite_doc = collate_results[0]
 
         # Ensure the tree has been stamped.

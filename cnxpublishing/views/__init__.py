@@ -80,7 +80,7 @@ def includeme(config):
         jinja2_env = config.get_jinja2_environment(ext)
         jinja2_env.globals.update(
             join_ident_hash=join_ident_hash,
-            )
+        )
 
     declare_api_routes(config)
     declare_browsable_routes(config)

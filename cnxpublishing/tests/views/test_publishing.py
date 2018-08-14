@@ -63,7 +63,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
             }
         try:
             setup = setup_mapping[use_case]
-        except:
+        except:  # noqa: E722
             raise ValueError("Unknown use-case. See code comments.")
         # If the above ValueError is raised, then you need to add
         # a setup method to the setup mapping.
@@ -78,7 +78,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
             }
         try:
             checker = checker_mapping[use_case]
-        except:
+        except:  # noqa: E722
             raise ValueError("Unknown use-case. See code comments.")
         # If the above ValueError is raised, then you need to add
         # a checker mapping to a checker callable.
@@ -125,7 +125,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         """
         path = '/publications/{}/license-acceptances/{}' \
             .format(publication_id, uid)
-        resp = self.app.post_json(path, data, headers=headers)
+        self.app.post_json(path, data, headers=headers)
 
     def app_get_role_acceptance(self, publication_id, uid, headers=[]):
         """User at ``uid`` lookups up the HTML page for role acceptance."""
@@ -142,7 +142,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         """
         path = '/publications/{}/role-acceptances/{}' \
             .format(publication_id, uid)
-        resp = self.app.post_json(path, data, headers=headers)
+        self.app.post_json(path, data, headers=headers)
 
     def app_post_acl(self, uuid_, data, headers=[]):
         """Submission of ACL information for content at ``uuid``.
@@ -150,7 +150,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         will marshal to JSON.
         """
         path = '/contents/{}/permissions'.format(uuid_)
-        resp = self.app.post_json(path, data, headers=headers)
+        self.app.post_json(path, data, headers=headers)
 
     def app_get_moderation(self, headers=[]):
         """Gets a list of the publication that are currently being moderated.
@@ -1464,7 +1464,6 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
 
         content = '<p class="para">composite</p>'
         publisher, message, composite_doc = self.make_one(binder, content)
-        collated_doc_content = '<p>collated</p>'
 
         ident_hash = binder.ident_hash
         ident_hash = ident_hash.split('@')[0]

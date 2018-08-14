@@ -18,7 +18,7 @@ from .publish import (
     publish_collated_document,
     publish_collated_tree,
     publish_composite_model,
-    )
+)
 
 
 def _formatter_callback_factory():  # pragma: no cover
@@ -79,7 +79,7 @@ def bake(binder, recipe_id, publisher, message, cursor):
 
     def only_documents_filter(model):
         return isinstance(model, cnxepub.Document) \
-               and not isinstance(model, cnxepub.CompositeDocument)
+            and not isinstance(model, cnxepub.CompositeDocument)
 
     for doc in cnxepub.flatten_to(binder, flatten_filter):
         publish_composite_model(cursor, doc, binder, publisher, message)

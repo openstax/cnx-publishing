@@ -17,20 +17,20 @@ from cnxepub import (
     Binder,
     CompositeDocument,
     Document,
-    )
+)
 
 from .utils import (
     issequence,
     join_ident_hash,
     parse_user_uri,
     split_ident_hash,
-    )
+)
 
 
 ATTRIBUTED_ROLE_KEYS = (
     'authors', 'copyright_holders', 'editors', 'illustrators',
     'publishers', 'translators',
-    )
+)
 MODULE_INSERTION_TEMPLATE = """\
 WITH abstract_insertion AS (
   INSERT INTO abstracts (abstractid, abstract, html)
@@ -139,7 +139,7 @@ def _insert_optional_roles(cursor, model, ident):
         # (<metadata-attr>, <db-role-id>,),
         ('translators', 4,),
         ('editors', 5,),
-        ]
+    ]
     for attr, role_id in optional_roles:
         roles = model.metadata.get(attr)
         if not roles:
@@ -180,7 +180,7 @@ def _insert_metadata(cursor, model, publisher, message):
         #   moduleid will not be found. This happens on a pre-publication.
         try:
             moduleid = cursor.fetchone()[0]
-        except TypeError as exc:  # NoneType
+        except TypeError:  # NoneType
             moduleid = None
         params['_moduleid'] = moduleid
 
@@ -188,8 +188,8 @@ def _insert_metadata(cursor, model, publisher, message):
         cursor.execute("SELECT * from document_controls where uuid = %s",
                        (uuid,))
         try:
-            _ = cursor.fetchone()[0]
-        except TypeError as exc:  # NoneType
+            cursor.fetchone()[0]
+        except TypeError:  # NoneType
             cursor.execute("INSERT INTO document_controls (uuid) VALUES (%s)",
                            (uuid,))
 
@@ -201,7 +201,7 @@ def _insert_metadata(cursor, model, publisher, message):
             '__minor_version__': "%(_minor_version)s",
             '__moduleid__': moduleid is None and "DEFAULT" or "%(_moduleid)s",
             '__created__': created is None and "DEFAULT" or "%(created)s",
-            })
+        })
     else:
         created = model.metadata.get('created', None)
         # Format the statement for defaults.
@@ -211,7 +211,7 @@ def _insert_metadata(cursor, model, publisher, message):
             '__minor_version__': "DEFAULT",
             '__moduleid__': "DEFAULT",
             '__created__': created is None and "DEFAULT" or "%(created)s",
-            })
+        })
 
     # Insert the metadata
     cursor.execute(stmt, params)
@@ -299,7 +299,7 @@ def _insert_tree(cursor, tree, parent_id=None, index=0, is_collated=False):
             """, (tree['id'],))
             try:
                 document_id, document_title = cursor.fetchone()
-            except TypeError as exc:  # NoneType
+            except TypeError:  # NoneType
                 raise ValueError("Missing published document for '{}'."
                                  .format(tree['id']))
             if tree.get('title', None):
@@ -346,7 +346,7 @@ def publish_model(cursor, model, publisher, message):
             file_args = {
                 'media_type': 'text/html',
                 'data': psycopg2.Binary(html),
-                }
+            }
             cursor.execute("""\
             insert into files (file, media_type)
             VALUES (%(data)s, %(media_type)s)
@@ -356,7 +356,7 @@ def publish_model(cursor, model, publisher, message):
             'module_ident': module_ident,
             'filename': 'index.cnxml.html',
             'fileid': fileid,
-            }
+        }
         cursor.execute("""\
         INSERT INTO module_files
           (module_ident, fileid, filename)
@@ -397,7 +397,7 @@ def publish_composite_model(cursor, model, parent_model, publisher, message):
             'module_ident': module_ident,
             'parent_ident_hash': parent_model.ident_hash,
             'fileid': fileid,
-            }
+        }
         cursor.execute("""\
         INSERT INTO collated_file_associations
           (context, item, fileid)
@@ -426,7 +426,7 @@ def publish_collated_document(cursor, model, parent_model):
         file_args = {
             'media_type': 'text/html',
             'data': psycopg2.Binary(html),
-            }
+        }
         cursor.execute("""\
         INSERT INTO files (file, media_type)
         VALUES (%(data)s, %(media_type)s)
@@ -436,7 +436,7 @@ def publish_collated_document(cursor, model, parent_model):
         'module_ident_hash': model.ident_hash,
         'parent_ident_hash': parent_model.ident_hash,
         'fileid': fileid,
-        }
+    }
     stmt = """\
 INSERT INTO collated_file_associations (context, item, fileid)
 VALUES
@@ -712,4 +712,4 @@ __all__ = (
     'rebuild_collection_tree',
     'republish_binders',
     'republish_collection',
-    )
+)
