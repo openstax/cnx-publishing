@@ -5,7 +5,6 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import os
 import sys
 import io
 import json
@@ -121,7 +120,7 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
     @db_connect
     def persist_model(self, cursor, publication_id, model):
         from ..db import add_pending_model, add_pending_model_content
-        ident_hash = add_pending_model(cursor, publication_id, model)
+        add_pending_model(cursor, publication_id, model)
         add_pending_model_content(cursor, publication_id, model)
 
 
@@ -133,12 +132,12 @@ class DatabaseUtilitiesTestCase(BaseDatabaseIntegrationTestCase):
         archive_ids = (
             '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
             'd648765a-9a05-4414-a772-71466ec3a1bf',
-            )
+        )
         pending_ids = (
             '5e254713-2050-4fa7-9b4c-5e5e8a71768a',  # new id
             '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
             'd648765a-9a05-4414-a772-71466ec3a1bf',
-            )
+        )
         publication_id = self.make_publication()
 
         # Setup stub entries for these values.
@@ -162,7 +161,7 @@ VALUES (%s, %s, 'Document')""", (id, publication_id,))
             '5e254713-2050-4fa7-9b4c-5e5e8a71768a',  # new id
             '1a33f51c-cc7b-4b62-bc93-b297e14e9733',
             'd648765a-9a05-4414-a772-71466ec3a1bf',
-            )
+        )
         publication_id = self.make_publication()
 
         # Setup stub entries for these values.
@@ -240,7 +239,7 @@ RETURNING id, uuid""", (self.publication_id, metadata,))
             (uuid_, 'charrose', True),  # (uuid_, 'frahablar', None),
             (uuid_, 'impicky', True), (uuid_, 'marknewlyn', True),
             (uuid_, 'ream', True),  # (uuid_, 'rings', None),
-            ]
+        ]
         serial_values = []
         for v in values:
             serial_values.extend(v)
@@ -289,7 +288,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             (uuid_, 'marknewlyn', True),
             (uuid_, 'ream', True),
             (uuid_, 'rings', True),
-            ]
+        ]
         first_set_size = 2
 
         # Call the target on the first group.
@@ -337,7 +336,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             (uuid_, 'marknewlyn', True),
             (uuid_, 'ream', True),
             (uuid_, 'rings', True),
-            ]
+        ]
         serial_values = []
         for v in values:
             serial_values.extend(v)
@@ -362,7 +361,7 @@ ORDER BY user_id""", (uuid_,))
             tuple(list(values[0][:2]) + [False]),
             tuple(list(values[1][:2]) + [False]),
             tuple(list(values[-1][:2]) + [False]),
-            ]
+        ]
         self.assertEqual(entries, expected)
 
 
@@ -408,7 +407,7 @@ ORDER BY user_id ASC, role_type ASC""", (uuid_,))
             ('impicky', 'Editor', None), ('marknewlyn', 'Author', None),
             ('ream', 'Copyright Holder', None),
             ('ream', 'Publisher', None), ('rings', 'Publisher', None),
-            ]
+        ]
         self.assertEqual(entries, expected)
 
     @db_connect
@@ -438,7 +437,7 @@ RETURNING id, uuid""", (self.publication_id, metadata,))
             (uuid_, 'ream', 'Copyright Holder', True),
             (uuid_, 'ream', 'Publisher', True),
             # (uuid_, 'rings', 'Publisher', None),
-            ]
+        ]
         serial_values = []
         for v in values:
             serial_values.extend(v)
@@ -490,7 +489,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             (uuid_, 'ream', 'Copyright Holder', True),
             (uuid_, 'ream', 'Publisher', True),
             (uuid_, 'rings', 'Publisher', True),
-            ]
+        ]
         first_set_size = 3
 
         # Call the target on the first group.
@@ -539,7 +538,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             (uuid_, 'ream', 'Copyright Holder', True),
             (uuid_, 'ream', 'Publisher', True),
             (uuid_, 'rings', 'Publisher', None),
-            ]
+        ]
         serial_values = []
         for v in values:
             serial_values.extend(v)
@@ -564,7 +563,7 @@ ORDER BY user_id""", (uuid_,))
             tuple(list(values[0][:3]) + [False]),
             tuple(list(values[1][:3]) + [False]),
             tuple(list(values[6][:3]) + [False]),
-            ]
+        ]
         self.assertEqual(entries, expected)
 
     @db_connect
@@ -584,7 +583,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             (uuid_, 'ream', 'Copyright Holder', True),
             (uuid_, 'ream', 'Publisher', True),
             (uuid_, 'rings', 'Publisher', True),
-            ]
+        ]
         serial_values = []
         for v in values:
             serial_values.extend(v)
@@ -601,7 +600,7 @@ VALUES {}""".format(value_format), serial_values)
             {'uid': 'rings', 'role': 'Publisher'},
             # update, testing usage of has_accepted...
             {'uid': 'frahablar', 'role': 'Translator', 'has_accepted': True},
-            ]
+        ]
         self.call_target(cursor, uuid_, roles)
 
         # Update values to the expected state.
@@ -712,7 +711,7 @@ class UserUpsertTestCase(BaseDatabaseIntegrationTestCase):
     def test_fetch_error(self, cursor):
         """Verify user fetch error"""
         from ..db import UserFetchError
-        with self.assertRaises(UserFetchError) as caught_exc:
+        with self.assertRaises(UserFetchError):
             self.call_target(cursor, ['mia'])
 
 
@@ -747,7 +746,7 @@ SELECT COUNT(*) FROM pending_resources WHERE hash = %s""", [
         metadata = {
             'authors': [{'id': 'able', 'type': 'cnx-id'}],
             'license_url': VALID_LICENSE_URL,
-            }
+        }
         document = self.make_document(metadata=metadata)
 
         # Here we are testing the function of add_pending_document.
@@ -794,7 +793,7 @@ WHERE
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
             'license_url': VALID_LICENSE_URL,
-            }
+        }
 
         # Create a publication and an acceptance record.
         publication_id = self.make_publication()
@@ -854,7 +853,7 @@ WHERE
             'publishers': [role_struct],
             'cnx-archive-uri': uri,
             'license_url': VALID_LICENSE_URL,
-            }
+        }
 
         # Create a publication and an acceptance record.
         publication_id = self.make_publication()
@@ -923,8 +922,7 @@ VALUES ((SELECT uuid from control_insert), 'ream', 'publish'::permission_type)
 
         # Here we are testing the function of add_pending_document.
         from ..db import add_pending_model
-        document_ident_hash = add_pending_model(
-            cursor, publication_id, document)
+        add_pending_model(cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
         # This doesn't seem like much, but we only need to check that
@@ -955,7 +953,7 @@ WHERE id = %s""", (publication_id,))
             u'type': u'NotAllowed',
             u'message': expected_message,
             u'uuid': document_id,
-            }
+        }
         self.assertEqual(state_messages, expected_state_messages)
 
     def test_add_pending_document_w_invalid_license(self):
@@ -977,8 +975,7 @@ WHERE id = %s""", (publication_id,))
         from ..db import add_pending_model
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_model(
-                    cursor, publication_id, document)
+                add_pending_model(cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
         # This doesn't seem like much, but we only need to check that
@@ -1025,8 +1022,7 @@ WHERE id = %s""", (publication_id,))
         from ..db import add_pending_model
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
-                document_ident_hash = add_pending_model(
-                    cursor, publication_id, document)
+                add_pending_model(cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
         # This doesn't seem like much, but we only need to check that
@@ -1091,7 +1087,7 @@ VALUES
             'authors': [{u'id': u'able', u'type': u'cnx-id'}],
             'publishers': [{'id': 'able', 'type': 'cnx-id'}],
             'license_url': VALID_LICENSE_URL,
-            }
+        }
         content = """
             <!-- Invalid references -->
             <img src="../resources/8bef27ba.png"/>
@@ -1118,8 +1114,7 @@ VALUES
 
         # Here we are testing the function of add_pending_document.
         from ..db import add_pending_model, add_pending_model_content
-        document_ident_hash = add_pending_model(
-            cursor, publication_id, document)
+        add_pending_model(cursor, publication_id, document)
         add_pending_model_content(cursor, publication_id, document)
 
         # Confirm the addition by checking for an entry
@@ -1152,7 +1147,7 @@ WHERE id = %s""", (publication_id,))
             u'message': expected_message,
             u'xpath': xpath,
             u'value': ref_value,
-            }
+        }
         self.assertEqual(len(state_messages), 2)
         self.assertEqual(state_messages[-1], expected_state_message)
 
@@ -1176,15 +1171,14 @@ WHERE id = %s""", (publication_id,))
                 # Invalid, because it points at a binder.
                 cnxepub.DocumentPointer(
                     book_three.ident_hash),
-                ],
-            )
+            ],
+        )
 
         # Here we are testing the function of add_pending_document.
         from ..db import add_pending_model, add_pending_model_content
         with psycopg2.connect(self.db_conn_str) as db_conn:
             with db_conn.cursor() as cursor:
-                binder_ident_hash = add_pending_model(
-                    cursor, publication_id, binder)
+                add_pending_model(cursor, publication_id, binder)
                 add_pending_model_content(cursor, publication_id, binder)
 
         # Confirm the addition by checking for an entry
@@ -1217,7 +1211,7 @@ WHERE id = %s""", (publication_id,))
             u'ident_hash': unicode(book_three.ident_hash),
             u'exists': True,
             u'is_document': False,
-            }
+        }
         self.assertEqual(len(state_messages), 2)
         self.assertEqual(state_messages[0], expected_state_message)
 
@@ -1235,7 +1229,7 @@ WHERE id = %s""", (publication_id,))
         patch_args = {
             'target': 'cnxpublishing.db.set_publication_failure',
             'new': raise_exception,
-            }
+        }
 
         from ..exceptions import PublicationException
         # Here we are testing the function of add_pending_document.
@@ -1245,8 +1239,7 @@ WHERE id = %s""", (publication_id,))
                 with mock.patch(**patch_args):
                     # This insures that we raise the original exception.
                     with self.assertRaises(PublicationException):
-                        document_ident_hash = add_pending_model(
-                            cursor, publication_id, document)
+                        add_pending_model(cursor, publication_id, document)
         # Check ``sys.stderr`` for the inner exception that caused
         # the critical failure.
         stderr.seek(0)
@@ -1306,7 +1299,7 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
     #   test_{exception-code}_{point-of-interest}
 
     _base_metadata = {
-        }
+    }
 
     def setUp(self):
         super(ValidationsTestCase, self).setUp()
@@ -1396,10 +1389,10 @@ class ValidationsTestCase(BaseDatabaseIntegrationTestCase):
         invalid_subjects = [
             u'Science and Statistics',
             u'Math and Stuph',
-            ]
+        ]
         valid_subjects = [
             u'Humanities',
-            ]
+        ]
         subjects = invalid_subjects + valid_subjects
         metadata = {u'subjects': subjects}
         model = self.make_document(metadata=metadata)
@@ -1561,7 +1554,7 @@ ORDER BY major_version ASC, minor_version ASC""")
         expected_versions = {
             'dbb28a6b-cad2-4863-986f-6059da93386b': [(1, 1,), (2, 1,)],
             'c3bb4bfb-3b53-41a9-bb03-583cf9ce3408': [(1, 1,), (1, 2,)],
-            }
+        }
         self.assertEqual(versions, expected_versions)
 
         # Check the shared binder's tree got updated.
@@ -1595,7 +1588,7 @@ ORDER BY major_version ASC, minor_version ASC""")
                       u'shortId': u'3q2-76kn@1',
                       u'title': u'Document Four'}],
                  }],
-            }
+        }
         self.assertEqual(tree, expected_tree)
         cursor.execute("SELECT tree_to_json(%s, '2.1', FALSE)::json",
                        (binder.id,))
@@ -1624,7 +1617,7 @@ ORDER BY major_version ASC, minor_version ASC""")
                       u'shortId': u'LyhY6pM8@2',
                       u'title': u'Document Three'}],
                  }],
-            }
+        }
         self.assertEqual(tree, expected_tree)
 
     @db_connect
@@ -1642,8 +1635,8 @@ ORDER BY major_version ASC, minor_version ASC""")
             nodes=[
                 cnxepub.DocumentPointer(book_three[0].ident_hash),
                 cnxepub.DocumentPointer(book_three[1].ident_hash),
-                ],
-            )
+            ],
+        )
 
         # * Assemble the publication request.
         publication_id = self.make_publication(publisher='ream')
@@ -1790,5 +1783,5 @@ ORDER BY uuid, 2""")
             (book_three.id, [book_three.metadata['version'], '1.1'],),
             (book_one.id, ['1.2', '1.1'],),
             (book_two.id, ['1.2', '1.1'],),
-            ]
+        ]
         self.assertEqual(rows, expected_rows)

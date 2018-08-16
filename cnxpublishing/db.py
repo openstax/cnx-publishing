@@ -21,7 +21,7 @@ from openstax_accounts.interfaces import IOpenstaxAccounts
 from psycopg2.extras import register_uuid
 from pyramid.threadlocal import (
     get_current_request, get_current_registry,
-    )
+)
 
 from . import exceptions
 from .config import CONNECTION_STRING
@@ -29,9 +29,13 @@ from .exceptions import (
     DocumentLookupError,
     ResourceFileExceededLimitError,
     UserFetchError,
-    )
-from .utils import (parse_archive_uri, parse_user_uri, join_ident_hash,
-                    split_ident_hash)
+)
+from .utils import (
+    parse_archive_uri,
+    parse_user_uri,
+    join_ident_hash,
+    split_ident_hash,
+)
 
 
 END_N_INTERIM_STATES = ('Publishing', 'Done/Success',
@@ -219,7 +223,7 @@ def add_pending_resource(cursor, resource, document=None):
         'media_type': resource.media_type,
         'hash': resource.hash,
         'filename': resource.filename,
-        }
+    }
     with resource.open() as data:
         upload_limit = settings['file_upload_limit'] * 1024 * 1024
         if data.seek(0, 2) > upload_limit:
@@ -486,7 +490,7 @@ RETURNING "id", "uuid", module_version("major_version", "minor_version")
         exc.pending_ident_hash = pending_ident_hash
         try:
             set_publication_failure(cursor, exc)
-        except:
+        except BaseException:
             import traceback
             print("Critical data error. Immediate attention is "
                   "required. On publication at '{}'."
@@ -613,7 +617,7 @@ FROM (SELECT unnest(%s::uuid[]), unnest(%s::integer[]), unnest(%s::integer[]))\
                           if dp.ident_hash == join_ident_hash(uuid, version)
                           ][0]
                     exc = exceptions.InvalidDocumentPointer(
-                            dp, exists=exists, is_document=is_document)
+                        dp, exists=exists, is_document=is_document)
                     attach_info_to_exception(exc)
                     set_publication_failure(cursor, exc)
 
@@ -852,9 +856,9 @@ WHERE p.id = %s""",
         #   the publisher was done by a vetted peer.
         if not is_publisher_moderated \
            and not is_revision_publication(publication_id, cursor):
-                # Hold up! This publish needs moderation.
-                change_state = "Waiting for moderation"
-                is_publish_ready = False
+            # Hold up! This publish needs moderation.
+            change_state = "Waiting for moderation"
+            is_publish_ready = False
 
     # Publish the pending documents.
     if is_publish_ready:
@@ -1098,16 +1102,16 @@ VALUES {}""".format(values_fmt), args)
         for x in roles
         # Prevent updating newly inserted records.
         if (x['uid'], x.get('has_accepted', None),) not in new_acceptors
-        ])
+    ])
     existing_acceptors = set([
         x for x in existing_acceptors
         # Prevent updating newly inserted records.
         if x[0] not in new_acceptors
-        ])
+    ])
     tobe_updated_acceptors = acceptors.difference(existing_acceptors)
 
     for uid, has_accepted in tobe_updated_acceptors:
-            cursor.execute("""\
+        cursor.execute("""\
 UPDATE license_acceptances SET accepted = %s
 WHERE uuid = %s AND user_id = %s""", (has_accepted, uuid_, uid,))
 
@@ -1165,12 +1169,12 @@ VALUES (%s, %s, %s, %s)""", (uuid_, acceptor, type_, has_accepted,))
         for x in roles
         # Prevent updating newly inserted records.
         if (x['uid'], x.get('has_accepted', None),) not in new_acceptors
-        ])
+    ])
     existing_acceptors = set([
         x for x in existing_roles
         # Prevent updating newly inserted records.
         if (x[0], x[1],) not in new_acceptors
-        ])
+    ])
     tobe_updated_acceptors = acceptors.difference(existing_acceptors)
 
     for uid, type_, has_accepted in tobe_updated_acceptors:
@@ -1398,7 +1402,7 @@ GROUP BY user_id
             'full_name': None,  # TODO
             'licensor': user_id in licensors,
             'roles': roles.get(user_id, []),
-            }
+        }
         message = NOTIFICATION_TEMPLATE.render(**data)
         accounts.send_message(user_id, NOFIFICATION_SUBJECT, message)
 
@@ -1466,4 +1470,4 @@ __all__ = (
     'upsert_users',
     'validate_model',
     'with_db_cursor',
-    )
+)

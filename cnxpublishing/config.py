@@ -45,7 +45,7 @@ class RootFactory(object):
           'moderate',
           'administer')),
         security.DENY_ALL,
-        )
+    )
 
     def __init__(self, request):
         self.request = request

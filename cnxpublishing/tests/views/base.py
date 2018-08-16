@@ -77,7 +77,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
         def get_info():
             from cnxpublishing.authnz import lookup_api_key_info
             with self.db_connect() as db_conn:
-                with db_conn.cursor() as cursor:
+                with db_conn.cursor():
                     return lookup_api_key_info()
 
         if api_keys is None:
@@ -134,7 +134,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
 
     def setUp(self):
         EPUBMixInTestCase.setUp(self)
-        config = testing.setUp(settings=self.settings)
+        testing.setUp(settings=self.settings)
         init_db(self.db_conn_str)
 
         # Assign API keys for testing

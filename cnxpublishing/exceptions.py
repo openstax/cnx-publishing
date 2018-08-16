@@ -5,7 +5,6 @@
 # Public License version 3 (AGPLv3).
 # See LICENCE.txt for details.
 # ###
-import json
 
 
 # ###################### #
@@ -85,7 +84,7 @@ class PublicationException(Exception):
             'epub_filename': self.epub_filename,
             'pending_document_id': self.pending_document_id,
             'pending_ident_hash': self.pending_ident_hash,
-            }
+        }
         return data
 
 
@@ -285,4 +284,4 @@ __all__ = (
     'PublicationException',
     'ResourceFileExceededLimitError',
     'UserFetchError',
-    )
+)

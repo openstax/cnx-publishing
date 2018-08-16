@@ -41,7 +41,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         licensors = [
             {'uid': 'marknewlyn', 'has_accepted': True},
             {'uid': 'charrose', 'has_accepted': True},
-            ]
+        ]
         license_url = u"http://creativecommons.org/licenses/by/4.0/"
 
         # 1.
@@ -56,8 +56,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             u'licensors': [
                 {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
                 {u'uuid': unicode(uuid_), u'uid': u'marknewlyn', u'has_accepted': True},
-                ],
-            }
+            ],
+        }
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
@@ -71,8 +71,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             u'license_url': license_url,
             u'licensors': [
                 {u'uuid': unicode(uuid_), u'uid': u'charrose', u'has_accepted': True},
-                ],
-            }
+            ],
+        }
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
@@ -95,13 +95,13 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         licensors = [
             {'uid': 'marknewlyn', 'has_accepted': True},
             {'uid': 'charrose', 'has_accepted': True},
-            ]
+        ]
 
         # 1.
         path = "/contents/{}/licensors".format(uuid_)
         data = {'licensors': licensors}
         with self.assertRaises(AppError) as caught_exception:
-            resp = self.app.post_json(path, data, headers=headers)
+            self.app.post_json(path, data, headers=headers)
         exception = caught_exception.exception
         self.assertTrue(exception.args[0].find("400 Bad Request") >= 0)
 
@@ -182,7 +182,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             {'uid': 'charrose', 'role': 'Author', 'has_accepted': True},
             {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
             {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
@@ -207,7 +207,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
              'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'rings',
              'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
@@ -215,7 +215,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         data = [
             {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': True},
             {'uid': 'marknewlyn', 'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
         resp = self.app.delete_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 200)
 
@@ -225,7 +225,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
              'role': 'Author', 'has_accepted': True},
             {'uuid': str(uuid_), 'uid': 'rings',
              'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
@@ -258,7 +258,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         data = [
             {'uid': 'ream', 'permission': 'publish'},
             {'uid': 'rings', 'permission': 'publish'},
-            ]
+        ]
         resp = self.app.post_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 202)
 
@@ -266,21 +266,21 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         expected = [
             {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
             {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
-            ]
+        ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
         # 3.
         data = [
             {'uid': 'rings', 'permission': 'publish'},
-            ]
+        ]
         resp = self.app.delete_json(path, data, headers=headers)
         self.assertEqual(resp.status_int, 200)
 
         # 4.
         expected = [
             {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
-            ]
+        ]
         resp = self.app.get(path, headers=api_key_header)
         self.assertEqual(resp.json, expected)
 
@@ -302,13 +302,13 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         licensors = [
             {'uid': 'marknewlyn', 'has_accepted': True},
             {'uid': 'charrose', 'has_accepted': True},
-            ]
+        ]
 
         path = "/contents/{}/licensors".format(uuid_)
         data = {
             'license_url': license_url,
             'licensors': licensors,
-            }
+        }
 
         # 1.
         headers = self.gen_api_key_headers('no-trust')
@@ -330,8 +330,8 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
                  u'has_accepted': True},
                 {u'uuid': unicode(uuid_), u'uid': u'marknewlyn',
                  u'has_accepted': True},
-                ],
-            }
+            ],
+        }
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
@@ -355,7 +355,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
             {'uid': 'charrose', 'role': 'Author'},
             {'uid': 'marknewlyn', 'role': 'Author', 'has_accepted': False},
             {'uid': 'rings', 'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
 
         # 1.
         headers = self.gen_api_key_headers('no-trust')
@@ -379,7 +379,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
              'role': 'Author', 'has_accepted': False},
             {'uuid': str(uuid_), 'uid': 'rings',
              'role': 'Publisher', 'has_accepted': True},
-            ]
+        ]
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 
@@ -402,7 +402,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         data = [
             {'uid': 'ream', 'permission': 'publish'},
             {'uid': 'rings', 'permission': 'publish'},
-            ]
+        ]
 
         # 1.
         headers = self.gen_api_key_headers('no-trust')
@@ -422,7 +422,7 @@ INSERT INTO document_controls (uuid) VALUES (DEFAULT) RETURNING uuid""")
         expected = [
             {'uuid': str(uuid_), 'uid': 'ream', 'permission': 'publish'},
             {'uuid': str(uuid_), 'uid': 'rings', 'permission': 'publish'},
-            ]
+        ]
         resp = self.app.get(path, headers=headers)
         self.assertEqual(resp.json, expected)
 

@@ -19,7 +19,7 @@ install_requires = (
     'pyramid_jinja2',
     'pyramid_multiauth',
     'python-memcached',
-    )
+)
 tests_require = [
     'cnx-db',
     'pytest',
@@ -27,10 +27,10 @@ tests_require = [
     'pytest-runner',
     'vcrpy-unittest',
     'webtest',
-    ]
+]
 extras_require = {
     'test': tests_require,
-    }
+}
 description = """\
 Application for accepting publication requests to the Connexions Archive."""
 
@@ -59,7 +59,7 @@ setup(
                           'static/js/vendor/*.*',
                           ],
         'cnxpublishing.tests': ['data/*.*'],
-        },
+    },
     cmdclass=versioneer.get_cmdclass(),
     entry_points="""\
     [paste.app_factory]
@@ -70,4 +70,4 @@ setup(
     [dbmigrator]
     migrations_directory = cnxpublishing.main:find_migrations_directory
     """,
-    )
+)

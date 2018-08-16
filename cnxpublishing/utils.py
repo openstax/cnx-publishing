@@ -62,4 +62,4 @@ __all__ = (
     'parse_archive_uri',
     'parse_user_uri',
     'split_ident_hash',
-    )
+)

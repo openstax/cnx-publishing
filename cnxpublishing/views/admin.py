@@ -24,7 +24,7 @@ STATE_ICONS = [
     ("RETRY", 'fa fa-repeat state-icon retry'),
     ("FAILURE", 'fa fa-close state-icon failure'),
     ("SUCCESS", 'fa fa-check-square state-icon success'),
-    ]
+]
 DEFAULT_ICON = 'fa fa-exclamation-triangle state-icon unknown'
 SORTS_DICT = {
     "bpsa.created": 'created',
@@ -56,8 +56,8 @@ def admin_index(request):  # pragma: no cover
             {'name': 'Content Status',
              'uri': request.route_url('admin-content-status'),
              },
-            ],
-        }
+        ],
+    }
 
 
 @view_config(route_name='admin-moderation', request_method='GET',
