@@ -19,11 +19,6 @@ you may have to `docker-compose rm cnxdb && docker volume rm docker volume rm cn
 this will create a db and the app will turn on, but it will be empty, and thats not great for
 development. you're probably better off doing the slim dump thing.
 
-```bash
-docker-compose exec cnxdb psql --user postgres -c 'create database repository'
-docker-compose exec cnxpublishing cnx-db init
-```
-
 make celery make its tables
 
 ```bash

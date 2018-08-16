@@ -53,11 +53,6 @@ class RootFactory(object):
     def __getitem__(self, key):  # pragma: no cover
         raise KeyError(key)
 
-# https://stackoverflow.com/a/16446566
-def expandvars_dict(settings):
-    """Expands all environment variables in a settings dictionary."""
-    return dict((key, os.path.expandvars(value)) for
-        key, value in settings.iteritems())
 
 # https://stackoverflow.com/a/16446566
 def expandvars_dict(settings):
