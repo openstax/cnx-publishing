@@ -6,6 +6,7 @@ __pycache__
 .tox
 *.*~
 .DS_Store
+cnx_slim_dump.sql
 /*.log
 .cache
 .pytest_cache

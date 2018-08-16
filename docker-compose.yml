@@ -5,8 +5,10 @@ services:
     volumes:
      - .:/code
     environment:
-     - DB_URL=postgresql://postgres@cnxdb/cnxarchive
+     - DB_URL=postgresql://postgres@cnxdb/repository
   cnxpublishing:
+    volumes:
+     - .:/code
     extends:
       service: app
     links:
@@ -28,7 +30,7 @@ services:
       - rabbitmq
     environment:
       - SHARED_DIR=/app/var
-      - DB_SUPER_URL=postgresql://postgres@cnxdb/cnxarchive
+      - DB_SUPER_URL=postgresql://postgres@cnxdb/repository
       - AMQP_URL=amqp://guest@rabbitmq:5672//
 volumes:
   pgdata:

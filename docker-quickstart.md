@@ -7,22 +7,37 @@
 
 docker-compose is included in docker for mac. on other platforms it may have to be installed separately.
 
+## slim dump
+
+you're gonna want to get yourself a [slim dump](https://github.com/Connexions/devops/wiki/How-To:-Get-a-Slim-Database-Dump)
+follow the instructions for adding a volume on the `cnxdb` container for the sql file.
+
+you may have to `docker-compose rm cnxdb && docker volume rm docker volume rm cnx-publishing_pgdata` if you've already created a container.
+
+## create db manually
+
+this will create a db and the app will turn on, but it will be empty, and thats not great for
+development. you're probably better off doing the slim dump thing.
+
+```bash
+docker-compose exec cnxdb psql --user postgres -c 'create database repository'
+docker-compose exec cnxpublishing cnx-db init
+```
+
+make celery make its tables
+
+```bash
+docker-compose exec worker /bin/bash -c "pshell development.ini"
+```
+
+```python
+app.registry.celery_app.backend.ResultSession()
+```
+
 ## turn it on
 ```bash
 # foreground
 docker-compose up
 # background
 docker-compose up -d
-```
-
-## create db manually
-
-the `openstax/cnx-db` image doesn't come with the cnxarchive db created by default, when you create your container for the
-first time you'll have to run these commands to set it up.
-
-TODO - add docker/run-development.sh that ensures db is created and then runs `pserve development.ini`
-
-```bash
-docker exec $(docker ps | grep cnx-publishing_cnxdb | awk '{print $1}') psql --user postgres -c 'create database cnxarchive'
-docker exec $(docker ps | grep cnx-publishing_cnxpublishing | awk '{print $1}') cnx-db init
 ```
