@@ -6,6 +6,15 @@
 
    - feature message
 
+0.13.0
+------
+
+- Update README to fix installation documentation.
+- Add 'fallback' state to the content-status (GOB) dashboard. This indicates
+  when the content has failed to bake with the newest version and will fallback
+  to the previous version.
+  See https://github.com/Connexions/cnx-publishing/issues/224
+
 0.12.0
 ------
 
