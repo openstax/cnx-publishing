@@ -24,6 +24,7 @@ STATE_ICONS = [
     ("RETRY", 'fa fa-repeat state-icon retry'),
     ("FAILURE", 'fa fa-close state-icon failure'),
     ("SUCCESS", 'fa fa-check-square state-icon success'),
+    ("FALLBACK", 'fa fa-check-square state-icon fallback'),
 ]
 DEFAULT_ICON = 'fa fa-exclamation-triangle state-icon unknown'
 SORTS_DICT = {
@@ -516,9 +517,15 @@ def get_baking_statuses_sql(get_request):
                        f.sha1 as recipe,
                        m.module_ident,
                        ident_hash(m.uuid, m.major_version, m.minor_version),
-                       bpsa.created, ctm.status as state, ctm.traceback
+                       bpsa.created, ctm.traceback,
+                       CASE WHEN ctm.status = 'SUCCESS'
+                           AND ms.statename = 'fallback'
+                       THEN 'FALLBACK'
+                       ELSE ctm.status
+                       END as state
                 FROM document_baking_result_associations AS bpsa
                 INNER JOIN modules AS m USING (module_ident)
+                INNER JOIN modulestates as ms USING (stateid)
                 LEFT JOIN celery_taskmeta AS ctm
                     ON bpsa.result_id = ctm.task_id::uuid
                 LEFT JOIN default_print_style_recipes as dps
@@ -548,6 +555,7 @@ def admin_content_status(request):
     and the filters from the GET request to pre-populate the form.
     """
     statement, sql_args = get_baking_statuses_sql(request.GET)
+
     states = []
     status_filters = request.params.getall('status_filter') or []
     state_icons = dict(STATE_ICONS)
