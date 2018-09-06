@@ -1,9 +1,10 @@
-from python:2.7
+FROM python:2.7
 
-copy . /code
-workdir /code
+COPY . /src
+WORKDIR /src
 
-run python setup.py install && \
-  pip install pyramid_sawing
+RUN set -x \
+  && python setup.py install \
+  && pip install pyramid_sawing
 
-CMD pserve development.ini
+ENV PYRAMID_INI environ.ini
