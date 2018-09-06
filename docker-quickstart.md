@@ -23,6 +23,6 @@ first time you'll have to run these commands to set it up.
 TODO - add docker/run-development.sh that ensures db is created and then runs `pserve development.ini`
 
 ```bash
-docker exec $(docker ps | grep cnx-publishing_cnxdb | awk '{print $1}') psql --user postgres -c 'create database cnxarchive'
-docker exec $(docker ps | grep cnx-publishing_cnxpublishing | awk '{print $1}') cnx-db init
+docker exec $(docker ps | grep cnx-publishing_db | awk '{print $1}') psql --user postgres -c 'create database cnxarchive'
+docker exec $(docker ps | grep cnx-publishing_publishing | awk '{print $1}') cnx-db init
 ```
