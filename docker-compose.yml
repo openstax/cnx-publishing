@@ -22,7 +22,7 @@ services:
     links:
       - db
     ports:
-      - "6544:6544"
+      - "6543:6543"
   publishing-worker:
     extends:
       service: app
