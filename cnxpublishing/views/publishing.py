@@ -23,7 +23,7 @@ from ..utils import split_ident_hash
 
 
 @view_config(route_name='publications', request_method='POST', renderer='json',
-             permission='publish')
+             permission='publish', http_cache=0)
 def publish(request):
     """Accept a publication request at form value 'epub'"""
     if 'epub' not in request.POST:
@@ -58,7 +58,7 @@ def publish(request):
 
 
 @view_config(route_name='get-publication', request_method=['GET', 'HEAD'],
-             renderer='json', permission='view')
+             renderer='json', permission='view', http_cache=0)
 def get_publication(request):
     """Lookup publication state"""
     publication_id = request.matchdict['id']
@@ -73,7 +73,7 @@ def get_publication(request):
 
 @view_config(route_name='publication-license-acceptance',
              request_method='GET',
-             accept='application/json', renderer='json')
+             accept='application/json', renderer='json', http_cache=0)
 def get_accept_license(request):
     """This produces JSON data for a user (at ``uid``) to view the license(s)
     they have accepted or will need to accept for a publication (at ``id``).
@@ -109,7 +109,7 @@ WHERE pd.publication_id = %s AND user_id = %s
 
 
 @view_config(route_name='publication-license-acceptance',
-             request_method='POST', accept='application/json')
+             request_method='POST', accept='application/json', http_cache=0)
 def post_accept_license(request):
     """Allows the user (at ``uid``) to accept the license(s) for
     a publication (at ``id``).
@@ -151,7 +151,7 @@ def post_accept_license(request):
 
 
 @view_config(route_name='publication-role-acceptance', request_method='GET',
-             accept='application/json', renderer='json')
+             accept='application/json', renderer='json', http_cache=0)
 def get_accept_role(request):
     """This produces JSON data for a user (at ``uid``) to view the role(s)
     they have accepted or will need to accept for a publication (at ``id``).
@@ -190,7 +190,7 @@ WHERE
 
 
 @view_config(route_name='publication-role-acceptance', request_method='POST',
-             accept='application/json')
+             accept='application/json', http_cache=0)
 def post_accept_role(request):
     """Allows the user (at ``uid``) to accept the role(s) for
     a publication (at ``id``).
@@ -232,9 +232,9 @@ def post_accept_role(request):
 
 
 @view_config(route_name='collate-content', request_method='POST',
-             renderer='json', permission='publish')
+             renderer='json', permission='publish', http_cache=0)
 @view_config(route_name='bake-content', request_method='POST',
-             renderer='json', permission='publish')
+             renderer='json', permission='publish', http_cache=0)
 def bake_content(request):
     """Invoke the baking process - trigger post-publication"""
     ident_hash = request.matchdict['ident_hash']
