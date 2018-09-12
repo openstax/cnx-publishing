@@ -38,7 +38,7 @@ ARROW_MATCH = {
 
 @view_config(route_name='admin-index', request_method='GET',
              renderer="cnxpublishing.views:templates/index.html",
-             permission='preview')
+             permission='preview', http_cache=60)
 def admin_index(request):  # pragma: no cover
     return {
         'navigation': [
@@ -63,17 +63,17 @@ def admin_index(request):  # pragma: no cover
 
 @view_config(route_name='admin-moderation', request_method='GET',
              renderer="cnxpublishing.views:templates/moderations.html",
-             permission='moderate')
+             permission='moderate', http_cache=0)
 @view_config(route_name='moderation-rss', request_method='GET',
              renderer="cnxpublishing.views:templates/moderations.rss",
-             permission='view')
+             permission='view', http_cache=0)
 def admin_moderations(request):  # pragma: no cover
     return {'moderations': get_moderation(request)}
 
 
 @view_config(route_name='admin-api-keys', request_method='GET',
              renderer="cnxpublishing.views:templates/api-keys.html",
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_api_keys(request):  # pragma: no cover
     # Easter Egg that will invalidate the cache, just hit this page.
     # FIXME Move this logic into the C[R]UD views...
@@ -86,7 +86,7 @@ def admin_api_keys(request):  # pragma: no cover
 
 @view_config(route_name='admin-post-publications', request_method='GET',
              renderer='cnxpublishing.views:templates/post-publications.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_post_publications(request):
     states = []
     with db_connect() as db_conn:
@@ -116,7 +116,7 @@ ORDER BY bpsa.created DESC LIMIT 100""")
 
 @view_config(route_name='admin-add-site-messages', request_method='GET',
              renderer='cnxpublishing.views:templates/site-messages.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_add_site_message(request):
     banners = []
     with db_connect() as db_conn:
@@ -170,7 +170,7 @@ def parse_message_args(request):
 
 @view_config(route_name='admin-add-site-messages-POST', request_method='POST',
              renderer='templates/site-messages.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_add_site_message_POST(request):
     # # If it was a post request to delete
     # if 'delete' in request.POST.keys():
@@ -203,7 +203,7 @@ def admin_add_site_message_POST(request):
 
 @view_config(route_name='admin-delete-site-messages', request_method='DELETE',
              renderer='templates/site-messages.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_delete_site_message(request):
     message_id = request.body.split("=")[1]
     with db_connect() as db_conn:
@@ -219,7 +219,7 @@ def admin_delete_site_message(request):
 
 @view_config(route_name='admin-edit-site-message', request_method='GET',
              renderer='templates/site-message-edit.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_edit_site_message(request):
     message_id = request.matchdict['id']
     args = {'id': message_id}
@@ -251,7 +251,7 @@ def admin_edit_site_message(request):
 
 @view_config(route_name='admin-edit-site-message-POST', request_method='POST',
              renderer='templates/site-message-edit.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_edit_site_message_POST(request):
     message_id = request.matchdict['id']
     args = parse_message_args(request)
@@ -276,7 +276,7 @@ def admin_edit_site_message_POST(request):
 
 @view_config(route_name='admin-print-style', request_method='GET',
              renderer='cnxpublishing.views:templates/print-style.html',
-             permission='view')
+             permission='view', http_cache=0)
 def admin_print_styles(request):
     """
     Returns a dictionary of all unique print_styles, and their latest tag,
@@ -345,7 +345,7 @@ def admin_print_styles(request):
 
 @view_config(route_name='admin-print-style-single', request_method='GET',
              renderer='cnxpublishing.views:templates/print-style-single.html',
-             permission='view')
+             permission='view', http_cache=0)
 def admin_print_styles_single(request):
     """ Returns all books with any version of the given print style.
 
@@ -548,7 +548,7 @@ def format_authors(authors):
 
 @view_config(route_name='admin-content-status', request_method='GET',
              renderer='cnxpublishing.views:templates/content-status.html',
-             permission='view')
+             permission='view', http_cache=0)
 def admin_content_status(request):
     """
     Returns a dictionary with the states and info of baking books,
@@ -639,7 +639,7 @@ def admin_content_status(request):
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
              renderer='templates/content-status-single.html',
-             permission='view')
+             permission='view', http_cache=0)
 def admin_content_status_single(request):
     """
     Returns a dictionary with all the past baking statuses of a single book.
@@ -694,7 +694,7 @@ def admin_content_status_single(request):
 
 @view_config(route_name='admin-content-status-single', request_method='POST',
              renderer='templates/content-status-single.html',
-             permission='administer')
+             permission='administer', http_cache=0)
 def admin_content_status_single_POST(request):
     """ Retriggers baking for a given book. """
     args = admin_content_status_single(request)

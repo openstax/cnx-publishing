@@ -13,7 +13,7 @@ from ..db import poke_publication_state, db_connect
 
 @view_config(route_name='moderation', request_method='GET',
              accept="application/json",
-             renderer='json', permission='moderate')
+             renderer='json', permission='moderate', http_cache=0)
 def get_moderation(request):
     """Return the list of publications that need moderation."""
     with db_connect() as db_conn:
@@ -32,7 +32,7 @@ SELECT row_to_json(combined_rows) FROM (
 
 
 @view_config(route_name='moderate', request_method='POST',
-             accept="application/json", permission='moderate')
+             accept="application/json", permission='moderate', http_cache=0)
 def post_moderation(request):
     publication_id = request.matchdict['id']
     posted = request.json

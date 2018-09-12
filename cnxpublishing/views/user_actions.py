@@ -28,7 +28,7 @@ from ..db import (
 
 @view_config(route_name='license-request',
              request_method='GET',
-             accept='application/json', renderer='json')
+             accept='application/json', renderer='json', http_cache=0)
 def get_license_request(request):
     """Returns a list of those accepting the license."""
     uuid_ = request.matchdict['uuid']
@@ -73,7 +73,7 @@ ORDER BY user_id ASC
 
 @view_config(route_name='license-request',
              permission='publish.assign-acceptance',
-             request_method='POST', accept='application/json')
+             request_method='POST', accept='application/json', http_cache=0)
 def post_license_request(request):
     """Submission to create a license acceptance request."""
     uuid_ = request.matchdict['uuid']
@@ -122,7 +122,7 @@ RETURNING dc.licenseid""",
 
 @view_config(route_name='license-request',
              permission='publish.remove-acceptance',
-             request_method='DELETE', accept='application/json')
+             request_method='DELETE', accept='application/json', http_cache=0)
 def delete_license_request(request):
     """Submission to remove a license acceptance request."""
     uuid_ = request.matchdict['uuid']
@@ -139,7 +139,7 @@ def delete_license_request(request):
 
 @view_config(route_name='roles-request',
              request_method='GET',
-             accept='application/json', renderer='json')
+             accept='application/json', renderer='json', http_cache=0)
 def get_roles_request(request):
     """Returns a list of accepting roles."""
     uuid_ = request.matchdict['uuid']
@@ -182,7 +182,7 @@ SELECT TRUE FROM document_controls WHERE uuid = %s""", (uuid_,))
 
 @view_config(route_name='roles-request',
              permission='publish.assign-acceptance',
-             request_method='POST', accept='application/json')
+             request_method='POST', accept='application/json', http_cache=0)
 def post_roles_request(request):
     """Submission to create a role acceptance request."""
     uuid_ = request.matchdict['uuid']
@@ -214,7 +214,7 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 
 @view_config(route_name='roles-request',
              permission='publish.remove-acceptance',
-             request_method='DELETE', accept='application/json')
+             request_method='DELETE', accept='application/json', http_cache=0)
 def delete_roles_request(request):
     """Submission to remove a role acceptance request."""
     uuid_ = request.matchdict['uuid']
@@ -231,7 +231,7 @@ def delete_roles_request(request):
 
 @view_config(route_name='acl-request',
              request_method='GET',
-             accept='application/json', renderer='json')
+             accept='application/json', renderer='json', http_cache=0)
 def get_acl(request):
     """Returns the ACL for the given content identified by ``uuid``."""
     uuid_ = request.matchdict['uuid']
@@ -259,7 +259,7 @@ ORDER BY user_id ASC, permission ASC
 
 @view_config(route_name='acl-request',
              permission='publish.assign-acl',
-             request_method='POST', accept='application/json')
+             request_method='POST', accept='application/json', http_cache=0)
 def post_acl_request(request):
     """Submission to create an ACL."""
     uuid_ = request.matchdict['uuid']
@@ -288,7 +288,7 @@ INSERT INTO document_controls (uuid) VALUES (%s)""", (uuid_,))
 
 @view_config(route_name='acl-request',
              permission='publish.remove-acl',
-             request_method='DELETE', accept='application/json')
+             request_method='DELETE', accept='application/json', http_cache=0)
 def delete_acl_request(request):
     """Submission to remove an ACL."""
     uuid_ = request.matchdict['uuid']

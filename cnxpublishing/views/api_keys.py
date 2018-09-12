@@ -12,7 +12,7 @@ from ..db import db_connect
 
 @view_config(route_name='api-keys', request_method='GET',
              accept="application/json",
-             renderer='json', permission='administer')
+             renderer='json', permission='administer', http_cache=0)
 def get_api_keys(request):
     """Return the list of API keys."""
     with db_connect() as db_conn:
