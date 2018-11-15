@@ -7,6 +7,7 @@ pipeline {
       }
     }
     stage('Publish Dev Container') {
+      when { branch 'master' }
       steps {
         // 'docker-registry' is defined in Jenkins under credentials
         withDockerRegistry([credentialsId: 'docker-registry', url: '']) {
@@ -15,11 +16,9 @@ pipeline {
       }
     }
     stage('Publish Release') {
-      when {
-        expression {
-          release = sh(returnStdout: true, script: 'git tag -l --points-at HEAD | head -n 1').trim()
-          return release
-        }
+      when { buildingTag() }
+      environment {
+        release = meta.version()
       }
       steps {
         withDockerRegistry([credentialsId: 'docker-registry', url: '']) {
