@@ -3,33 +3,32 @@ services:
   app:
     build: .
     volumes:
-     - .:/code
+      - .:/src
     environment:
-     - DB_URL=postgresql://postgres@cnxdb/cnxarchive
-  cnxpublishing:
-    extends:
-      service: app
-    links:
-     - cnxdb
-    ports:
-     - "6544:6544"
-  cnxdb:
+      - DB_URL=postgresql://postgres@db/cnxarchive
+      - DB_SUPER_URL=postgresql://postgres@db/cnxarchive
+      - AMQP_URL=amqp://guest@rabbitmq:5672//
+  db:
     image: "openstax/cnx-db"
     volumes:
-     - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
   rabbitmq:
     image: rabbitmq:latest
-  worker:
+
+   publishing:
     extends:
       service: app
-    command: bash -c "PYRAMID_INI=development.ini celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
+    command: bash -c "pserve $${PYRAMID_INI}"
     links:
-      - cnxdb
+      - db
+    ports:
+      - "6543:6543"
+  publishing-worker:
+    extends:
+      service: app
+    command: bash -c "celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
+    links:
+      - db
       - rabbitmq
-    environment:
-      - SHARED_DIR=/app/var
-      - DB_SUPER_URL=postgresql://postgres@cnxdb/cnxarchive
-      - AMQP_URL=amqp://guest@rabbitmq:5672//
 volumes:
   pgdata:
-
