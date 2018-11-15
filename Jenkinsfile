@@ -15,6 +15,21 @@ pipeline {
         }
       }
     }
+    stage('Deploy to the Staging stack') {
+      when { branch 'master' }
+      steps {
+        // Requires DOCKER_HOST be set in the Jenkins Configuration.
+        // Using the environment variable enables this file to be
+        // endpoint agnostic.
+        sh "docker -H ${CNX_STAGING_DOCKER_HOST} service update --label-add 'git.commit-hash=${GIT_COMMIT}' --image openstax/cnx-archive:dev staging_publishing"
+      }
+    }
+    stage('Run Functional Tests'){
+      when { branch 'master' }
+      steps {
+          runCnxFunctionalTests(testingDomain: "${env.CNX_STAGING_DOCKER_HOST}")
+      }
+    }
     stage('Publish Release') {
       when { buildingTag() }
       environment {
