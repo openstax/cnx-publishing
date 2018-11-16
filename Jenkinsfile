@@ -7,6 +7,7 @@ pipeline {
       }
     }
     stage('Publish Dev Container') {
+      when { branch 'master' }
       steps {
         // 'docker-registry' is defined in Jenkins under credentials
         withDockerRegistry([credentialsId: 'docker-registry', url: '']) {
@@ -14,12 +15,25 @@ pipeline {
         }
       }
     }
+    stage('Deploy to the Staging stack') {
+      when { branch 'master' }
+      steps {
+        // Requires DOCKER_HOST be set in the Jenkins Configuration.
+        // Using the environment variable enables this file to be
+        // endpoint agnostic.
+        sh "docker -H ${CNX_STAGING_DOCKER_HOST} service update --label-add 'git.commit-hash=${GIT_COMMIT}' --image openstax/cnx-archive:dev staging_publishing"
+      }
+    }
+    stage('Run Functional Tests'){
+      when { branch 'master' }
+      steps {
+          runCnxFunctionalTests(testingDomain: "${env.CNX_STAGING_DOCKER_HOST}")
+      }
+    }
     stage('Publish Release') {
-      when {
-        expression {
-          release = sh(returnStdout: true, script: 'git tag -l --points-at HEAD | head -n 1').trim()
-          return release
-        }
+      when { buildingTag() }
+      environment {
+        release = meta.version()
       }
       steps {
         withDockerRegistry([credentialsId: 'docker-registry', url: '']) {

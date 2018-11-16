@@ -5,17 +5,26 @@ services:
     volumes:
       - .:/src
     environment:
-      - DB_URL=postgresql://postgres@db/cnxarchive
-      - DB_SUPER_URL=postgresql://postgres@db/cnxarchive
+      - DB_URL=postgresql://postgres@db/repository
+      - DB_SUPER_URL=postgresql://postgres@db/repository
       - AMQP_URL=amqp://guest@rabbitmq:5672//
+      - 'USERS=smoo,smoo'
+      - MODERATORS=smoo
+      - ADMINISTRATORS=smoo
+      - MATHMLCLOUD_URL
+      - MEMCACHE_HOST
+      - EXERCISES_URL
   db:
-    image: "openstax/cnx-db"
+    image: openstax/cnx-db:latest
+    environment:
+      - DB_URL=postgresql://rhaptos@/repository
+      - DB_SUPER_URL=postgresql://postgres@/repository
     volumes:
       - pgdata:/var/lib/postgresql/data
   rabbitmq:
-    image: rabbitmq:latest
+    image: rabbitmq:3-management
 
-   publishing:
+  publishing:
     extends:
       service: app
     command: bash -c "pserve $${PYRAMID_INI}"
@@ -30,5 +39,13 @@ services:
     links:
       - db
       - rabbitmq
+  channel-processing:
+    extends:
+      service: app
+    command: bash -c "cnx-publishing-channel-processing $${PYRAMID_INI}"
+    links:
+      - db
+      - rabbitmq
+
 volumes:
   pgdata:
