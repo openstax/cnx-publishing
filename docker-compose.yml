@@ -39,5 +39,13 @@ services:
     links:
       - db
       - rabbitmq
+  channel-processing:
+    extends:
+      service: app
+    command: bash -c "cnx-publishing-channel-processing $${PYRAMID_INI}"
+    links:
+      - db
+      - rabbitmq
+
 volumes:
   pgdata:
