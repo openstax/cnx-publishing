@@ -85,7 +85,7 @@ BOOK = cnxepub.Binder(
                     nodes=[
                         cnxepub.Document(
                             id=u'2cf4d7d3@draft',
-                            data=u'<p class="para">If you finish the book, there will be cake.</p><img src="../resources/{}">'.format(RESOURCE_ONE_FILENAME),
+                            data=u'<body><p class="para">If you finish the book, there will be cake.</p><img src="../resources/{}" /></body>'.format(RESOURCE_ONE_FILENAME),
                             resources=[
                                 cnxepub.Resource(RESOURCE_ONE_FILENAME,
                                                  _read_file(RESOURCE_ONE_FILEPATH, 'rb'),
