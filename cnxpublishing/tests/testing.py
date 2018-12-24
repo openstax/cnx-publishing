@@ -35,6 +35,11 @@ def config_uri():
 def integration_test_settings():
     """Integration settings initializer"""
     settings = get_appsettings(config_uri())
+    # See also cnxpublishing.config.expandvars_dict
+    settings = {
+        key: os.path.expandvars(value)
+        for key, value in settings.iteritems()
+    }
     return settings
 
 

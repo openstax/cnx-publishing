@@ -27,6 +27,21 @@ Interface for:
 - Moderating publications for first time publishers
 - Post-publication operations
 
+
+Quick Start Development Guide
+-----------------------------
+
+First install `Docker <https://www.docker.com/community-edition>`_ and then::
+
+    docker-compose build
+    docker-compose up
+
+Running the tests can be achived with the following command::
+
+    docker-compose run --rm app python -m pytest
+
+
+
 System Requirements
 -------------------
 
@@ -90,7 +105,7 @@ be created using the following commands::
 
 Install the prerequisite testing package::
 
-  pip install pytest pytest-runner pytest-cov testfixtures
+    pip install pytest pytest-runner pytest-cov testfixtures
 
 Run RabbitMQ (otherwise, all the tests that use it such as ``test_subscribers.py`` will get hungup with no output message at all) with::
 
@@ -103,11 +118,11 @@ Or run it in the background with::
 
 The tests can then be run using::
 
-  python setup.py test
+    python setup.py test
 
 To run a single test::
 
-  python setup.py test --addopts "-k test_name"
+    python setup.py test --addopts "-k test_name"
 
 If you receive DBSchemaInitialized errors in tests,
 drop and recreate the cnxarchive-testing database.

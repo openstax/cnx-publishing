@@ -23,6 +23,7 @@ install_requires = (
 tests_require = [
     'cnx-db',
     'pytest',
+    'pytest-cov',
     'pytest-mock',
     'pytest-runner',
     'vcrpy-unittest',
