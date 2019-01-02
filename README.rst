@@ -11,9 +11,6 @@
 Connexions Publishing Service
 =============================
 
-.. image:: https://travis-ci.org/Connexions/cnx-publishing.svg
-   :target: https://travis-ci.org/Connexions/cnx-publishing
-
 .. image:: https://img.shields.io/codecov/c/github/Connexions/cnx-publishing.svg
   :target: https://codecov.io/gh/Connexions/cnx-publishing
 
