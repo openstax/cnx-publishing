@@ -14,38 +14,33 @@ services:
       - MATHMLCLOUD_URL
       - MEMCACHE_HOST
       - EXERCISES_URL
+      # Use the docker aware version of the testing configuration file
+      - TESTING_CONFIG=docker-testing.ini
+
   db:
     image: openstax/cnx-db:latest
-    environment:
-      - DB_URL=postgresql://rhaptos@/repository
-      - DB_SUPER_URL=postgresql://postgres@/repository
     volumes:
       - pgdata:/var/lib/postgresql/data
+
   rabbitmq:
     image: rabbitmq:3-management
 
-  publishing:
+  web:
     extends:
       service: app
     command: bash -c "pserve $${PYRAMID_INI}"
-    links:
-      - db
     ports:
-      - "6543:6543"
+      - "6543"
+
   publishing-worker:
     extends:
       service: app
     command: bash -c "celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
-    links:
-      - db
-      - rabbitmq
+
   channel-processing:
     extends:
       service: app
     command: bash -c "cnx-publishing-channel-processing $${PYRAMID_INI}"
-    links:
-      - db
-      - rabbitmq
 
 volumes:
   pgdata:
