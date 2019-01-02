@@ -71,10 +71,6 @@ Or::
 
     pip install .
 
-Make sure you have the correct version of cssselect2 installed::
-
-    pip install git+https://github.com/Connexions/cssselect2.git#egg=cssselect2
-
 Initialize the database with the archive and publishing schema using the
 following command::
 
