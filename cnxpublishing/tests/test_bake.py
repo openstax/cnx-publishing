@@ -99,8 +99,8 @@ WHERE
 
         # Ensure the changes to a document content were persisted.
         content_to_check = [
-            (binder[0][0], baked_doc_content,),
-            (composite_doc, content,),
+                (binder[0][0], baked_doc_content[3:-4],),
+                (composite_doc, content[3:-4],),
         ]
         for doc, content in content_to_check:
             self.assertIn(content, self._get_baked_file(cursor, doc, binder))

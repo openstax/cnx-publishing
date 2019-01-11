@@ -644,7 +644,7 @@ class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
         message = "Composite addition"
 
         # Add some fake collation objects to the book.
-        content = '<p class="para">composite</p>'
+        content = '<p><p class="para">composite</p></p>'
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
 
         ident_hash = self.target(cursor, composite_doc, binder,
@@ -678,7 +678,7 @@ WHERE
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
-        self.assertIn(content, persisted_content)
+        self.assertIn(content[3:-4], persisted_content)
 
 
 class PublishCollatedDocumentTestCase(BaseDatabaseIntegrationTestCase):
@@ -696,7 +696,7 @@ class PublishCollatedDocumentTestCase(BaseDatabaseIntegrationTestCase):
         doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
 
         # Add some fake collation objects to the book.
-        content = '<p class="para">collated</p>'
+        content = '<p><p class="para">collated</p></p>'
         doc.content = content
 
         self.target(cursor, doc, binder)
@@ -715,7 +715,7 @@ WHERE
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, doc.ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
-        self.assertIn(content, persisted_content)
+        self.assertIn(content[3:-4], persisted_content)
 
     @db_connect
     def test_no_change_to_contents(self, cursor):
@@ -723,6 +723,9 @@ WHERE
 
         # Modify the content of a document to mock the collation changes.
         doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
+
+        # Need to wrap content w/ node that will be discarded
+        doc.content = '<div>{}</div>'.format(doc.content)
 
         self.target(cursor, doc, binder)
 
@@ -740,7 +743,7 @@ WHERE
    AND m2.module_ident = cfa.item)""",
                        (binder.ident_hash, doc.ident_hash,))
         persisted_content = cursor.fetchone()[0][:]
-        self.assertIn(doc.content, persisted_content)
+        self.assertIn(doc.content[5:-6], persisted_content)
 
 
 class PublishCollatedTreeTestCase(BaseDatabaseIntegrationTestCase):
