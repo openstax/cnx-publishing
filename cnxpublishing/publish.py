@@ -337,7 +337,7 @@ def publish_model(cursor, model, publisher, message):
         _insert_resource_file(cursor, module_ident, resource)
 
     if isinstance(model, Document):
-        html = str(cnxepub.DocumentContentFormatter(model)).encode('utf-8')
+        html = bytes(cnxepub.DocumentContentFormatter(model))
         sha1 = hashlib.new('sha1', html).hexdigest()
         cursor.execute("SELECT fileid FROM files WHERE sha1 = %s", (sha1,))
         try:
@@ -390,9 +390,8 @@ def publish_composite_model(cursor, model, parent_model, publisher, message):
         _insert_resource_file(cursor, module_ident, resource)
 
     if isinstance(model, CompositeDocument):
-        html = str(cnxepub.DocumentContentFormatter(model))
-        fileid, _ = _insert_file(cursor, io.BytesIO(html.encode('utf-8')),
-                                 'text/html')
+        html = bytes(cnxepub.DocumentContentFormatter(model))
+        fileid, _ = _insert_file(cursor, io.BytesIO(html), 'text/html')
         file_arg = {
             'module_ident': module_ident,
             'parent_ident_hash': parent_model.ident_hash,
@@ -417,7 +416,7 @@ def publish_collated_document(cursor, model, parent_model):
     the archive.
 
     """
-    html = str(cnxepub.DocumentContentFormatter(model)).encode('utf-8')
+    html = bytes(cnxepub.DocumentContentFormatter(model))
     sha1 = hashlib.new('sha1', html).hexdigest()
     cursor.execute("SELECT fileid FROM files WHERE sha1 = %s", (sha1,))
     try:

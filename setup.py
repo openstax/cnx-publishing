@@ -22,7 +22,7 @@ install_requires = (
 )
 tests_require = [
     'cnx-db',
-    'pytest',
+    'pytest<4.1.0',
     'pytest-cov',
     'pytest-mock',
     'pytest-runner',

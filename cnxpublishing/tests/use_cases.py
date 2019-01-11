@@ -349,7 +349,7 @@ PAGE_THREE = cnxepub.Document(
 
 PAGE_FOUR = cnxepub.Document(
     id=u'deadbeef@draft',
-    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    data=u'<p class="para">If you finish the böök, there will be cake.</p>',
     metadata={
         u'title': u'Document Four of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
