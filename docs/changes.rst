@@ -6,6 +6,12 @@
 
    - feature message
 
+
+0.14.0
+------
+
+- Set Cache-Control headers (#235)
+     
 0.13.0
 ------
 
