@@ -6,6 +6,16 @@
 
    - feature message
 
+0.15.0
+------
+
+- Add a config INI that uses environment variables (#234)
+- Comment out assertion for testing postgres notifications count (#238)
+- Correct errors due to cnx-epub changes
+- Rename cssselect2 to cnx-cssselect2
+- Add Sentry integration for exception tracking (#243)
+- Avoid double encoding when publishing content. This is in
+  association with ``cnx-epub>=0.15.3`` (#244)
 
 0.14.0
 ------
