@@ -1391,12 +1391,12 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
         # FIXME use collate with real ruleset when it is available
 
         # Add some fake collation objects to the book.
-        content = '<p>composite</p>'
+        content = '<p>compösite</p>'
         publisher, message, composite_doc = self.make_one(binder, content)
         composite_section = cnxepub.TranslucentBinder(
             nodes=[composite_doc],
             metadata={'title': "Other things"})
-        collated_doc_content = '<p>collated</p>'
+        collated_doc_content = '<p>cöllated</p>'
 
         def _collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
