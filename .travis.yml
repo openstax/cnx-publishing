@@ -17,6 +17,9 @@ before_install:
   # remove zope.interface installed from aptitude
   - sudo apt-get purge python-zope.interface
 
+  # Uninstall pytest as it is old and it will be installed further down
+  - pip uninstall -y pytest
+
   # Stop local postgres
   - sudo service postgresql stop
 
@@ -50,7 +53,6 @@ before_script:
   - docker-compose -f .travis-compose.yml exec db /bin/bash -c "echo 'ALTER USER cnxarchive WITH SUPERUSER' | psql -U postgres postgres"
   # Stop init_venv from doing anything
   - docker-compose -f .travis-compose.yml exec db /bin/bash -c "echo 'CREATE SCHEMA venv' | psql -U cnxarchive cnxarchive-testing"
-  - pip install -U pytest pytest-runner pytest-cov
 script:
   # This is the same as `coverage run setup.py test`.
   - AS_VENV_IMPORTABLE=false pytest cnxpublishing
