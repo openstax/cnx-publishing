@@ -61,13 +61,13 @@ WHERE
         metadata['title'] = "Made up of other things"
 
         # Add some fake collation objects to the book.
-        content = '<p>composite</p>'
+        content = '<body><p>composite</p></body>'
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
         composite_section = cnxepub.TranslucentBinder(
             nodes=[composite_doc],
             metadata={'title': "Other things"})
 
-        baked_doc_content = '<p>collated</p>'
+        baked_doc_content = '<body><p>collated</p></body>'
 
         def cnxepub_collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = baked_doc_content
@@ -148,13 +148,13 @@ WHERE
         metadata['title'] = "Made up of other things"
 
         # Add some fake collation objects to the book.
-        content = '<p>composite</p>'
+        content = '<body><p>composite</p></body>'
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
         composite_section = cnxepub.TranslucentBinder(
             nodes=[composite_doc],
             metadata={'title': "Other things"})
 
-        baked_doc_content = '<p>collated</p>'
+        baked_doc_content = '<body><p>collated</p></body>'
 
         def cnxepub_collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = baked_doc_content

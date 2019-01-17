@@ -112,7 +112,7 @@ VALUES (%s, %s, %s) RETURNING "id";""", args)
     def make_document(self, id=None, content=None, metadata=None):
         from cnxepub import Document
         if content is None:
-            content = io.BytesIO(b'<div><p>Blank.</p></div>')
+            content = io.BytesIO(b'<body><p>Blank.</p></body>')
         document = Document(id, content,
                             metadata=metadata)
         return document
@@ -1089,7 +1089,7 @@ VALUES
             'license_url': VALID_LICENSE_URL,
         }
         content = """
-            <div>
+            <body>
             <!-- Invalid references -->
             <img src="../resources/8bef27ba.png"/>
             <a href="/contents/765792e0-5e65-4411-88d3-90df8f48eb3a@55">
@@ -1110,7 +1110,7 @@ VALUES
             </a>
             <a href="#hello">anchor link</a>
             <a href="http://example.org/">external link</a>
-            </div>""" \
+            </body>""" \
                 .format(doc_ident_hash)
         document = self.make_document(content=content, metadata=metadata)
 
@@ -1134,7 +1134,7 @@ WHERE id = %s""", (publication_id,))
         state, state_messages = cursor.fetchone()
 
         self.assertEqual(state, 'Failed/Error')
-        xpath = u'/div/img'
+        xpath = u'/body/img'
         ref_value = u'../resources/8bef27ba.png'
         expected_message = u"Invalid reference at '{}'." \
                            .format(xpath)

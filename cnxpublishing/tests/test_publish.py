@@ -72,7 +72,7 @@ class PublishIntegrationTestCase(unittest.TestCase):
 
     def make_document(self, id=None, content=None, metadata=None):
         if content is None:
-            content = io.BytesIO(b'<p>Blank.</p>')
+            content = io.BytesIO(b'<body><p>Blank.</p></body>')
         document = cnxepub.Document(id, content, metadata=metadata)
         return document
 
@@ -644,7 +644,7 @@ class PublishCompositeDocumentTestCase(BaseDatabaseIntegrationTestCase):
         message = "Composite addition"
 
         # Add some fake collation objects to the book.
-        content = '<p class="para">composite</p>'
+        content = '<body><p class="para">composite</p></body>'
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
 
         ident_hash = self.target(cursor, composite_doc, binder,
@@ -696,7 +696,7 @@ class PublishCollatedDocumentTestCase(BaseDatabaseIntegrationTestCase):
         doc = [x for x in cnxepub.flatten_to_documents(binder)][0]
 
         # Add some fake collation objects to the book.
-        content = '<p class="para">collated</p>'
+        content = '<body><p class="para">collated</p></body>'
         doc.content = content
 
         self.target(cursor, doc, binder)
@@ -765,7 +765,7 @@ class PublishCollatedTreeTestCase(BaseDatabaseIntegrationTestCase):
         message = "Composite addition"
 
         # Add some fake collation objects to the book.
-        content = '<p class="para">composite</p>'
+        content = '<body><p class="para">composite</p></body>'
         composite_doc = cnxepub.CompositeDocument(None, content, metadata)
 
         from cnxpublishing.publish import publish_composite_model

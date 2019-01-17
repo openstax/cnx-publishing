@@ -1391,12 +1391,12 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
         # FIXME use collate with real ruleset when it is available
 
         # Add some fake collation objects to the book.
-        content = '<p>compösite</p>'
+        content = '<body><p>compösite</p></body>'
         publisher, message, composite_doc = self.make_one(binder, content)
         composite_section = cnxepub.TranslucentBinder(
             nodes=[composite_doc],
             metadata={'title': "Other things"})
-        collated_doc_content = '<p>cöllated</p>'
+        collated_doc_content = '<body><p>cöllated</p></body>'
 
         def _collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
@@ -1434,9 +1434,9 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
         binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         cursor.connection.commit()
 
-        content = '<p class="para">composite</p>'
+        content = '<body><p class="para">composite</p></body>'
         publisher, message, composite_doc = self.make_one(binder, content)
-        collated_doc_content = '<p>collated</p>'
+        collated_doc_content = '<body><p>collated</p></body>'
 
         def _collate(binder_model, ruleset=None, includes=None):
             binder_model[0][0].content = collated_doc_content
@@ -1464,7 +1464,7 @@ class BakeContentTestCase(BaseFunctionalViewTestCase):
         binder = use_cases.setup_COMPLEX_BOOK_ONE_in_archive(self, cursor)
         cursor.connection.commit()
 
-        content = '<p class="para">composite</p>'
+        content = '<body><p class="para">composite</p></body>'
         publisher, message, composite_doc = self.make_one(binder, content)
 
         ident_hash = binder.ident_hash

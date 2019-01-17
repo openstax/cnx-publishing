@@ -193,7 +193,7 @@ SPAM = cnxepub.Binder(
     nodes=[
         cnxepub.Document(
             id=u'2cf4d7d3@draft',
-            data=u'<p class="para">Yummy Yummy SPAM!!!</p>',
+            data=u'<body><p class="para">Yummy Yummy SPAM!!!</p></body>',
             resources=[],
             metadata={
                 u'title': u'Eat up!',
@@ -223,7 +223,7 @@ SPAM = cnxepub.Binder(
 
 PAGE_ONE = cnxepub.Document(
     id=u'2cf4d7d3@draft',
-    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    data=u'<body><p class="para">If you finish the book, there will be cake.</p></body>',
     metadata={
         u'title': u'Document One of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -269,7 +269,7 @@ PAGE_ONE = cnxepub.Document(
 
 PAGE_TWO = cnxepub.Document(
     id=u'c24fe396@draft',
-    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    data=u'<body><p class="para">If you finish the book, there will be cake.</p></body>',
     metadata={
         u'title': u'Document Two of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -309,7 +309,7 @@ PAGE_TWO = cnxepub.Document(
 
 PAGE_THREE = cnxepub.Document(
     id=u'e12b72ac@draft',
-    data=u'<p class="para">If you finish the book, there will be cake.</p>',
+    data=u'<body><p class="para">If you finish the book, there will be cake.</p></body>',
     metadata={
         u'title': u'Document Three of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -349,7 +349,7 @@ PAGE_THREE = cnxepub.Document(
 
 PAGE_FOUR = cnxepub.Document(
     id=u'deadbeef@draft',
-    data=u'<p class="para">If you finish the böök, there will be cake.</p>',
+    data=u'<body><p class="para">If you finish the böök, there will be cake.</p></body>',
     metadata={
         u'title': u'Document Four of Infinity',
         u'created': u'2013/03/19 15:01:16 -0500',
@@ -383,7 +383,7 @@ PAGE_FOUR = cnxepub.Document(
 
 PAGE_FIVE = cnxepub.Document(
     id=u'b3627ba5@draft',
-    data=u'<p class="para">Download big file <a href="../resources/big-file.txt">here</a></p>',
+    data=u'<body><p class="para">Download big file <a href="../resources/big-file.txt">here</a></p></body>',
     resources=[
         cnxepub.Resource('big-file.txt',
                          # a 2 MB file
@@ -425,6 +425,7 @@ PAGE_FIVE = cnxepub.Document(
 EXERCISES_PAGE = cnxepub.Document(
     id=u'01234567@draft',
     data=u"""
+<body>
     <p class="para">
         <section>
             <div data-type="exercise" class="os-exercise">
@@ -463,6 +464,7 @@ EXERCISES_PAGE = cnxepub.Document(
             </div>
         </section>
     </p>
+</body>
     """,
     metadata={
         u'title': u'Exercises Page',
