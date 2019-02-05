@@ -3,7 +3,7 @@ services:
   app:
     build: .
     volumes:
-      - .:/src
+      - ./cnxpublishing:/src/cnxpublishing
     environment:
       - DB_URL=postgresql://postgres@db/repository
       - DB_SUPER_URL=postgresql://postgres@db/repository
