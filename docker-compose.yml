@@ -28,19 +28,19 @@ services:
   web:
     extends:
       service: app
-    command: bash -c "pserve $${PYRAMID_INI}"
+    command: bash -c "wait-for db:5432 -- pserve $${PYRAMID_INI}"
     ports:
       - "6543"
 
   publishing-worker:
     extends:
       service: app
-    command: bash -c "celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
+    command: bash -c "wait-for db:5432 -- wait-for rabbitmq:5672 -- celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
 
   channel-processing:
     extends:
       service: app
-    command: bash -c "cnx-publishing-channel-processing $${PYRAMID_INI}"
+    command: bash -c "wait-for db:5432 -- wait-for rabbitmq:5672 -- cnx-publishing-channel-processing $${PYRAMID_INI}"
 
 volumes:
   pgdata:

@@ -18,6 +18,6 @@ script:
   - docker-compose build
   - docker-compose up -d
   # TODO: report coverage to codecov
-  - docker-compose run $ci_env web python -m pytest
+  - docker-compose run $ci_env web wait-for db:5432 -- wait-for rabbitmq:5672 -- python -m pytest
 notifications:
   email: false
