@@ -1,5 +1,8 @@
 FROM python:2.7
 
+RUN addgroup --system openstax \
+    && adduser --system --group openstax
+
 RUN set -x \
     && apt-get update \
     && apt-get install netcat --no-install-recommends -qqy \
@@ -19,3 +22,5 @@ RUN set -x \
     && python -m pip install -e .
 
 ENV PYRAMID_INI environ.ini
+
+USER openstax
