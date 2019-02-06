@@ -12,7 +12,7 @@ RUN set -x \
 
 RUN set -x && python -m pip install pyramid_sawing sentry-sdk
 
-COPY . /src
+COPY --chown=openstax:openstax . /src
 WORKDIR /src
 
 RUN set -x \
