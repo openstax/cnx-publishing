@@ -454,7 +454,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             admin_content_status(request)
         self.assertIn('invalid page', caught_exc.exception.message)
 
-    @mock.patch('cnxpublishing.views.admin.db_connect')
+    @mock.patch('cnxpublishing.views.admin.content_status.db_connect')
     def test_admin_content_status_state_icons(self, mock_db_connect):
         states = ['PENDING', 'QUEUED', 'STARTED', 'RETRY', 'SUCCESS',
                   'FAILURE', 'REVOKED', 'UNKNOWN']

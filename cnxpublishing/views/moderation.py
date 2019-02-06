@@ -66,3 +66,13 @@ UPDATE publications SET (epub, state) = (null, 'Rejected')
 WHERE id = %s""", (publication_id,))
 
     return httpexceptions.HTTPAccepted()
+
+
+@view_config(route_name='admin-moderation', request_method='GET',
+             renderer="cnxpublishing.views:templates/moderations.html",
+             permission='moderate', http_cache=0)
+@view_config(route_name='moderation-rss', request_method='GET',
+             renderer="cnxpublishing.views:templates/moderations.rss",
+             permission='view', http_cache=0)
+def admin_moderations(request):  # pragma: no cover
+    return {'moderations': get_moderation(request)}
