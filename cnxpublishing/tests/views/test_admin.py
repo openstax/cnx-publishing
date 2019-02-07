@@ -53,50 +53,6 @@ def add_data(self):
     return book
 
 
-@pytest.mark.usefixtures('scoped_pyramid_app')
-class PostPublicationsViewsTestCase(unittest.TestCase):
-    maxDiff = None
-
-    @classmethod
-    def setUpClass(cls):
-        cls.settings = integration_test_settings()
-        from cnxpublishing.config import CONNECTION_STRING
-        cls.db_conn_str = cls.settings[CONNECTION_STRING]
-        cls.db_connect = staticmethod(db_connection_factory())
-
-    @property
-    def target(self):
-        from ...views.admin import admin_post_publications
-        return admin_post_publications
-
-    def test_no_results(self):
-        request = testing.DummyRequest()
-
-        resp_data = self.target(request)
-
-        self.assertEqual({'states': []}, resp_data)
-
-    def test(self):
-        request = testing.DummyRequest()
-
-        book = add_data(self)
-
-        resp_data = self.target(request)
-        self.assertEqual({
-            'states': [
-                {'created': resp_data['states'][0]['created'],
-                 'ident_hash': book.ident_hash,
-                 'state': u'PENDING',
-                 'state_message': '',
-                 'title': 'Book of Infinity'},
-                {'created': resp_data['states'][1]['created'],
-                 'ident_hash': book.ident_hash,
-                 'state': u'PENDING',
-                 'state_message': '',
-                 'title': 'Book of Infinity'},
-                ]}, resp_data)
-
-
 class PrintStyleViewsTestCase(unittest.TestCase):
     maxDiff = None
 
