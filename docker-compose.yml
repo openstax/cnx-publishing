@@ -5,8 +5,9 @@ services:
     volumes:
       - ./cnxpublishing:/src/cnxpublishing
     environment:
-      - DB_URL=postgresql://postgres@db/repository
-      - DB_SUPER_URL=postgresql://postgres@db/repository
+      # FIXME: The application's tests expects to have super-user privilege.
+      - DB_URL=postgresql://rhaptos_admin@db/repository
+      - DB_SUPER_URL=postgresql://rhaptos_admin@db/repository
       - AMQP_URL=amqp://guest@rabbitmq:5672//
       - 'USERS=smoo,smoo'
       - MODERATORS=smoo
@@ -21,6 +22,9 @@ services:
     image: openstax/cnx-db:latest
     volumes:
       - pgdata:/var/lib/postgresql/data
+    environment:
+      - DB_URL=postgresql://rhaptos@db/repository
+      - DB_SUPER_URL=postgresql://rhaptos_admin@db/repository
 
   rabbitmq:
     image: rabbitmq:3-management
