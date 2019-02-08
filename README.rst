@@ -38,7 +38,7 @@ First install `Docker <https://www.docker.com/community-edition>`_ and then::
 
 Running the tests can be achived with the following command::
 
-    docker-compose run --rm app python -m pytest
+    docker-compose run --rm app wait-for db:5432 -- wait-for rabbitmq:5672 -- python -m pytest
 
 
 
