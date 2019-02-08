@@ -17,7 +17,11 @@ script:
   - ci_env=`bash <(curl -s https://codecov.io/env)`
   - docker-compose build
   - docker-compose up -d
+  - sleep 20
+  - docker-compose ps
+  - docker-compose logs db
   # TODO: report coverage to codecov
-  - docker-compose run $ci_env web wait-for db:5432 -- wait-for rabbitmq:5672 -- python -m pytest
+  # Note, travis is kinda slow, so we give the connection to the database a longer timeout (60s).
+  - docker-compose run $ci_env web wait-for --timeout=240 db:5432 -- wait-for rabbitmq:5672 -- python -m pytest
 notifications:
   email: false
