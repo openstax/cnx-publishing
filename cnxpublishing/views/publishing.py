@@ -6,7 +6,7 @@
 # See LICENCE.txt for details.
 # ###
 import cnxepub
-from cnxarchive.utils.ident_hash import IdentHashError
+from cnxdb.ident_hash import IdentHashError
 from pyramid import httpexceptions
 from pyramid.settings import asbool
 from pyramid.view import view_config

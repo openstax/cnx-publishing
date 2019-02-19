@@ -15,7 +15,11 @@ try:
 except ImportError:
     from urllib2 import unquote
 
-import cnxarchive.utils
+from cnxdb.ident_hash import (
+    join_ident_hash as upstream_join_ident_hash,
+    split_ident_hash as upstream_split_ident_hash,
+    IdentHashMissingVersion,
+)
 
 
 def issequence(t):
@@ -45,15 +49,15 @@ def parse_user_uri(uri, type_='cnx-id'):
 
 def split_ident_hash(*args, **kwargs):
     try:
-        return cnxarchive.utils.split_ident_hash(*args, **kwargs)
-    except cnxarchive.utils.IdentHashMissingVersion as e:
+        return upstream_split_ident_hash(*args, **kwargs)
+    except IdentHashMissingVersion as e:
         version = None
         if kwargs.get('split_version'):
             version = (None, None)
         return e.id, version
 
 
-join_ident_hash = cnxarchive.utils.join_ident_hash
+join_ident_hash = upstream_join_ident_hash
 
 
 __all__ = (
