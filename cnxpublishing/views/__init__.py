@@ -75,7 +75,7 @@ def includeme(config):
     config.commit()
 
     # Place a few globals in the template environment.
-    from cnxarchive.utils import join_ident_hash
+    from cnxdb.ident_hash import join_ident_hash
     for ext in ('.html', '.rss',):
         jinja2_env = config.get_jinja2_environment(ext)
         jinja2_env.globals.update(

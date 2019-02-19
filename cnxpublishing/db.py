@@ -15,7 +15,7 @@ import json
 import cnxepub
 import psycopg2
 import jinja2
-from cnxarchive.utils import IdentHashSyntaxError, IdentHashShortId
+from cnxdb.ident_hash import IdentHashSyntaxError, IdentHashShortId
 from cnxepub import ATTRIBUTED_ROLE_KEYS
 from openstax_accounts.interfaces import IOpenstaxAccounts
 from psycopg2.extras import register_uuid

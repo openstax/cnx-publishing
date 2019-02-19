@@ -12,7 +12,7 @@ import unittest
 
 import cnxepub
 import psycopg2
-from cnxarchive.utils import join_ident_hash
+from cnxdb.ident_hash import join_ident_hash
 from pyramid import testing
 
 from . import use_cases
