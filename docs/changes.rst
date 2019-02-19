@@ -6,6 +6,15 @@
 
    - feature message
 
+0.15.1
+------
+
+- Fix tests to use <body> when creating cnxepub.Document to correct
+  adjustment made in cnx-epub
+- Fix to explicitly install cnx-epub with collation support in the container setup
+- Refactor admin views (split into sub-modules)
+- Fix ImportError for ident-hash functionality
+
 0.15.0
 ------
 
