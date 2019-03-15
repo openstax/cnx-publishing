@@ -6,6 +6,11 @@
 
    - feature message
 
+0.16.0
+------
+
+- Remove the unused post-publications view (#250)
+
 0.15.1
 ------
 
