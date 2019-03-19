@@ -1,10 +1,8 @@
 
-.. Use the following to start a new version entry:
+0.16.2
+------
 
-   |version|
-   ----------------------
-
-   - feature message
+- Re-release 0.16.0, which fixes CI tooling to release this package
 
 0.16.1
 ------
