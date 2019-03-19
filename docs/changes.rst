@@ -6,6 +6,11 @@
 
    - feature message
 
+0.16.1
+------
+
+- Re-release 0.16.0, which contained Python modules from previous versions.
+
 0.16.0
 ------
 
