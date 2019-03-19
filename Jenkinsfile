@@ -1,3 +1,5 @@
+@Library('pipeline-library') _
+
 pipeline {
   agent { label 'docker' }
   stages {
