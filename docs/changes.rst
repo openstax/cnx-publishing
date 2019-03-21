@@ -1,3 +1,8 @@
+0.16.3
+------
+
+- Fix admin view template paths after previous changes refactored the admin
+  views into individual modules (#251)
 
 0.16.2
 ------
