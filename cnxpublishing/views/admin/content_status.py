@@ -237,7 +237,8 @@ def admin_content_status(request):
 
 
 @view_config(route_name='admin-content-status-single', request_method='GET',
-             renderer='templates/content-status-single.html',
+             renderer='cnxpublishing.views:'
+                      'templates/content-status-single.html',
              permission='view', http_cache=0)
 def admin_content_status_single(request):
     """
@@ -292,7 +293,8 @@ def admin_content_status_single(request):
 
 
 @view_config(route_name='admin-content-status-single', request_method='POST',
-             renderer='templates/content-status-single.html',
+             renderer='cnxpublishing.views:'
+                      'templates/content-status-single.html',
              permission='administer', http_cache=0)
 def admin_content_status_single_POST(request):
     """ Retriggers baking for a given book. """

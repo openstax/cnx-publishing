@@ -78,7 +78,7 @@ def parse_message_args(request):
 
 
 @view_config(route_name='admin-add-site-messages-POST', request_method='POST',
-             renderer='templates/site-messages.html',
+             renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer', http_cache=0)
 def admin_add_site_message_POST(request):
     # # If it was a post request to delete
@@ -111,7 +111,7 @@ def admin_add_site_message_POST(request):
 
 
 @view_config(route_name='admin-delete-site-messages', request_method='DELETE',
-             renderer='templates/site-messages.html',
+             renderer='cnxpublishing.views:templates/site-messages.html',
              permission='administer', http_cache=0)
 def admin_delete_site_message(request):
     message_id = request.body.split("=")[1]
@@ -127,7 +127,7 @@ def admin_delete_site_message(request):
 
 
 @view_config(route_name='admin-edit-site-message', request_method='GET',
-             renderer='templates/site-message-edit.html',
+             renderer='cnxpublishing.views:templates/site-message-edit.html',
              permission='administer', http_cache=0)
 def admin_edit_site_message(request):
     message_id = request.matchdict['id']
@@ -159,7 +159,7 @@ def admin_edit_site_message(request):
 
 
 @view_config(route_name='admin-edit-site-message-POST', request_method='POST',
-             renderer='templates/site-message-edit.html',
+             renderer='cnxpublishing.views:templates/site-message-edit.html',
              permission='administer', http_cache=0)
 def admin_edit_site_message_POST(request):
     message_id = request.matchdict['id']
