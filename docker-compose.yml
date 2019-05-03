@@ -18,7 +18,7 @@ services:
       - TESTING_CONFIG=docker-testing.ini
 
   db:
-    image: openstax/cnx-db:latest
+    image: openstax/cnx-db:a395564
     volumes:
       - pgdata:/var/lib/postgresql/data
 

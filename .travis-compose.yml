@@ -1,7 +1,7 @@
 version: "2"
 services:
   db:
-    image: openstax/cnx-db:2.2.1
+    image: openstax/cnx-db:a395564
     ports:
       - "5432:5432"
     environment:
