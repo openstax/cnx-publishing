@@ -1,0 +1,12 @@
+beaker
+celery[sqlalchemy]
+cnx-archive
+cnx-epub
+cnx-epub[collation]
+jinja2
+openstax-accounts>=1.0.0
+psycopg2
+pyramid>=1.5
+pyramid_jinja2
+pyramid_multiauth
+python-memcached
