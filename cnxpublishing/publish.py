@@ -102,10 +102,10 @@ SELECT module_ident, ident_hash FROM module_insertion
 TREE_NODE_INSERT = """
 INSERT INTO trees
   (nodeid, parent_id, documentid,
-   title, childorder, latest, is_collated)
+   title, childorder, latest, is_collated, slug)
 VALUES
   (DEFAULT, %(parent_id)s, %(document_id)s,
-   %(title)s, %(child_order)s, %(is_latest)s, %(is_collated)s)
+   %(title)s, %(child_order)s, %(is_latest)s, %(is_collated)s, %(slug)s)
 RETURNING nodeid
 """
 
@@ -302,17 +302,31 @@ def _insert_tree(cursor, tree, parent_id=None, index=0, is_collated=False):
             except TypeError:  # NoneType
                 raise ValueError("Missing published document for '{}'."
                                  .format(tree['id']))
+
             if tree.get('title', None):
                 title = tree['title']
             else:
                 title = document_title
+
+        slug = None
+        if tree.get('slug', None):
+            slug = tree['slug']
+
         # TODO We haven't settled on a flag (name or value)
         #      to pin the node to a specific version.
         is_latest = True
-        cursor.execute(TREE_NODE_INSERT,
-                       dict(document_id=document_id, parent_id=parent_id,
-                            title=title, child_order=index,
-                            is_latest=is_latest, is_collated=is_collated))
+        cursor.execute(
+            TREE_NODE_INSERT,
+            dict(
+                document_id=document_id,
+                parent_id=parent_id,
+                title=title,
+                child_order=index,
+                is_latest=is_latest,
+                is_collated=is_collated,
+                slug=slug,
+            ),
+        )
         node_id = cursor.fetchone()[0]
         if 'contents' in tree:
             _insert_tree(cursor, tree['contents'], parent_id=node_id,
