@@ -9,9 +9,7 @@ services:
   - rabbitmq
   - docker
 before_install:
-  - pip install flake8
-  - flake8 --exclude=cnxpublishing/tests *.py cnxpublishing/
-  - flake8 --max-line-length=200 cnxpublishing/tests
+  - make lint
 
   - sudo apt-get update
   # remove zope.interface installed from aptitude
