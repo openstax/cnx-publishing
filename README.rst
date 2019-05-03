@@ -48,6 +48,7 @@ System Requirements
 - PostgreSQL >= 9.4
 - RabbitMQ >= 3.6
 - Memcached
+
 On OSX:
 
 - the specific version of ``pyicu`` required by `cnx-easybake <https://github.com/Connexions/cnx-easybake>`_ (currently 1.9.8) which you can install by running::
@@ -86,8 +87,9 @@ Here ``<your-config>.ini`` can be the ``development.ini`` in the project root.
 The settings in this config are the same as the development settings used
 by cnx-archive.
 
-If you're using **cnx-authoring** together with **cnx-publishing**, please make sure
-your development.ini use the **same openstax_accounts settings**.
+If you're using **cnx-authoring** together with **cnx-publishing**,
+please make sure your development.ini
+uses the **same openstax_accounts settings**.
 
 Testing
 -------
@@ -103,7 +105,8 @@ Install the prerequisite testing package::
 
     pip install pytest pytest-runner pytest-cov testfixtures
 
-Run RabbitMQ (otherwise, all the tests that use it such as ``test_subscribers.py`` will get hungup with no output message at all) with::
+Run RabbitMQ (otherwise, all the tests that use it such as
+``test_subscribers.py`` will get hungup with no output message at all) with::
 
     rabbitmq-server
 
@@ -171,11 +174,11 @@ HTTP API
                                to create additional permission entries.
 
 :/publications: Accepts EPUB files for publication into a *Connexions Archive*.
-                Returns a mapping of identifiers, keyed by the identifiers given
-                in the EPUB with values that identify where the content will be
-                published.
+                Returns a mapping of identifiers, keyed by the identifiers
+                given in the EPUB with values that identify where the content
+                will be published.
 
-:/publications/{id}: Poll and poke the state of the publication. #main API point
+:/publications/{id}: Poll and poke the state of the publication.
 
 :/publications/{id}/license-acceptances/{uid}: Route for retrieving and posting
     information about a particular user's license acceptance. Only the user

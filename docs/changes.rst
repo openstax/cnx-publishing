@@ -24,7 +24,8 @@
 
 - Fix tests to use <body> when creating cnxepub.Document to correct
   adjustment made in cnx-epub
-- Fix to explicitly install cnx-epub with collation support in the container setup
+- Fix to explicitly install cnx-epub with collation support in the container
+  setup
 - Refactor admin views (split into sub-modules)
 - Fix ImportError for ident-hash functionality
 
@@ -43,7 +44,7 @@
 ------
 
 - Set Cache-Control headers (#235)
-     
+
 0.13.0
 ------
 

@@ -34,9 +34,10 @@ AMQP broker (RabbitMQ) for task management. The steps involved in baking are:
 
 There are 3 possible sources for a recipe for a given book:
   1. A recipe associated with the `print_style` that has been set on the book
-  2. A custom recipe attached to the book, named to match the `print_style` set on that book
+  2. A custom recipe attached to the book, named to match the `print_style`
+     set on that book
   3. A custom recipe attached to the book, name "ruleset.css"
-  (for historical reasons).
+     (for historical reasons).
 
 These three paths allow for flexible association of recipes with books. The
 `print_style` based lookup serves as a recipe-box, so that more than one book
@@ -48,12 +49,14 @@ filename.
 
 #### When do you need to bake? What are the results?
 
-There are two possibilities for when a book needs to be baked: when its content
-has changed, or when its recipe has been changed. If the book's content has
+There are two possibilities for when a book needs to be baked:
+when its content has changed,
+or when its recipe has been changed.
+If the book's content has
 changed, there is a new version of the book available - it will have a new
 version number. This content will be submitted for baking. On successful
-completion, the new version will be recognized as the "latest" for that book (by
-uuid), and the book's state is `current`.
+completion, the new version will be recognized as the "latest" for that book
+(by uuid), and the book's state is `current`.
 
 #### What about problems?
 This is a change in the definition for latest - now it is the most recently
@@ -72,11 +75,12 @@ baked content is left in place, and the book enters a `stale recipe` state.
 
 The `stale` states are both formally error states, but not equally serious.
 `Stale content` is more serious, since new content has been published, but is
-not available to the reader. Conversely, `stale recipe`, for the most part, will
-be missing styling or labeling of content, rather than whole sale absence
-absence (though in principle the recipe changes could be anything). In order to
-help mitigate the seriousness of `stale content`, if content fails to build with
-its primary recipe (discovered as described above), then, if this book has been
-baked before (in this or an earlier version), the previous recipe will be
-used as a fallback. The state of the content is then `fallback recipe` or simply
-`fallback`.
+not available to the reader. Conversely, `stale recipe`, for the most part,
+will be missing styling or labeling of content, rather than whole sale absence
+absence (though in principle the recipe changes could be anything).
+In order to help mitigate the seriousness of `stale content`,
+if content fails to build with its primary recipe
+(discovered as described above), then, if this book has
+been baked before (in this or an earlier version),
+the previous recipe will be used as a fallback.
+The state of the content is then `fallback recipe` or simply `fallback`.
