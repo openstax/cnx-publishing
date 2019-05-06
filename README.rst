@@ -36,9 +36,14 @@ First install `Docker <https://www.docker.com/community-edition>`_ and then::
     docker-compose build
     docker-compose up
 
+Run steps to setup the database for the tests::
+
+    docker-compose exec db psql -U postgres -d postgres -c "CREATE USER cnxarchive WITH SUPERUSER PASSWORD 'cnxarchive';"
+    docker-compose exec db createdb -U postgres -O cnxarchive cnxarchive-testing
+
 Running the tests can be achived with the following command::
 
-    docker-compose run --rm app python -m pytest
+    docker-compose run --rm test bin/test
 
 
 
