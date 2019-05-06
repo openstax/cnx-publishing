@@ -22,7 +22,8 @@ x-test-environ-vars: &test-environ-vars
 x-app-defaults: &app-defaults
   build: .    
   volumes:
-    - .:/src
+    - ./cnxpublishing:/src/cnxpublishing
+    - ./docs:/src/docs
   environment: *app-environ-vars
 
 services:
