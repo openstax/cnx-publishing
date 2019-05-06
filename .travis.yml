@@ -28,7 +28,7 @@ before_script:
 
 script:
   - ci_env=`bash <(curl -s https://codecov.io/env)`
-  - docker-compose run $ci_env test python -m pytest -vv cnxpublishing/tests
+  - docker-compose run $ci_env test bin/test
 
 notifications:
   email: false
