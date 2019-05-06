@@ -25,6 +25,8 @@ before_install:
 
   # Create cnx-db docker image
   - docker-compose -f .travis-compose.yml up -d
+  - sleep 10
+  - docker-compose logs db
 
   # Install the coverage utility and codecov reporting utility
   - pip install coverage
