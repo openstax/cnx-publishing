@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+set -x
+
+# Wait for a connection to start up. The first time takes a little longer.
+until python -c "import os, psycopg2 as p; dsn = os.environ['DB_SUPER_URL'].rsplit('/', 1)[0] + '/postgres';p.connect(dsn)"; do
+  >&2 echo "Postgres is unavailable - sleeping"
+  sleep 1
+done
+>&2 echo "Postgres is up - continuing execution"
+
+# Run the unittests
+#   - Let nothing go unnoticed by using `--strict`
+#   - The pytest coverage and verbosity options are configured in setup.cfg
+python -m pytest --strict ${@:-cnxpublishing/tests}
+python -m coverage html
+
+# Report test coverage to codecov.io
+# See also: https://docs.codecov.io/docs/testing-with-docker
+if [ "$TRAVIS" = "true" ];
+then
+    # Report coverage to codecov
+    bash <(curl -s https://codecov.io/bash)
+fi

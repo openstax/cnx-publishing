@@ -1,22 +1,32 @@
-version: '2'
-services:
-  app:
-    build: .
-    volumes:
-      - .:/src
-    environment:
-      - DB_URL=postgresql://postgres@db/repository
-      - DB_SUPER_URL=postgresql://postgres@db/repository
-      - AMQP_URL=amqp://guest@rabbitmq:5672//
-      - 'USERS=smoo,smoo'
-      - MODERATORS=smoo
-      - ADMINISTRATORS=smoo
-      - MATHMLCLOUD_URL
-      - MEMCACHE_HOST
-      - EXERCISES_URL
-      # Use the docker aware version of the testing configuration file
-      - TESTING_CONFIG=docker-testing.ini
+version: '3.4'
 
+x-app-environ-vars: &app-environ-vars
+  - DB_URL=postgresql://postgres@db/repository
+  - DB_SUPER_URL=postgresql://postgres@db/repository
+  - AMQP_URL=amqp://guest@rabbitmq:5672//
+  - 'USERS=smoo,smoo'
+  - MODERATORS=smoo
+  - ADMINISTRATORS=smoo
+  - MATHMLCLOUD_URL
+  - MEMCACHE_HOST
+  - EXERCISES_URL
+
+x-test-environ-vars: &test-environ-vars
+  - AMQP_URL=amqp://guest@rabbitmq:5672//
+  - DB_URL=postgresql://cnxarchive@db/cnxarchive-testing
+  - DB_SUPER_URL=postgresql://cnxarchive@db/cnxarchive-testing
+  # Use the docker aware version of the testing configuration file
+  - TESTING_CONFIG=docker-testing.ini
+  
+  
+x-app-defaults: &app-defaults
+  build: .    
+  volumes:
+    - ./cnxpublishing:/src/cnxpublishing
+    - ./docs:/src/docs
+  environment: *app-environ-vars
+
+services:
   db:
     image: openstax/cnx-db:latest
     volumes:
@@ -26,21 +36,23 @@ services:
     image: rabbitmq:3-management
 
   web:
-    extends:
-      service: app
+    <<: *app-defaults
     command: bash -c "pserve $${PYRAMID_INI}"
     ports:
       - "6543"
 
   publishing-worker:
-    extends:
-      service: app
+    <<: *app-defaults
     command: bash -c "celery worker -A cnxpublishing -Q default,deferred --loglevel debug"
 
   channel-processing:
-    extends:
-      service: app
+    <<: *app-defaults
     command: bash -c "cnx-publishing-channel-processing $${PYRAMID_INI}"
+
+  test:
+    <<: *app-defaults
+    environment: *test-environ-vars
+    command: sleep infinity
 
 volumes:
   pgdata:
