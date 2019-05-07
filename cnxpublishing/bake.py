@@ -19,6 +19,7 @@ from .publish import (
     publish_collated_tree,
     publish_composite_model,
 )
+from .utils import amend_tree_with_slugs
 
 
 def _formatter_callback_factory():  # pragma: no cover
@@ -88,6 +89,7 @@ def bake(binder, recipe_id, publisher, message, cursor):
         publish_collated_document(cursor, doc, binder)
 
     tree = cnxepub.model_to_tree(binder)
+    amend_tree_with_slugs(tree)
     publish_collated_tree(cursor, tree)
 
     return []
