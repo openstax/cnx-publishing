@@ -1148,13 +1148,16 @@ FROM modules ORDER BY major_version ASC""")
                     u"id": unicode(binder_ident_hash),
                     u"shortId": u"1du9jtE3@1.1",
                     u"title": u"Book of Infinity",
+                    u'slug': None,
                     u"contents": [
                         {u"id": u"subcol",
                          u"shortId": u"subcol",
                          u"title": use_cases.REVISED_BOOK[0].metadata['title'],
+                         u'slug': None,
                          u"contents": [
                              {u"id": unicode(document_ident_hash),
                               u"shortId": u"EeLmMXO1@1",
+                              u'slug': None,
                               u"title": use_cases.REVISED_BOOK[0].get_title_for_node(document)}]}]}
                 cursor.execute("""\
 SELECT tree_to_json(uuid::text, module_version( major_version, minor_version), FALSE)
