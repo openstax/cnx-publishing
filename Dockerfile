@@ -6,9 +6,11 @@ COPY . /src
 WORKDIR /src
 
 RUN set -x \
-    # FIXME: pip still has an issue with dependencies that have requirement
-    # extras. It understands the requirement but drops the extras part.
-    && python -m pip install "cnx-epub[collation]" \
-    && python -m pip install -e ".[test]"
+    && python -m pip install \
+       -r requirements/main.txt \
+       -r requirements/test.txt \
+       -r requirements/docs.txt \
+       -r requirements/lint.txt \
+    && python -m pip install -e .
 
 ENV PYRAMID_INI environ.ini
