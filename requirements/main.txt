@@ -1,6 +1,7 @@
 beaker
 celery[sqlalchemy]
 cnx-archive
+cnx-common
 cnx-epub[collation]
 jinja2
 openstax-accounts>=1.0.0

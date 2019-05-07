@@ -15,6 +15,7 @@ try:
 except ImportError:
     from urllib2 import unquote
 
+from cnxcommon.urlslug import generate_slug
 from cnxdb.ident_hash import (
     join_ident_hash as upstream_join_ident_hash,
     split_ident_hash as upstream_split_ident_hash,
@@ -60,7 +61,17 @@ def split_ident_hash(*args, **kwargs):
 join_ident_hash = upstream_join_ident_hash
 
 
+def amend_tree_with_slugs(tree, title_seq=[]):
+    """Places the 'slug' key value pair within the tree's node items."""
+    title_seq = title_seq + [tree['title']]
+    tree['slug'] = generate_slug(*title_seq)
+    if 'contents' in tree:
+        for node in tree['contents']:
+            amend_tree_with_slugs(node, title_seq)
+
+
 __all__ = (
+    'amend_tree_with_slugs',
     'issequence',
     'join_ident_hash',
     'parse_archive_uri',
