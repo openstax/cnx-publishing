@@ -20,6 +20,19 @@ from .testing import db_connect
 from .test_db import BaseDatabaseIntegrationTestCase
 
 
+def flatten_tree(tree):
+    """Flatten a tree to a linear sequence of values."""
+    yield dict([
+        (k, v)
+        for k, v in tree.items()
+        if k != 'contents'
+    ])
+    if 'contents' in tree:
+        for x in tree['contents']:
+            for y in flatten_tree(x):
+                yield y
+
+
 class AmendWithBakeTestCase(BaseDatabaseIntegrationTestCase):
 
     @property
@@ -96,6 +109,20 @@ WHERE
         baked_tree = cursor.fetchone()[0]
         self.assertIn(composite_doc.ident_hash,
                       cnxepub.flatten_tree_to_ident_hashes(baked_tree))
+        # ... and with slug values
+        slugs = [x['slug'] for x in flatten_tree(baked_tree)]
+        expected_slugs = [
+            u'book-of-infinity',
+            u'part-one',
+            u'document-one',
+            u'document-two',
+            u'part-two',
+            u'document-three',
+            u'document-four',
+            u'other-things',
+            u'made-up-of-other-things',
+        ]
+        self.assertEqual(slugs, expected_slugs)
 
         # Ensure the changes to a document content were persisted.
         content_to_check = [
