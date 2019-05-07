@@ -7,10 +7,20 @@ from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 
 
+def _filter_requirement(req):
+    req = req.strip()
+    # skip comments and dash options (e.g. `-e` & `-r`)
+    return bool(req and req[0] not in '#-')
+
+
 def read_from_requirements_txt(filepath):
     f = os.path.join(here, filepath)
     with open(f) as fb:
-        return tuple([x.strip() for x in fb if not x.strip().startswith('#')])
+        return tuple([
+            x.strip()
+            for x in fb
+            if _filter_requirement(x)
+        ])
 
 
 install_requires = read_from_requirements_txt('requirements/main.txt')
