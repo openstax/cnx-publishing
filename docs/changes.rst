@@ -1,3 +1,13 @@
+0.16.4
+------
+
+- Use requirements.txt files for dependencies
+- Add base Makefile to the project
+- Run tests on Travis-CI the same as one would run them in development (#…
+- Remove redundant mention of the cnx-epub dependency
+- Filter out invalid requirements that start with # or -
+- Build the container from the requirement/*.txt files
+
 0.16.3
 ------
 
