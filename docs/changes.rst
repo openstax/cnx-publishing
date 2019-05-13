@@ -1,3 +1,14 @@
+0.17.0
+------
+
+- Generate the content slug during the persistence of baked content
+  to the database (#255)
+
+  - Supply slug values when inserting the baked tree
+  - Add utility func to amend the tree with slug values
+  - Add the slug value during tree insertion
+  - Fix tests associated with cnx-db tree_to_json changes
+
 0.16.4
 ------
 
