@@ -15,6 +15,15 @@ done
 python -m pytest --strict ${@:-cnxpublishing/tests}
 python -m coverage html
 
+# Check for PyPi Release Errors
+if [[ "$TRAVIS" == "true" ]]
+then
+    # check the distribution
+    python setup.py bdist_wheel
+    pip install twine
+    twine check dist/*
+fi
+
 # Report test coverage to codecov.io
 # See also: https://docs.codecov.io/docs/testing-with-docker
 if [ "$TRAVIS" = "true" ];
