@@ -28,7 +28,7 @@ x-app-defaults: &app-defaults
 
 services:
   db:
-    image: openstax/cnx-db:latest
+    build: https://github.com/openstax/cnx-db.git
     volumes:
       - pgdata:/var/lib/postgresql/data
 
