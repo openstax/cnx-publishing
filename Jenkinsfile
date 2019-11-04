@@ -37,9 +37,6 @@ pipeline {
     stage('Publish Release') {
       when { buildingTag() }
       environment {
-        TWINE_CREDS = credentials('pypi-openstax-creds')
-        TWINE_USERNAME = "${TWINE_CREDS_USR}"
-        TWINE_PASSWORD = "${TWINE_CREDS_PSW}"
         release = meta.version()
       }
       steps {
@@ -49,8 +46,6 @@ pipeline {
           sh "docker push openstax/cnx-publishing:${release}"
           sh "docker push openstax/cnx-publishing:latest"
         }
-        // Release the Python package to the package index
-        sh "docker run --rm -e TWINE_USERNAME -e TWINE_PASSWORD --volume ${WORKSPACE}:/usr/src/:rw --workdir /usr/src/ python:2.7 /bin/bash -c \"pip install -q twine && python2 setup.py bdist_wheel && twine upload dist/*\""
       }
     }
   }
