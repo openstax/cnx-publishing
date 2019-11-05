@@ -36,11 +36,12 @@ def post_publication_processing(event, cursor):
     celery_app = get_current_registry().celery_app
 
     # Check baking is not already queued.
-    cursor.execute('SELECT result_id::text '
-                   'FROM document_baking_result_associations '
+    cursor.execute('SELECT status '
+                   'FROM document_baking_result_associations d '
+                   'JOIN celery_taskmeta t ON d.result_id::text = t.task_id '
                    'WHERE module_ident = %s', (module_ident,))
     for result in cursor.fetchall():
-        state = celery_app.AsyncResult(result[0]).state
+        state = result[0]
         if state in ('QUEUED', 'STARTED', 'RETRY'):
             logger.debug('Already queued module_ident={} ident_hash={}'.format(
                 module_ident, ident_hash))
