@@ -1,3 +1,12 @@
+0.17.1
+------
+
+- Change docker-compose db to build from github master
+- Add check for pypi release errors
+- Remove upload pypi step in Jenkinsfile
+- Remove `<4.1.0` restriction for pytest in requirements/test.txt (#261)
+- Bypass celery error when queueing books for post publication (#260)
+
 0.17.0
 ------
 
