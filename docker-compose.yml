@@ -20,7 +20,7 @@ x-test-environ-vars: &test-environ-vars
   
   
 x-app-defaults: &app-defaults
-  build: .    
+  build: .
   volumes:
     - ./cnxpublishing:/src/cnxpublishing
     - ./docs:/src/docs
@@ -28,7 +28,7 @@ x-app-defaults: &app-defaults
 
 services:
   db:
-    build: https://github.com/openstax/cnx-db.git
+    image: openstax/cnx-db
     volumes:
       - pgdata:/var/lib/postgresql/data
 
