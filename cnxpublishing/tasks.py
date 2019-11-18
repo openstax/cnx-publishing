@@ -77,11 +77,18 @@ def includeme(config):
             Queue('deferred'),
         ),
     )
+
     # Override the existing Task class.
     config.registry.celery_app.Task = PyramidAwareTask
 
     # Set the default celery app so that the AsyncResult class is able
     # to assume the celery backend.
     config.registry.celery_app.set_default()
+
+    # Initialize celery database tables early
+    from celery.backends.database.session import SessionManager
+    session = SessionManager()
+    engine = session.get_engine(config.registry.celery_app.backend.url)
+    session.prepare_models(engine)
 
     config.add_directive('make_celery_app', _make_celery_app)
