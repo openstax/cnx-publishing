@@ -1,3 +1,8 @@
+0.17.3
+______
+
+- Update dependency versions of cnx-epub and waitress to 0.21.0 and 1.4.2, respectively
+
 0.17.1
 ------
 
