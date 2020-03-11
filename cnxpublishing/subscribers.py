@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import logging
 
+from celery.exceptions import SoftTimeLimitExceeded
 from cnxarchive.scripts import export_epub
 from pyramid.events import subscriber
 from pyramid.threadlocal import get_current_registry
@@ -102,87 +103,97 @@ def _get_recipe_ids(module_ident, cursor):
     return cursor.fetchone()
 
 
-@task(bind=True)
+@task(bind=True, time_limit=14400, soft_time_limit=10800)
 @with_db_cursor
 def baking_processor(self, module_ident, ident_hash, cursor=None):
-    if self.request.retries == 0:
-        cursor.execute("""\
+    try:
+        if self.request.retries == 0:
+            cursor.execute("""\
 SELECT module_ident, ident_hash(uuid, major_version, minor_version)
 FROM modules NATURAL JOIN modulestates
 WHERE uuid = %s AND statename IN ('post-publication', 'processing')
 ORDER BY major_version DESC, minor_version DESC""",
-                       (utils.split_ident_hash(ident_hash)[0],))
-        latest_module_ident = cursor.fetchone()
-        if latest_module_ident:
-            if latest_module_ident[0] != module_ident:
-                logger.debug("""\
+                           (utils.split_ident_hash(ident_hash)[0],))
+            latest_module_ident = cursor.fetchone()
+            if latest_module_ident:
+                if latest_module_ident[0] != module_ident:
+                    logger.debug("""\
 More recent version (module_ident={} ident_hash={}) in queue. \
 Move this message (module_ident={} ident_hash={}) \
 to the deferred (low priority) queue"""
-                             .format(latest_module_ident[0],
-                                     latest_module_ident[1],
-                                     module_ident, ident_hash))
+                                 .format(latest_module_ident[0],
+                                         latest_module_ident[1],
+                                         module_ident, ident_hash))
 
-                raise self.retry(queue='deferred')
-        else:
-            # In case we can't find the latest version being baked, we'll
-            # continue with baking this one
-            pass
+                    raise self.retry(queue='deferred')
+            else:
+                # In case we can't find the latest version being baked, we'll
+                # continue with baking this one
+                pass
 
-    logger.debug('Starting baking module_ident={} ident_hash={}'
-                 .format(module_ident, ident_hash))
-
-    recipe_ids = _get_recipe_ids(module_ident, cursor)
-
-    state = 'current'
-    if recipe_ids[0] is None:
-        remove_baked(ident_hash, cursor=cursor)
-        logger.debug('Finished unbaking module_ident={} ident_hash={} '
-                     'with a final state of \'{}\'.'
-                     .format(module_ident, ident_hash, state))
-        update_module_state(cursor, module_ident, state, None)
-        return
-
-    try:
-        binder = export_epub.factory(ident_hash)
-    except:  # noqa: E722
-        logger.exception('Logging an uncaught exception during baking'
-                         'ident_hash={} module_ident={}'
-                         .format(ident_hash, module_ident))
-        # FIXME If the top module doesn't exist, this is going to fail.
-        update_module_state(cursor, module_ident, 'errored', None)
-        raise
-    finally:
-        logger.debug('Exported module_ident={} ident_hash={}'
+        logger.debug('Starting baking module_ident={} ident_hash={}'
                      .format(module_ident, ident_hash))
 
-    cursor.execute("""\
-SELECT submitter, submitlog FROM modules
-WHERE ident_hash(uuid, major_version, minor_version) = %s""",
-                   (ident_hash,))
-    publisher, message = cursor.fetchone()
-    remove_baked(ident_hash, cursor=cursor)
+        recipe_ids = _get_recipe_ids(module_ident, cursor)
 
-    for recipe_id in recipe_ids:
-        try:
-            bake(binder, recipe_id, publisher, message, cursor=cursor)
-        except Exception:
-            if state == 'current' and recipe_ids[1] is not None:
-                state = 'fallback'
-                continue
-            else:
-                state = 'errored'
-                # TODO rollback to pre-removal of the baked content??
-                cursor.connection.rollback()
-                logger.exception('Uncaught exception during baking')
-                update_module_state(cursor, module_ident, state, recipe_id)
-                raise
-        else:
-            logger.debug('Finished baking module_ident={} ident_hash={} '
+        state = 'current'
+        if recipe_ids[0] is None:
+            remove_baked(ident_hash, cursor=cursor)
+            logger.debug('Finished unbaking module_ident={} ident_hash={} '
                          'with a final state of \'{}\'.'
                          .format(module_ident, ident_hash, state))
-            update_module_state(cursor, module_ident, state, recipe_id)
-            break
+            update_module_state(cursor, module_ident, state, None)
+            return
+
+        try:
+            binder = export_epub.factory(ident_hash)
+        except:  # noqa: E722
+            logger.exception('Logging an uncaught exception during baking'
+                             'ident_hash={} module_ident={}'
+                             .format(ident_hash, module_ident))
+            # FIXME If the top module doesn't exist, this is going to fail.
+            update_module_state(cursor, module_ident, 'errored', None)
+            raise
+        finally:
+            logger.debug('Exported module_ident={} ident_hash={}'
+                         .format(module_ident, ident_hash))
+
+        cursor.execute("""\
+SELECT submitter, submitlog FROM modules
+WHERE ident_hash(uuid, major_version, minor_version) = %s""",
+                       (ident_hash,))
+        publisher, message = cursor.fetchone()
+        remove_baked(ident_hash, cursor=cursor)
+
+        for recipe_id in recipe_ids:
+            try:
+                bake(binder, recipe_id, publisher, message, cursor=cursor)
+            except Exception:
+                if state == 'current' and recipe_ids[1] is not None:
+                    state = 'fallback'
+                    logger.exception('Exception while baking module {}.'
+                                     'Falling back...'
+                                     .format(module_ident))
+                    continue
+                else:
+                    state = 'errored'
+                    # TODO rollback to pre-removal of the baked content??
+                    cursor.connection.rollback()
+                    logger.exception('Uncaught exception while'
+                                     'baking module {}'
+                                     .format(module_ident))
+                    update_module_state(cursor, module_ident, state, recipe_id)
+                    raise
+            else:
+                logger.debug('Finished baking module_ident={} ident_hash={} '
+                             'with a final state of \'{}\'.'
+                             .format(module_ident, ident_hash, state))
+                update_module_state(cursor, module_ident, state, recipe_id)
+                break
+    except SoftTimeLimitExceeded:
+        logger.exception('Baking timed out for module {}'
+                         .format(module_ident))
+        update_module_state(cursor, module_ident, 'errored', None)
 
 
 @subscriber(events.ChannelProcessingStartUpEvent)
