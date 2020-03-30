@@ -1,3 +1,25 @@
+0.17.7
+------
+
+- upgraded cnx-db from 3.5.2 to 3.5.3 (#273)
+
+0.17.6
+------
+
+- Bump waitress from 1.4.2 to 1.4.3 in /requirements (#270)
+- Extra logging, add soft + hard timeout to baking task (#271)
+- Bump urllib3 for security fix (#272)
+
+0.17.5
+------
+
+- Unrestrict recipes dependency (#269)
+
+0.17.4
+------
+
+- Update waitress dependency to 1.4.2 (#268)
+
 0.17.3
 ______
 
