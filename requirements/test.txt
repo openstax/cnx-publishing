@@ -1,5 +1,5 @@
 mock==1.0.1 ; python_version <= '2.7'
-pytest
+pytest==5.4.1
 pytest-cov
 pytest-mock
 pytest-runner
