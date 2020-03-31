@@ -31,7 +31,7 @@ PasteDeploy==2.0.1
 PasteScript==3.2.0
 plaster==1.0
 plaster-pastedeploy==0.7
-psycopg2==2.8.3
+psycopg2==2.8.4
 PyICU==2.3.1
 pyparsing==2.4.2
 pyramid==1.10.4
