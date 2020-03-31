@@ -1,7 +1,7 @@
 mock==1.0.1 ; python_version <= '2.7'
 pytest
 pytest-cov
-pytest-mock
+pytest-mock==3.0.0
 pytest-runner
 vcrpy-unittest
 webtest
