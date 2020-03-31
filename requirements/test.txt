@@ -3,5 +3,5 @@ pytest
 pytest-cov
 pytest-mock
 pytest-runner
-vcrpy-unittest
+vcrpy-unittest==0.1.7
 webtest
