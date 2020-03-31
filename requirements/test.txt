@@ -4,4 +4,4 @@ pytest-cov
 pytest-mock
 pytest-runner
 vcrpy-unittest
-webtest
+webtest==2.0.34
