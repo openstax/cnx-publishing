@@ -1,3 +1,9 @@
+0.17.8
+------
+
+- Scheduled weekly dependency update for week 14 (#308)
+- added pyup.yml config file so that individual PRs aren't made for each dependency update (#307)
+
 0.17.7
 ------
 
