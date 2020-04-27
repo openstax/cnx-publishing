@@ -1,3 +1,8 @@
+0.17.9
+------
+
+- Scheduled weekly dependency update for week 16 (#311)
+
 0.17.8
 ------
 
