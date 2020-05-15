@@ -1,3 +1,18 @@
+0.17.12
+------
+
+- Update cnx common and archive dependency versions (#318)
+
+0.17.11
+------
+
+- Update cnx common and archive dependency versions (#316)
+
+0.17.10
+------
+
+- Update cnx-common, cnx-epub, lxml pins (#314)
+
 0.17.9
 ------
 
