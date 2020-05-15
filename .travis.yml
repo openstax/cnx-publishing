@@ -8,7 +8,7 @@ services:
 
 before_install:
   # Linting
-  - pip install flake8
+  - pip install -r requirements/lint.txt
   - flake8 --exclude=cnxpublishing/tests *.py cnxpublishing/
   - flake8 --max-line-length=200 cnxpublishing/tests
 
