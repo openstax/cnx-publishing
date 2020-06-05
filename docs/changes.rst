@@ -1,3 +1,18 @@
+0.17.15
+------
+
+- Dependency update including cnx-archive dependencies
+
+0.17.14
+------
+
+- Update cnx-epub
+
+0.17.13
+------
+
+- Update cnxmlutils to 2.0
+
 0.17.12
 ------
 
