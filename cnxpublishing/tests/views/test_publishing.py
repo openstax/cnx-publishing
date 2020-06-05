@@ -60,7 +60,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         """
         setup_mapping = {
             use_cases.BOOK: use_cases.setup_BOOK_in_archive,
-            }
+        }
         try:
             setup = setup_mapping[use_case]
         except:  # noqa: E722
@@ -75,7 +75,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         checker_mapping = {
             use_cases.BOOK: use_cases.check_BOOK_in_archive,
             use_cases.REVISED_BOOK: use_cases.check_REVISED_BOOK_in_archive,
-            }
+        }
         try:
             checker = checker_mapping[use_case]
         except:  # noqa: E722
@@ -171,7 +171,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         data = {
             'username': username,
             'password': password,
-            }
+        }
         resp = self.app.post(path, data)
         return resp
 
@@ -260,7 +260,7 @@ class PublishingAPIFunctionalTestCase(BaseFunctionalViewTestCase):
         uids = (
             'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
             'rings', 'sarblyth',
-            )
+        )
         for uid in uids:
             # -- Check the form has the correct values.
             resp = self.app_get_license_acceptance(
@@ -475,7 +475,7 @@ SELECT 'eek' FROM modules WHERE uuid = ANY (%s)""", (uuids,))
         uids = (
             'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
             'rings', 'sarblyth',
-            )
+        )
         for uid in uids:
             # -- Check the form has the correct values.
             resp = self.app_get_license_acceptance(
@@ -615,7 +615,7 @@ GROUP BY user_id, accepted
         uids = (
             'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
             'rings', 'sarblyth',
-            )
+        )
         for uid in uids:
             # -- Check the form has the correct values.
             resp = self.app_get_license_acceptance(
@@ -774,7 +774,7 @@ VALUES (%s, %s, 'publish')""", (id, publisher,))
         uids = (
             'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
             'rings', 'sarblyth',
-            )
+        )
         for uid in uids:
             # -- Check the form has the correct values.
             resp = self.app_get_license_acceptance(
@@ -900,7 +900,7 @@ GROUP BY user_id, accepted
         uids = (
             'charrose', 'frahablar', 'impicky', 'marknewlyn', 'ream',
             'rings', 'sarblyth',
-            )
+        )
         for uid in uids:
             # -- Check the form has the correct values.
             resp = self.app_get_license_acceptance(
@@ -1011,7 +1011,7 @@ GROUP BY user_id, accepted
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
-            ]
+        ]
         for id in ids:
             resp = self.app_post_acl(
                 id, [{'uid': publisher, 'permission': 'publish'}],
@@ -1022,7 +1022,7 @@ GROUP BY user_id, accepted
             'publishers': 'Publisher', 'copyright_holders': 'Copyright Holder',
             'editors': 'Editor', 'illustrators': 'Illustrator',
             'translators': 'Translator', 'authors': 'Author',
-            }
+        }
         for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):
             id = split_ident_hash(model.id)[0]
             attributed_roles = []
@@ -1130,11 +1130,11 @@ FROM modules ORDER BY major_version ASC""")
                     # [uuid, moduleid]: [[major_version, minor_version, version], ...]
                     key_sep.join([binder_uuid, 'col10000']): [
                         [1, 1, '1.1'],  # REVISED_BOOK
-                        ],
+                    ],
                     key_sep.join([document_uuid, 'm10000']): [
                         [1, None, '1.1'],
-                        ],
-                    }
+                    ],
+                }
                 self.assertEqual(expected_records, records)
 
                 # Check the tree...
@@ -1222,8 +1222,8 @@ WHERE portal_type = 'Collection'""")
         self.assertEqual(len(error_messages), 1)
         self.assertEqual(error_messages[0]['code'], 22)
         self.assertEqual(
-                error_messages[0]['message'],
-                'Resource files cannot be bigger than 1MB (big-file.txt)')
+            error_messages[0]['message'],
+            'Resource files cannot be bigger than 1MB (big-file.txt)')
 
         self.app_check_state(publication_id, 'Failed/Error',
                              headers=api_key_headers)
@@ -1270,7 +1270,7 @@ WHERE portal_type = 'Collection'""")
         ids = [
             split_ident_hash(use_cases.REVISED_BOOK.id)[0],
             split_ident_hash(use_cases.REVISED_BOOK[0][0].id)[0],
-            ]
+        ]
         for id in ids:
             resp = self.app_post_acl(
                 id, [{'uid': publisher, 'permission': 'publish'}],
@@ -1280,7 +1280,7 @@ WHERE portal_type = 'Collection'""")
             'publishers': 'Publisher', 'copyright_holders': 'Copyright Holder',
             'editors': 'Editor', 'illustrators': 'Illustrator',
             'translators': 'Translator', 'authors': 'Author',
-            }
+        }
         for model in (use_cases.REVISED_BOOK, use_cases.REVISED_BOOK[0][0],):
             id = split_ident_hash(model.id)[0]
             attributed_roles = []

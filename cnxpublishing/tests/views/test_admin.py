@@ -25,7 +25,7 @@ from ..testing import (
     integration_test_settings,
     db_connection_factory,
     init_db,
-    )
+)
 
 
 def add_data(self):
@@ -337,7 +337,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
             ('sort', 'STATE ASC'),
             ('author', 'charrose'),
             ('status_filter', 'PENDING'),
-            ]))
+        ]))
 
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
@@ -381,7 +381,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
         request = testing.DummyRequest(params=MultiDict([
             ('page', 1),
             ('number', 1),
-            ]))
+        ]))
         from ...views.admin import admin_content_status
         content = admin_content_status(request)
         self.assertEqual('PENDING',
@@ -403,7 +403,7 @@ class ContentStatusViewsTestCase(unittest.TestCase):
     def test_admin_content_status_bad_page_number(self):
         request = testing.DummyRequest(params=MultiDict([
             ('page', 'abc'),
-            ]))
+        ]))
 
         from ...views.admin import admin_content_status
         with self.assertRaises(HTTPBadRequest) as caught_exc:
@@ -460,7 +460,7 @@ Hi there!
             ('FAILURE', 'fa fa-close state-icon failure'),
             ('REVOKED', 'fa fa-exclamation-triangle state-icon unknown'),
             ('UNKNOWN', 'fa fa-exclamation-triangle state-icon unknown')
-            ], state_icons)
+        ], state_icons)
 
     def test_admin_content_status_single_page(self):
         request = testing.DummyRequest()

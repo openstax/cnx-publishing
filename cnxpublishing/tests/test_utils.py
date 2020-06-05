@@ -105,9 +105,9 @@ def test_amend_tree_with_slugs():
                 '<span class="os-number">1</span>'
                 '<span class="os-divider"> </span>'
                 '<span class="os-text">Chapter One</span>'
-             ),
-             'slug': '1-chapter-one',
-             'contents': [
+            ),
+                'slug': '1-chapter-one',
+                'contents': [
                 {'slug': '1-1-apple',
                  'title': (
                      '<span class="os-number">1.1</span>'
@@ -126,7 +126,7 @@ def test_amend_tree_with_slugs():
                      'Problems &amp; Exercises'
                      '</span>'
                  )}]
-             },
+            },
             {'title': (
                 '<span class="os-number">2</span>'
                 '<span class="os-divider"> </span>'
