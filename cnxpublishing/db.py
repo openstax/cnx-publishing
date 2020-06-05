@@ -830,7 +830,8 @@ WHERE p.id = %s
                                            are_roles_accepted)
 
     # Are all the documents ready for publication?
-    state_lump = set([l and r for l, r in publication_state_mapping.values()])
+    state_lump = set([license and roles for license, roles
+                      in publication_state_mapping.values()])
     is_publish_ready = not (False in state_lump) and not (None in state_lump)
     change_state = "Done/Success"
     if not is_publish_ready:
