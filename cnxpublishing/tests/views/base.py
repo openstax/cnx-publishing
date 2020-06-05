@@ -19,7 +19,7 @@ from ..testing import (
     integration_test_settings,
     db_connection_factory,
     init_db,
-    )
+)
 
 
 class EPUBMixInTestCase(object):
@@ -101,7 +101,7 @@ class BaseFunctionalViewTestCase(unittest.TestCase, EPUBMixInTestCase):
             ['4e8', 'no-trust', None],
             ['b07', 'some-trust', ['g:trusted-publishers']],
             ['dev', 'developer', ['g:trusted-publishers']],
-            )
+        )
         # key_info = [dict(zip(key_info_keys, value)) for value in key_info]
         with self.db_connect() as db_conn:
             with db_conn.cursor() as cursor:

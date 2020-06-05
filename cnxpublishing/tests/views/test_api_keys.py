@@ -13,7 +13,7 @@ from ..testing import (
     integration_test_settings,
     db_connection_factory,
     init_db,
-    )
+)
 
 
 class ApiKeyViewsTestCase(unittest.TestCase):
@@ -47,7 +47,7 @@ class ApiKeyViewsTestCase(unittest.TestCase):
         api_keys = [
             ['abc', "ABC", ['g:publishers']],
             ['xyz', "XYZ", ['g:trusted-publishers']],
-            ]
+        ]
         insert_stmt = "INSERT INTO api_keys (key, name, groups) " \
                       "VALUES (%s, %s, %s)" \
                       "RETURNING id, key, name, groups"
