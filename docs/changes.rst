@@ -1,3 +1,8 @@
+0.17.16
+------
+
+- Dependency update including cnx-archive dependencies
+
 0.17.15
 ------
 
@@ -141,7 +146,7 @@ ______
 ------
 
 - Set Cache-Control headers (#235)
-     
+
 0.13.0
 ------
 
