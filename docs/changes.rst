@@ -1,3 +1,15 @@
+0.17.19
+------
+
+- Dependency update including cnx-archive dependencies (#334)
+
+
+0.17.18
+------
+
+- Dependency update including cnx-archive dependencies (#331)
+
+
 0.17.16
 ------
 
