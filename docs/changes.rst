@@ -1,3 +1,24 @@
+0.17.23
+------
+
+- Dependency update including cnx-archive dependencies (#343)
+
+0.17.22
+------
+
+- Dependency update including cnx-archive dependencies (#342)
+
+0.17.21
+------
+
+- Dependency update including cnx-archive dependencies (#340)
+
+0.17.20
+------
+
+- Dependency update including cnx-archive dependencies (#338)
+- Add pyup: update no pragma to amqp (#336)
+
 0.17.19
 ------
 
