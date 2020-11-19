@@ -1,3 +1,8 @@
+0.17.24
+------
+
+- Dependency update including cnx-archive dependencies (`#345 <https://github.com/openstax/cnx-publishing/pull/345>`_)
+
 0.17.23
 ------
 
