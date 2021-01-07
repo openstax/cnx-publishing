@@ -25,7 +25,7 @@ kombu==4.6.11 # pyup: update no, kombu dropped support for python 2.7
 lxml==4.4.3 # pyup: update no, Unicode problem in lxml 4.5.0 cnx#924
 MarkupSafe==1.1.1
 openstax-accounts==1.0.0
-packaging==20.7
+packaging==20.8
 parsimonious==0.8.1
 Paste==3.5.0
 PasteDeploy==2.1.1
