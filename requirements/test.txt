@@ -1,6 +1,6 @@
 mock==3.0.5; python_version <= '2.7' # pyup: update no, mock dropped support for python 2.7
 pytest==4.6.9 # pyup: update no, pytest dropped support for python 2.7
-pytest-cov==2.10.1
+pytest-cov==2.11.1
 pytest-mock==2.0.0 # pyup: update no, pytest-mock dropped support for python 2.7
 pytest-runner==5.2
 vcrpy-unittest==0.1.7
