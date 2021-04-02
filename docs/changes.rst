@@ -1,3 +1,17 @@
+0.17.29
+-------
+
+- Upgrade cnx-archive from 4.15.18 to 4.15.20
+- Update zope.interface from 5.2.0 to 5.3.0
+- Update urllib3 from 1.26.3 to 1.26.4
+- Update sqlalchemy from 1.3.23 to 1.4.4
+- Update flake8 from 3.8.4 to 3.9.0
+- Downgrade pyramid from 2.0 to 1.10.7 and exclude from pyup
+- Downgrade waitress from 2.0.0 to 1.4.4 and exclude from pyup
+- Update waitress from 1.4.4 to 2.0.0
+- Update pyramid from 1.10.7 to 2.0
+
+
 0.17.28
 -------
 
