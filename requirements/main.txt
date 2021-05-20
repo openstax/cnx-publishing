@@ -18,7 +18,7 @@ cnx-cssselect2==0.2.3
 db-migrator==1.1.0
 funcsigs==1.0.2
 future==0.18.2
-hupper==1.10.2
+hupper==1.10.3
 idna==2.10 # pyup: update no, dropped support for python 2.7
 Jinja2==2.11.3
 kombu==4.6.11 # pyup: update no, kombu dropped support for python 2.7
