@@ -1,3 +1,17 @@
+0.17.30
+-------
+- Upgrade cnx-archive from 4.15.20 to 4.15.21
+- added exception messages for Jinja2 and MarkUp safe due to python support
+- Update pytest-cov from 2.11.1 to 2.12.0
+- Update zope.interface from 5.3.0 to 5.4.0
+- Update sqlalchemy from 1.4.4 to 1.4.15
+- Update six from 1.15.0 to 1.16.0
+- Update pyicu from 2.6 to 2.7.3
+- Update pastescript from 3.2.0 to 3.2.1
+- Update hupper from 1.10.2 to 1.10.3
+- Update billiard from 3.6.3.0 to 3.6.4.0
+- Update flake8 from 3.9.0 to 3.9.2
+
 0.17.29
 -------
 
