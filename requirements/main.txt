@@ -48,7 +48,7 @@ requests==2.25.1
 rhaptos.cnxmlutils==2.1.1
 sanction==0.4.1
 six==1.16.0
-SQLAlchemy==1.4.15
+SQLAlchemy==1.4.17
 tinycss2==0.6.1 # pyup: update no, tinycss2 dropped support for python 2.7
 translationstring==1.4
 tzlocal==2.1
