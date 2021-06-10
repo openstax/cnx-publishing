@@ -1,3 +1,10 @@
+0.17.31
+-------
+- Update certifi from 2020.12.5 to 2021.5.30
+- Update sqlalchemy from 1.4.15 to 1.4.17
+- Update urllib3 from 1.26.4 to 1.26.5
+- Update pytest-cov from 2.12.0 to 2.12.1
+
 0.17.30
 -------
 - Upgrade cnx-archive from 4.15.20 to 4.15.21
