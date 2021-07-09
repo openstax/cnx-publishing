@@ -1,3 +1,12 @@
+0.17.32
+-------
+- Upgrade cnx-archive from 4.15.23 to 4.15.24
+- Added pyup exception for psycopg2 due to loss of python 2.7 support
+- Added pyup exception for packaging due to loss of python 2.7 support
+- Update urllib3 from 1.26.5 to 1.26.6
+- Update sqlalchemy from 1.4.17 to 1.4.20
+- Update pyicu from 2.7.3 to 2.7.4
+
 0.17.31
 -------
 - Update certifi from 2020.12.5 to 2021.5.30
