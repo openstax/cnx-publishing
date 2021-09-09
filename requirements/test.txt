@@ -4,4 +4,4 @@ pytest-cov==2.12.1
 pytest-mock==2.0.0 # pyup: update no, pytest-mock dropped support for python 2.7
 pytest-runner==5.2 # pyup: update no, pytest-runner dropped support for python 2.7
 vcrpy-unittest==0.1.7
-webtest==2.0.35
+webtest==3.0.0
