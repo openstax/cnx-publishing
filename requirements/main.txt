@@ -33,7 +33,7 @@ PasteScript==3.2.1
 plaster==1.0
 plaster-pastedeploy==0.7
 psycopg2==2.8.6 # pyup: update no, dropped support for python 2.7
-PyICU==2.7.4
+PyICU==2.8.1
 pyparsing==2.4.7
 pyramid==1.10.7 # pyup: update no, dropped support for python 2.7
 pyramid-jinja2==2.8
